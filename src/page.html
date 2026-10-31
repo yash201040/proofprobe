@@ -89,8 +89,8 @@ dialog{width:min(420px,calc(100vw - 32px));padding:22px;border:1px solid var(--l
     <p id="submitHint" class="state warn" style="margin-top:8px"></p>
     <p id="submitStatus" role="status" style="margin-top:10px"></p><ul id="log" class="log"></ul></div>
 </div></section>
-<dialog id="unlockBox" aria-labelledby="unlockTitle"><h3 id="unlockTitle">Edit this page</h3><label for="password">Enter this page's password</label><input id="password" type="password" autocomplete="current-password"><p class="state err" id="unlockErr" role="alert"></p><div class="dialogrow"><button type="button" class="ghost" id="unlockCancel">Cancel</button><button type="button" id="unlockGo">Continue</button></div></dialog>
-<footer class="notice">Privacy: anyone with this site's address can read every page, including research, documents and submitted answers. Saved answers stay out of view until submitted. Only someone with a page's password can edit it.</footer>
+<dialog id="unlockBox" aria-labelledby="unlockTitle"><h3 id="unlockTitle">Edit this page</h3><label for="password">Enter your profile password</label><input id="password" type="password" autocomplete="current-password"><p class="state err" id="unlockErr" role="alert"></p><div class="dialogrow"><button type="button" class="ghost" id="unlockCancel">Cancel</button><button type="button" id="unlockGo">Continue</button></div></dialog>
+<footer class="notice">Privacy: anyone with this site's address can read every page, including research, documents and submitted answers. Saved answers stay out of view until submitted. Only someone with a profile's password can edit its pages.</footer>
 </div>
 <script>
 const seg=location.pathname.split("/").filter(Boolean),onPage=seg.length===3;
@@ -241,7 +241,7 @@ async function showPage(){
   if(d.intro.length){renderBlocks($("intro"),d.intro);$("introBox").hidden=false}
   const ri=$("rerouteInfo");ri.textContent=d.reroute?"New direction requested: "+d.reroute.message:"";ri.hidden=!d.reroute;
   $("access").hidden=false;$("unlockBtn").hidden=d.editable||!d.hasPassword;$("lockBtn").hidden=!d.editable;
-  $("accessText").textContent=d.editable?"You can edit this page on this device.":d.hasPassword?"View only.":"View only. Editing isn't set up yet.";
+  $("accessText").textContent=d.editable?"You can edit all of "+d.name+"'s pages on this device.":d.hasPassword?"View only.":"View only. Editing isn't set up yet.";
   if(d.editable)showEdit(d);else showRead(d);
 }
 async function showDirectory(){

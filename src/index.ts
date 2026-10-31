@@ -54,8 +54,9 @@ interface Section { title: string; note?: string; first?: boolean; questions: Qu
 interface CaseRow {
   id: string; title: string; first_name: string; status: string; intro_json: string; questions_json: string; plan_json: string;
   created_at: string; updated_at: string; profile_id: string | null; slug: string | null;
-  password_hash: string | null; password_salt: string | null; pw_version: number; password_enc: string | null; password_iv: string | null;
+  password_hash: string | null; password_salt: string | null; password_enc: string | null; password_iv: string | null;
 }
+interface ProfileRow { id: string; slug: string; name: string; password_hash: string | null; password_salt: string | null; password_enc: string | null; password_iv: string | null; pw_version: number }
 
 async function freeSlug(env: Env, table: "profiles" | "cases", base: string, scope?: string) {
   for (let i = 1; ; i++) {
@@ -80,11 +81,22 @@ async function migrate(env: Env) {
   const cols = new Set((await env.DB.prepare("SELECT name FROM pragma_table_info('cases')").all()).results.map((r: any) => r.name));
   const add = [["profile_id", "TEXT"], ["slug", "TEXT"], ["password_hash", "TEXT"], ["password_salt", "TEXT"], ["pw_version", "INTEGER NOT NULL DEFAULT 0"], ["password_enc", "TEXT"], ["password_iv", "TEXT"]];
   for (const [name, type] of add) if (!cols.has(name)) await env.DB.prepare(`ALTER TABLE cases ADD COLUMN ${name} ${type}`).run();
+  const pcols = new Set((await env.DB.prepare("SELECT name FROM pragma_table_info('profiles')").all()).results.map((r: any) => r.name));
+  for (const [name, type] of [["password_hash", "TEXT"], ["password_salt", "TEXT"], ["password_enc", "TEXT"], ["password_iv", "TEXT"], ["pw_version", "INTEGER NOT NULL DEFAULT 0"]])
+    if (!pcols.has(name)) await env.DB.prepare(`ALTER TABLE profiles ADD COLUMN ${name} ${type}`).run();
   const old = await env.DB.prepare("SELECT id, title, first_name FROM cases WHERE profile_id IS NULL OR slug IS NULL").all<any>();
   const now = new Date().toISOString();
   for (const c of old.results) {
     const p = await profileFor(env, c.first_name, now);
     await env.DB.prepare("UPDATE cases SET profile_id = ?, slug = ? WHERE id = ?").bind(p.id, await freeSlug(env, "cases", slugify(c.title), p.id), c.id).run();
+  }
+  // Passwords moved from pages to profiles. Carry each one up, then clear the page copy.
+  const moved = await env.DB.prepare("SELECT id, profile_id, password_hash, password_salt, password_enc, password_iv FROM cases WHERE password_hash IS NOT NULL").all<any>();
+  for (const c of moved.results) {
+    await env.DB.batch([
+      env.DB.prepare("UPDATE profiles SET password_hash = ?, password_salt = ?, password_enc = ?, password_iv = ?, pw_version = pw_version + 1 WHERE id = ? AND password_hash IS NULL").bind(c.password_hash, c.password_salt, c.password_enc, c.password_iv, c.profile_id),
+      env.DB.prepare("UPDATE cases SET password_hash = NULL, password_salt = NULL, password_enc = NULL, password_iv = NULL WHERE id = ?").bind(c.id),
+    ]);
   }
 }
 
@@ -136,7 +148,7 @@ async function currentAnswers(env: Env, caseId: string) {
 const audit = (env: Env, caseId: string | null, actor: string, action: string, detail: string | null, ray: string) =>
   env.DB.prepare("INSERT INTO audit_log(case_id, actor, action, detail, ray_id, at) VALUES (?,?,?,?,?,?)").bind(caseId, actor, action, detail, ray, new Date().toISOString());
 
-const cookieName = (id: string) => `pp_edit_${id}`;
+const cookieName = (profileId: string) => `pp_edit_${profileId}`;
 function readCookie(request: Request, name: string) {
   for (const part of (request.headers.get("Cookie") ?? "").split(";")) {
     const [k, ...v] = part.trim().split("=");
@@ -144,11 +156,12 @@ function readCookie(request: Request, name: string) {
   }
   return null;
 }
-async function canEdit(request: Request, env: Env, row: CaseRow) {
-  const token = readCookie(request, cookieName(row.id));
+const profileOf = (env: Env, id: string | null) => env.DB.prepare("SELECT * FROM profiles WHERE id = ?").bind(id).first<ProfileRow>();
+async function canEdit(request: Request, env: Env, profile: ProfileRow) {
+  const token = readCookie(request, cookieName(profile.id));
   if (!token) return false;
-  const s = await env.DB.prepare("SELECT pw_version, expires_at FROM sessions WHERE token_hash = ? AND case_id = ?").bind(await sha256(token), row.id).first<any>();
-  return !!s && s.pw_version === row.pw_version && s.expires_at > new Date().toISOString();
+  const s = await env.DB.prepare("SELECT pw_version, expires_at FROM sessions WHERE token_hash = ? AND case_id = ?").bind(await sha256(token), profile.id).first<any>();
+  return !!s && s.pw_version === profile.pw_version && s.expires_at > new Date().toISOString();
 }
 
 const b64 = (u: ArrayBuffer | Uint8Array) => btoa(String.fromCharCode(...new Uint8Array(u instanceof Uint8Array ? u.buffer : u)));
@@ -161,30 +174,30 @@ async function seal(env: Env, text: string) {
 async function unseal(env: Env, enc: string, iv: string) {
   return new TextDecoder().decode(await crypto.subtle.decrypt({ name: "AES-GCM", iv: unb64(iv) }, await aesKey(env), unb64(enc)));
 }
-// Page passwords are hashed for checking and encrypted separately, so only the admin page can show them.
-async function setPagePassword(env: Env, id: string, password: string, actor: string, ray: string) {
-  const salt = randomToken(), sealed = await seal(env, password), now = new Date().toISOString();
+// Profile passwords are hashed for checking and encrypted separately, so only the admin page can show them.
+async function setProfilePassword(env: Env, id: string, password: string, actor: string, ray: string) {
+  const salt = randomToken(), sealed = await seal(env, password);
   await env.DB.batch([
-    env.DB.prepare("UPDATE cases SET password_hash = ?, password_salt = ?, password_enc = ?, password_iv = ?, pw_version = pw_version + 1, updated_at = ? WHERE id = ?").bind(await sha256(salt + password), salt, sealed.enc, sealed.iv, now, id),
+    env.DB.prepare("UPDATE profiles SET password_hash = ?, password_salt = ?, password_enc = ?, password_iv = ?, pw_version = pw_version + 1 WHERE id = ?").bind(await sha256(salt + password), salt, sealed.enc, sealed.iv, id),
     env.DB.prepare("DELETE FROM sessions WHERE case_id = ?").bind(id),
-    audit(env, id, actor, "password_changed", null, ray),
+    audit(env, null, actor, "password_changed", "profile=" + id, ray),
   ]);
 }
 
 // There is deliberately no lockout: visitors are welcome to try passwords while this is a showcase.
-async function unlock(request: Request, env: Env, row: CaseRow, ray: string) {
+async function unlock(request: Request, env: Env, profile: ProfileRow, ray: string) {
   const body = await request.json().catch(() => null) as { password?: unknown } | null;
   if (typeof body?.password !== "string" || body.password.length > 200) return json({ error: "bad_request" }, 400);
-  if (!row.password_hash || !row.password_salt) return json({ error: "no_password" }, 409);
-  if ((await sha256(row.password_salt + body.password)) !== row.password_hash) return json({ error: "wrong_password" }, 401);
+  if (!profile.password_hash || !profile.password_salt) return json({ error: "no_password" }, 409);
+  if ((await sha256(profile.password_salt + body.password)) !== profile.password_hash) return json({ error: "wrong_password" }, 401);
   const now = new Date();
   const token = randomToken(), expires = new Date(now.getTime() + SESSION_DAYS * 86_400_000).toISOString();
   await env.DB.batch([
-    env.DB.prepare("INSERT INTO sessions(token_hash, case_id, pw_version, expires_at) VALUES (?,?,?,?)").bind(await sha256(token), row.id, row.pw_version, expires),
+    env.DB.prepare("INSERT INTO sessions(token_hash, case_id, pw_version, expires_at) VALUES (?,?,?,?)").bind(await sha256(token), profile.id, profile.pw_version, expires),
     env.DB.prepare("DELETE FROM sessions WHERE expires_at < ?").bind(now.toISOString()),
-    audit(env, row.id, "editor", "unlock", null, ray),
+    audit(env, null, "editor", "unlock", "profile=" + profile.id, ray),
   ]);
-  return json({ ok: true }, 200, { "Set-Cookie": `${cookieName(row.id)}=${token}; Path=/; Max-Age=${SESSION_DAYS * 86_400}; HttpOnly; Secure; SameSite=Strict` });
+  return json({ ok: true }, 200, { "Set-Cookie": `${cookieName(profile.id)}=${token}; Path=/; Max-Age=${SESSION_DAYS * 86_400}; HttpOnly; Secure; SameSite=Strict` });
 }
 
 async function submit(env: Env, row: CaseRow, key: string, ray: string) {
@@ -231,23 +244,24 @@ async function directory(env: Env) {
 }
 
 async function pageApi(request: Request, env: Env, row: CaseRow, rest: string, ray: string) {
-  const editable = await canEdit(request, env, row);
+  const profile = await profileOf(env, row.profile_id);
+  if (!profile) return notFound();
+  const editable = await canEdit(request, env, profile);
   if (rest === "" && request.method === "GET") {
     const last = await env.DB.prepare("SELECT seq, submitted_at, payload FROM submissions WHERE case_id = ? ORDER BY seq DESC LIMIT 1").bind(row.id).first<any>();
-    const profile = await env.DB.prepare("SELECT slug, name FROM profiles WHERE id = ?").bind(row.profile_id).first<any>();
     return json({
-      title: row.title, name: profile?.name ?? row.first_name, profileSlug: profile?.slug, status: row.status,
+      title: row.title, name: profile.name, profileSlug: profile.slug, status: row.status,
       intro: parse(row.intro_json, []), plan: parse(row.plan_json, []), costUsd: await costUsd(env, row.id),
-      hasPassword: !!row.password_hash, editable, reroute: await openReroute(env, row.id), seq: last?.seq ?? null, submittedAt: last?.submitted_at ?? null,
+      hasPassword: !!profile.password_hash, editable, reroute: await openReroute(env, row.id), seq: last?.seq ?? null, submittedAt: last?.submitted_at ?? null,
       items: last ? parse(last.payload, []) : flatten(parse<Section[]>(row.questions_json, [])).map((q) => ({ ...q, answer: "" })),
       ...(editable ? { sections: parse(row.questions_json, []), answers: await currentAnswers(env, row.id), submissions: await summaries(env, row.id) } : {}),
     });
   }
-  if (rest === "unlock" && request.method === "POST") return unlock(request, env, row, ray);
+  if (rest === "unlock" && request.method === "POST") return unlock(request, env, profile, ray);
   if (rest === "lock" && request.method === "POST") {
-    const token = readCookie(request, cookieName(row.id));
+    const token = readCookie(request, cookieName(profile.id));
     if (token) await env.DB.prepare("DELETE FROM sessions WHERE token_hash = ?").bind(await sha256(token)).run();
-    return json({ ok: true }, 200, { "Set-Cookie": `${cookieName(row.id)}=; Path=/; Max-Age=0; HttpOnly; Secure; SameSite=Strict` });
+    return json({ ok: true }, 200, { "Set-Cookie": `${cookieName(profile.id)}=; Path=/; Max-Age=0; HttpOnly; Secure; SameSite=Strict` });
   }
   if (!(rest === "answers" && request.method === "PUT") && !((rest === "submit" || rest === "reroute") && request.method === "POST")) return notFound();
   if (!editable) return json({ error: "locked" }, 401);
@@ -346,28 +360,40 @@ async function adminSite(request: Request, env: Env, parts: string[], ray: strin
     return json({ ok: true }, 200, { "Set-Cookie": "pp_admin=; Path=/; Max-Age=0; HttpOnly; Secure; SameSite=Strict" });
   }
   if (what === "overview" && request.method === "GET") {
-    const r = await env.DB.prepare(`SELECT c.id, c.title, c.status, c.updated_at, c.questions_json, p.name AS profile, p.slug AS profile_slug, c.slug, c.password_hash IS NOT NULL AS has_password,
+    const profiles = await env.DB.prepare(`SELECT p.id, p.name, p.slug, p.password_hash IS NOT NULL AS has_password, (SELECT COUNT(*) FROM cases c WHERE c.profile_id = p.id) AS pages FROM profiles p ORDER BY p.created_at`).all();
+    const r = await env.DB.prepare(`SELECT c.id, c.title, c.status, c.updated_at, c.questions_json, p.name AS profile, p.slug AS profile_slug, c.slug,
       (SELECT COUNT(*) FROM submissions s WHERE s.case_id = c.id) AS submissions,
       (SELECT COUNT(*) FROM answers a WHERE a.case_id = c.id AND trim(a.text) != '') AS saved,
       EXISTS (SELECT 1 FROM reroutes r WHERE r.case_id = c.id AND r.handled_at IS NULL) AS rerouting,
       (SELECT COALESCE(SUM(e.usd_micro), 0) / 1000000.0 FROM cost_entries e WHERE e.case_id = c.id) AS cost_usd
       FROM cases c JOIN profiles p ON p.id = c.profile_id ORDER BY c.created_at`).all<any>();
-    return json({ pages: r.results.map(({ questions_json, ...x }) => ({ ...x, total: flatten(parse<Section[]>(questions_json, [])).length })) });
+    return json({ profiles: profiles.results, pages: r.results.map(({ questions_json, ...x }) => ({ ...x, total: flatten(parse<Section[]>(questions_json, [])).length })) });
+  }
+  if (what === "profiles" && !id && request.method === "POST") {
+    const b = await request.json().catch(() => null) as { name?: unknown } | null;
+    const name = typeof b?.name === "string" ? b.name.trim() : "";
+    if (!name || name.length > 80) return json({ error: "bad_name" }, 400);
+    return json(await profileFor(env, name, new Date().toISOString()), 201);
+  }
+  if (what === "profiles" && id) {
+    const profile = await profileOf(env, id);
+    if (!profile) return json({ error: "not_found" }, 404);
+    if (sub === "password" && request.method === "GET") {
+      await audit(env, null, "admin", "password_viewed", "profile=" + id, ray).run();
+      return json({ password: profile.password_enc && profile.password_iv ? await unseal(env, profile.password_enc, profile.password_iv) : null });
+    }
+    if (sub === "password" && request.method === "POST") {
+      const b = await request.json().catch(() => null) as { password?: unknown } | null;
+      if (typeof b?.password !== "string" || b.password.length < 4 || b.password.length > 200) return json({ error: "bad_password" }, 400);
+      await setProfilePassword(env, id, b.password, "admin", ray);
+      return json({ ok: true });
+    }
+    return notFound();
   }
   if (what !== "pages" || !id) return notFound();
   const row = await env.DB.prepare("SELECT * FROM cases WHERE id = ?").bind(id).first<CaseRow>();
   if (!row) return json({ error: "not_found" }, 404);
 
-  if (sub === "password" && request.method === "GET") {
-    await audit(env, id, "admin", "password_viewed", null, ray).run();
-    return json({ password: row.password_enc && row.password_iv ? await unseal(env, row.password_enc, row.password_iv) : null });
-  }
-  if (sub === "password" && request.method === "POST") {
-    const b = await request.json().catch(() => null) as { password?: unknown } | null;
-    if (typeof b?.password !== "string" || b.password.length < 4 || b.password.length > 200) return json({ error: "bad_password" }, 400);
-    await setPagePassword(env, id, b.password, "admin", ray);
-    return json({ ok: true });
-  }
   if (sub === "answers" && request.method === "PUT") {
     const b = await request.json().catch(() => null) as { answers?: Record<string, unknown> } | null;
     const known = new Set(flatten(parse<Section[]>(row.questions_json, [])).map((q) => q.id));
@@ -383,7 +409,7 @@ async function adminSite(request: Request, env: Env, parts: string[], ray: strin
   if (!sub && request.method === "GET") {
     const p = await env.DB.prepare("SELECT name FROM profiles WHERE id = ?").bind(row.profile_id).first<any>();
     const subs = await env.DB.prepare("SELECT * FROM submissions WHERE case_id = ? ORDER BY seq").bind(id).all<any>();
-    const auditRows = await env.DB.prepare("SELECT actor, action, detail, at FROM audit_log WHERE case_id = ? ORDER BY id DESC LIMIT 50").bind(id).all();
+    const auditRows = await env.DB.prepare("SELECT actor, action, detail, at FROM audit_log WHERE case_id = ? OR detail = ? ORDER BY id DESC LIMIT 50").bind(id, "profile=" + row.profile_id).all();
     const costs = await env.DB.prepare("SELECT usd_micro, label, at FROM cost_entries WHERE case_id = ? ORDER BY id").bind(id).all<any>();
     return json({
       title: row.title, profile: p?.name, status: row.status, sections: parse(row.questions_json, []), answers: await currentAnswers(env, id),
@@ -409,7 +435,7 @@ async function admin(request: Request, env: Env, parts: string[], ray: string) {
 
   if (!id && request.method === "GET") {
     const r = await env.DB.prepare(`SELECT c.id, c.title, c.status, c.updated_at, p.name AS profile, p.slug AS profile_slug, c.slug,
-      c.password_hash IS NOT NULL AS has_password,
+      p.password_hash IS NOT NULL AS has_password,
       (SELECT COUNT(*) FROM submissions s WHERE s.case_id = c.id) AS submissions,
       EXISTS (SELECT 1 FROM reroutes r WHERE r.case_id = c.id AND r.handled_at IS NULL) AS rerouting,
       (SELECT COALESCE(SUM(e.usd_micro), 0) / 1000000.0 FROM cost_entries e WHERE e.case_id = c.id) AS cost_usd
@@ -434,7 +460,7 @@ async function admin(request: Request, env: Env, parts: string[], ray: string) {
 
   if (!sub && request.method === "GET") {
     const p = await env.DB.prepare("SELECT slug, name FROM profiles WHERE id = ?").bind(row.profile_id).first<any>();
-    return json({ id: row.id, title: row.title, profile: p?.name, path: `/probes/${p?.slug}/${row.slug}`, status: row.status, hasPassword: !!row.password_hash, costUsd: await costUsd(env, id), reroute: await openReroute(env, id), sections: parse(row.questions_json, []), answers: await currentAnswers(env, id), submissions: await summaries(env, id) });
+    return json({ id: row.id, title: row.title, profile: p?.name, path: `/probes/${p?.slug}/${row.slug}`, status: row.status, hasPassword: !!(await profileOf(env, row.profile_id))?.password_hash, costUsd: await costUsd(env, id), reroute: await openReroute(env, id), sections: parse(row.questions_json, []), answers: await currentAnswers(env, id), submissions: await summaries(env, id) });
   }
   if (!sub && request.method === "PATCH") {
     const b = await request.json().catch(() => null) as { intro?: unknown; questions?: unknown; plan?: unknown; status?: string } | null;
@@ -464,7 +490,7 @@ async function admin(request: Request, env: Env, parts: string[], ray: string) {
   if (sub === "password" && request.method === "POST") {
     const b = await request.json().catch(() => null) as { password?: unknown } | null;
     if (typeof b?.password !== "string" || b.password.length < 4 || b.password.length > 200) return json({ error: "password must be 4 to 200 characters" }, 400);
-    await setPagePassword(env, id, b.password, "cli", ray);
+    await setProfilePassword(env, row.profile_id!, b.password, "cli", ray);
     return json({ ok: true });
   }
   if (!sub && request.method === "DELETE") {
@@ -472,9 +498,9 @@ async function admin(request: Request, env: Env, parts: string[], ray: string) {
       env.DB.prepare("DELETE FROM answers WHERE case_id = ?").bind(id),
       env.DB.prepare("DELETE FROM cost_entries WHERE case_id = ?").bind(id),
       env.DB.prepare("DELETE FROM submissions WHERE case_id = ?").bind(id),
-      env.DB.prepare("DELETE FROM sessions WHERE case_id = ?").bind(id),
       env.DB.prepare("DELETE FROM reroutes WHERE case_id = ?").bind(id),
       env.DB.prepare("DELETE FROM cases WHERE id = ?").bind(id),
+      env.DB.prepare("DELETE FROM sessions WHERE case_id = ? AND NOT EXISTS (SELECT 1 FROM cases WHERE profile_id = ?)").bind(row.profile_id, row.profile_id),
       env.DB.prepare("DELETE FROM profiles WHERE id = ? AND NOT EXISTS (SELECT 1 FROM cases WHERE profile_id = ?)").bind(row.profile_id, row.profile_id),
       audit(env, id, "admin", "purge", null, ray),
     ]);

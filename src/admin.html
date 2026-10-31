@@ -45,10 +45,14 @@ footer{margin-top:24px;color:var(--muted);font-size:15px}
 <main id="app" hidden>
   <h1>Admin</h1>
   <div class="tiles" id="tiles"></div>
-  <div class="tablebox"><table><thead><tr><th>Profile</th><th>Page</th><th>Stage</th><th>Saved</th><th>Submissions</th><th>Cost</th><th>Password</th><th>Last change</th><th></th></tr></thead><tbody id="rows"></tbody></table></div>
+  <h2>Profiles</h2>
+  <div class="tablebox" style="margin-block:10px 8px"><table><thead><tr><th>Profile</th><th>Pages</th><th>Password</th><th>Change password</th></tr></thead><tbody id="profiles"></tbody></table></div>
+  <div class="row"><input id="newProfile" placeholder="New profile name" aria-label="New profile name" style="max-width:280px"><button type="button" class="ghost" id="addProfile">Add profile</button><span class="muted" id="pwMsg"></span></div>
+  <h2 style="margin-top:24px">Pages</h2>
+  <div class="tablebox" style="margin-top:10px"><table><thead><tr><th>Profile</th><th>Page</th><th>Stage</th><th>Saved</th><th>Submissions</th><th>Cost</th><th>Last change</th><th></th></tr></thead><tbody id="rows"></tbody></table></div>
   <section class="panel" id="detail" hidden></section>
 </main>
-<footer id="foot" hidden>Everything here is private to this login. Every password reveal and answer edit is recorded in the activity log.</footer>
+<footer id="foot" hidden>Everything here is private to this login. Password views and answer edits are recorded in the activity log.</footer>
 </div>
 <script>
 const $=id=>document.getElementById(id);
@@ -86,23 +90,34 @@ $("login").addEventListener("submit",async e=>{
 $("logout").addEventListener("click",async()=>{await api("/logout",{method:"POST",body:"{}"}).catch(()=>{});location.reload()});
 async function reveal(id,host){
   host.textContent="";
-  try{const r=await api("/pages/"+id+"/password");host.appendChild(el("span",r.password||"Set a new one","pw"))}
+  try{const r=await api("/profiles/"+id+"/password");host.appendChild(el("span",r.password||"Set a new one","pw"))}
   catch(e){host.textContent="Couldn't load"}
 }
+function profileRows(list,pages){
+  const body=$("profiles");body.textContent="";
+  list.forEach(p=>{
+    const tr=el("tr"),pw=el("td"),set=el("td"),box=el("div",null,"row"),inp=el("input"),go=el("button","Set");
+    if(p.has_password){const b=el("button","Show","link show");b.type="button";b.addEventListener("click",()=>reveal(p.id,pw));pw.appendChild(b)}else pw.appendChild(el("span","Not set","chip bad"));
+    inp.type="text";inp.autocomplete="off";inp.placeholder="4 or more characters";inp.setAttribute("aria-label","New password for "+p.name);inp.className="pwi";go.type="button";go.className="pwset ghost";
+    go.addEventListener("click",async()=>{try{await api("/profiles/"+p.id+"/password",{method:"POST",body:JSON.stringify({password:inp.value})});$("pwMsg").textContent="Saved for "+p.name+". Devices using the old password are locked out.";loadApp()}catch(e){$("pwMsg").textContent=e.status===400?"Use 4 or more characters.":"Couldn't save."}});
+    box.append(inp,go);set.appendChild(box);tr.append(el("td",p.name),el("td",String(p.pages),"num"),pw,set);body.appendChild(tr);
+  });
+}
+$("addProfile").addEventListener("click",async()=>{const n=$("newProfile");try{await api("/profiles",{method:"POST",body:JSON.stringify({name:n.value})});n.value="";loadApp()}catch(e){$("pwMsg").textContent="Enter a name for the profile."}});
 async function loadApp(){
   const d=await api("/overview");view(["app","foot","logout"]);
+  profileRows(d.profiles);
   const pages=d.pages,sub=pages.reduce((a,p)=>a+p.submissions,0),cost=pages.reduce((a,p)=>a+p.cost_usd,0);
   const t=$("tiles");t.textContent="";
-  [[new Set(pages.map(p=>p.profile)).size,"Profiles"],[pages.length,"Pages"],[sub,"Submissions"],[money(cost),"Research cost"]].forEach(([v,l])=>{const c=el("div",null,"tile");c.append(el("b",String(v)),el("span",l));t.appendChild(c)});
+  [[d.profiles.length,"Profiles"],[pages.length,"Pages"],[sub,"Submissions"],[money(cost),"Research cost"]].forEach(([v,l])=>{const c=el("div",null,"tile");c.append(el("b",String(v)),el("span",l));t.appendChild(c)});
   const body=$("rows");body.textContent="";
   pages.forEach(p=>{
     const tr=el("tr"),[s,tone]=p.rerouting?["Changing direction","warn"]:STAGE[p.status]||[p.status,"info"];
     const open=el("button","Manage","link");open.type="button";open.addEventListener("click",()=>loadDetail(p.id));
-    const pw=el("td");if(p.has_password){const b=el("button","Show","link");b.type="button";b.addEventListener("click",()=>reveal(p.id,pw));pw.appendChild(b)}else pw.appendChild(el("span","Not set","chip bad"));
     const stage=el("td");stage.appendChild(el("span",s,"chip "+tone));
     const a=el("a",p.title);a.href="/probes/"+p.profile_slug+"/"+p.slug;const title=el("td");title.appendChild(a);
     const act=el("td");act.appendChild(open);
-    tr.append(el("td",p.profile),title,stage,el("td",p.saved+" of "+p.total,"num"),el("td",String(p.submissions),"num"),el("td",money(p.cost_usd),"num"),pw,el("td",fmt(p.updated_at)),act);
+    tr.append(el("td",p.profile),title,stage,el("td",p.saved+" of "+p.total,"num"),el("td",String(p.submissions),"num"),el("td",money(p.cost_usd),"num"),el("td",fmt(p.updated_at)),act);
     body.appendChild(tr);
   });
 }
@@ -110,10 +125,6 @@ async function loadDetail(id){
   const d=await api("/pages/"+id),box=$("detail");box.textContent="";box.hidden=false;
   box.appendChild(el("h2",d.profile+": "+d.title));
   if(d.reroute)box.appendChild(el("p","New direction requested "+fmt(d.reroute.at)+": "+d.reroute.message,"chip warn"));
-
-  const pwBox=el("div",null,"row"),pwIn=el("input");pwIn.id="pwInput";pwIn.type="text";pwIn.placeholder="New password for this page, 4 or more characters";pwIn.autocomplete="off";pwIn.setAttribute("aria-label","New page password");
-  const pwBtn=el("button","Set password");pwBtn.type="button";pwBtn.id="pwSet";const pwMsg=el("span",null,"muted");pwMsg.id="pwMsg";pwBox.append(pwIn,pwBtn,pwMsg);box.appendChild(pwBox);
-  pwBtn.addEventListener("click",async()=>{try{await api("/pages/"+id+"/password",{method:"POST",body:JSON.stringify({password:pwIn.value})});pwIn.value="";pwMsg.textContent="Saved. Devices using the old password are locked out.";loadApp()}catch(e){pwMsg.textContent=e.status===400?"Use 4 or more characters.":"Couldn't save."}});
 
   const qs=d.sections.flatMap(s=>s.questions);
   const ans=el("details",null,"fold");ans.open=true;const sm=el("summary","Saved answers ("+qs.filter(q=>(d.answers[q.id]?.text||"").trim()).length+" of "+qs.length+")");ans.appendChild(sm);

@@ -37,8 +37,8 @@ Run it with no command to see the options. The Cloudflare and admin details are 
 
 - Free tier only. No login or accounts for now.
 - Site map: home page at `/`, directory at `/probes`, and each page at `/probes/<profile>/<page>`. One profile can hold several pages.
-- The Admin page at `/admin` opens with a master password. It shows passwords, answers, logs and costs. Page passwords are hashed for checking and AES-GCM encrypted with the `PASSWORD_KEY` secret for display. Master password guesses pause after 6 tries, but page passwords never do.
-- Anyone can read every page and its submitted answers. Editing needs that page's password, and a page notice says so. Wrong guesses never lock anyone out.
+- The Admin page at `/admin` opens with a master password. It shows passwords, answers, logs and costs. Profile passwords are hashed for checking and AES-GCM encrypted with the `PASSWORD_KEY` secret for display. Master password guesses pause after 6 tries, but profile passwords never do.
+- Anyone can read every page and its submitted answers. Editing needs the profile's password, which unlocks all of that profile's pages and no others. A page notice covers this. Wrong guesses never lock anyone out.
 - Submissions are append-only, and a database trigger enforces that.
 - The website never mentions Claude, treg or how the research is done. Source code and docs can.
 - Page content renders as text only. Never inject stored content as HTML.

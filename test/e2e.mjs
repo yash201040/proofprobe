@@ -12,8 +12,10 @@ const ppFails = (...a) => { try { execFileSync("node", ["bin/proofprobe.mjs", ..
 const ok = (c, m) => { if (!c) throw new Error("FAILED: " + m); console.log("ok  " + m); };
 const qf = "/tmp/proofprobe-q-" + process.pid + ".json";
 writeFileSync(qf, JSON.stringify([{ title: "A", note: "n", first: true, questions: [{ id: "a1", text: "One?", why: "w" }, { id: "a2", text: "Two?", catchAll: true }] }]));
-const made = (profile, title) => { const c = JSON.parse(pp("new", "--profile", profile, "--title", title)); pp("publish", c.id, "--questions", qf, "--status", "open"); return { ...c, api: c.link.replace("/probes/", "/api/pages/"), pw: pp("password", c.id).match(/password: (\S+)/)[1] }; };
+const made = (profile, title) => { const c = JSON.parse(pp("new", "--profile", profile, "--title", title)); pp("publish", c.id, "--questions", qf, "--status", "open"); return { ...c, api: c.link.replace("/probes/", "/api/pages/") }; };
+const setPw = (c) => (c.pw = pp("password", c.id).match(/password: (\S+)/)[1]);
 const first = made("Test Person", "First goal"), second = made("Test Person", "Second goal"), other = made("Other Person", "Other goal");
+setPw(first); second.pw = first.pw; setPw(other);
 const cleanup = [first.id, second.id, other.id];
 const browser = await puppeteer.launch({ executablePath: "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome", headless: "new" });
 try {
@@ -75,7 +77,8 @@ const cookies = await page.cookies(); const c = cookies.find((x) => x.name.start
 ok(c && c.httpOnly && c.sameSite === "Strict", "the unlock cookie is protected");
 const cross = await fetch(other.api + "/answers", { method: "PUT", headers: { Cookie: `${c.name}=${c.value}` }, body: JSON.stringify({ answers: { a1: "x" } }) });
 const sibling = await fetch(second.api + "/answers", { method: "PUT", headers: { Cookie: `${c.name}=${c.value}` }, body: JSON.stringify({ answers: { a1: "x" } }) });
-ok(cross.status === 401 && sibling.status === 401, "unlocking one page never unlocks another");
+ok(sibling.status === 200, "one password unlocks every page in that profile");
+ok(cross.status === 401, "it never unlocks another person's profile");
 
 await page.type("#q-a1", " draft"); await page.click("#saveAll"); await saved();
 const pub = await (await fetch(first.api)).json();
@@ -129,14 +132,19 @@ await page.waitForFunction(() => /isn't right/.test(document.querySelector("#log
 await page.$eval("#master", (e) => (e.value = "")); await page.type("#master", "test-master-pass"); await page.click("#login button");
 await page.waitForSelector("#rows tr");
 ok((await page.$$("#tiles .tile")).length === 4 && (await txt("#rows")).includes("First goal"), "the dashboard lists every page");
-await page.evaluate(() => [...document.querySelectorAll("#rows tr")].find((r) => r.textContent.includes("First goal")).querySelector("td:nth-child(9) button").click());
-await page.waitForSelector("#pwInput");
-await page.type("#pwInput", "chosen-by-admin"); await page.click("#pwSet");
-await page.waitForFunction(() => /Saved/.test(document.querySelector("#pwMsg").textContent));
-await page.evaluate(() => [...document.querySelectorAll("#rows tr")].find((r) => r.textContent.includes("First goal")).querySelector("td:nth-child(7) button").click());
-await page.waitForFunction(() => document.querySelector("#rows").textContent.includes("chosen-by-admin"));
-ok(true, "admin can set and reveal a page password");
-ok((await fetch(first.api + "/unlock", { method: "POST", body: JSON.stringify({ password: "chosen-by-admin" }) })).status === 200, "the admin's password opens the page");
+const row = `[...document.querySelectorAll("#profiles tr")].find((r) => r.textContent.includes("Test Person"))`;
+await page.evaluate((r) => { const i = eval(r).querySelector(".pwi"); i.value = "chosen-by-admin"; eval(r).querySelector(".pwset").click(); }, row);
+await page.waitForFunction(() => /Saved for/.test(document.querySelector("#pwMsg").textContent));
+await page.waitForFunction((r) => eval(r)?.querySelector(".show"), {}, row);
+await page.evaluate((r) => eval(r).querySelector(".show").click(), row);
+await page.waitForFunction(() => document.querySelector("#profiles").textContent.includes("chosen-by-admin"));
+ok(true, "admin can set and reveal a profile password");
+await page.type("#newProfile", "Fresh Profile"); await page.click("#addProfile");
+await page.waitForFunction(() => document.querySelector("#profiles").textContent.includes("Fresh Profile"));
+ok(true, "admin can add a profile before it has pages");
+await page.evaluate(() => [...document.querySelectorAll("#rows tr")].find((r) => r.textContent.includes("First goal")).querySelector("td:nth-child(8) button").click());
+await page.waitForSelector("#a-a2");
+ok((await fetch(first.api + "/unlock", { method: "POST", body: JSON.stringify({ password: "chosen-by-admin" }) })).status === 200, "the admin's password opens the profile");
 await page.$eval("#a-a2", (e) => { e.value = "edited by admin"; }); await page.click("#saveAnswers");
 await page.waitForFunction(() => /Saved/.test(document.querySelector("#saveMsg").textContent) || document.querySelector("#a-a2").value === "edited by admin");
 const seen2 = JSON.parse(pp("status", first.id));
