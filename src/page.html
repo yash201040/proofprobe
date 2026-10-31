@@ -87,6 +87,9 @@ dialog{width:min(420px,calc(100vw - 32px));padding:22px;border:1px solid var(--l
 .cellwrap{display:inline-flex;align-items:center;max-width:100%;min-width:0}
 #tip{position:fixed;z-index:40;max-width:320px;padding:10px 13px;border:1px solid var(--line);border-radius:10px;background:var(--surface);color:var(--ink);font-size:15.5px;line-height:1.45;box-shadow:0 10px 30px rgba(0,0,0,.28)}
 @media (max-width:640px){#tip{left:12px!important;right:12px;top:auto!important;bottom:calc(env(safe-area-inset-bottom,0px) + 14px);max-width:none;padding:14px 16px;font-size:16px}}
+.dirtools{display:flex;flex-wrap:wrap;align-items:flex-end;gap:12px;margin-bottom:16px}.dirtools label{display:grid;gap:4px;font-size:14px;font-weight:600;color:var(--muted)}.dirtools select{min-height:42px;min-width:170px;padding:8px 34px 8px 11px;font:600 16px var(--body);color:var(--ink);background:var(--surface);border:1px solid var(--line);border-radius:6px;cursor:pointer}.dirtools select:hover{border-color:var(--accent)}.dircount{margin-left:auto;font-size:15px;color:var(--muted)}
+.profile .who{font:500 12.5px var(--mono);text-transform:uppercase;letter-spacing:.05em;color:var(--accent);margin-bottom:2px}.profile.single .pagelink{border-top:0;margin-top:0;padding-top:4px}
+@media (max-width:640px){.dirtools label{flex:1 1 150px}.dirtools select{width:100%;min-width:0}.dircount{margin-left:0;flex-basis:100%}}
 </style></head><body><div id="loadbar" role="progressbar" aria-label="Loading"></div><div class="wrap">
 <div class="topbar"><a class="brandlink" href="/">ProofProbe</a></div>
 <header><div class="eyebrow" id="eyebrow"></div><h1 id="title"></h1>
@@ -97,7 +100,7 @@ dialog{width:min(420px,calc(100vw - 32px));padding:22px;border:1px solid var(--l
 <div class="skel" id="skel" aria-hidden="true"><i></i><i></i><i></i></div>
 <div id="tip" role="tooltip" hidden></div>
 <div id="fatal" class="alert" hidden><p id="fatalText"></p><p style="margin-top:9px"><button type="button" id="retry">Try again</button></p></div>
-<section id="dirBox" hidden><div id="profiles" class="profiles"></div><p id="dirEmpty" hidden>No probes published yet.</p></section>
+<section id="dirBox" hidden><div class="dirtools"><label for="sortBy">Sort by<select id="sortBy"><option value="created">Date created</option><option value="updated">Last updated</option><option value="profile">Profile</option></select></label><label for="statusBy">Status<select id="statusBy"><option value="">All</option></select></label><span class="dircount" id="dirCount" role="status"></span></div><div id="profiles" class="profiles"></div><p id="dirEmpty" hidden></p></section>
 <section id="planBox" hidden><div class="stack"><h2>Recommended path</h2><div id="plan" class="blocks"></div></div></section>
 <section id="introBox" hidden><div id="intro" class="blocks"></div></section>
 <section id="viewQs" hidden><div class="stack"><h2>Questions and answers</h2><p id="viewNote"></p><div id="viewList" class="stack"></div></div></section>
@@ -296,17 +299,42 @@ async function showPage(){
   $("accessText").textContent=d.editable?"You can edit all of "+d.name+"'s pages on this device.":d.hasPassword?"View only.":"View only. Editing isn't set up yet.";
   if(d.editable)showEdit(d);else showRead(d);
 }
+const day=iso=>new Date(iso).toLocaleDateString([],{dateStyle:"medium"});
+const stageOf=g=>g.rerouting?"rerouting":g.status;
+const STAGE_NAME=k=>k==="rerouting"?"Changing direction":STAGE[k]||k;
+let directory=[];
+function pageLink(p,g){
+  const a=el("a",null,"pagelink"),k=stageOf(g);a.href="/probes/"+encodeURIComponent(p.slug)+"/"+encodeURIComponent(g.slug);
+  a.appendChild(el("b",g.title));a.appendChild(el("span",STAGE_NAME(k),"chip "+(k==="rerouting"?"warn":TONE[k]||"info")));
+  a.appendChild(el("small","Created "+day(g.createdAt)+" · Updated "+day(g.updatedAt)+" · Research cost "+money(g.costUsd)));return a;
+}
+function renderDirectory(){
+  const sort=$("sortBy").value,want=$("statusBy").value,host=$("profiles");host.textContent="";
+  const keep=g=>!want||stageOf(g)===want;
+  const rows=directory.flatMap(p=>p.pages.filter(keep).map(g=>({p,g})));
+  if(sort==="profile"){
+    directory.forEach(p=>{
+      const pages=p.pages.filter(keep);if(!pages.length)return;
+      const c=el("article",null,"profile");c.appendChild(el("h2",p.name));
+      pages.slice().sort((x,y)=>y.createdAt.localeCompare(x.createdAt)).forEach(g=>c.appendChild(pageLink(p,g)));host.appendChild(c);
+    });
+  }else{
+    const key=sort==="updated"?"updatedAt":"createdAt";
+    rows.sort((x,y)=>y.g[key].localeCompare(x.g[key])).forEach(({p,g})=>{const c=el("article",null,"profile single");c.append(el("div",p.name,"who"),pageLink(p,g));host.appendChild(c)});
+  }
+  $("dirCount").textContent=rows.length+(rows.length===1?" probe":" probes");
+  const e=$("dirEmpty");e.textContent=directory.length?"No probes have this status.":"No probes published yet.";e.hidden=rows.length>0;
+}
 async function showDirectory(){
   $("fatal").hidden=true;$("title").textContent="Probes";document.title="Probes";
   const r=await fetch("/api/probes");if(!r.ok)throw r;
-  const d=await r.json(),host=$("profiles");host.textContent="";
-  d.profiles.forEach(p=>{
-    const c=el("article",null,"profile");c.appendChild(el("h2",p.name));
-    p.pages.forEach(g=>{const a=el("a",null,"pagelink");a.href="/probes/"+encodeURIComponent(p.slug)+"/"+encodeURIComponent(g.slug);a.appendChild(el("b",g.title));a.appendChild(el("span",g.rerouting?"Changing direction":STAGE[g.status]||g.status,"chip "+(g.rerouting?"warn":TONE[g.status]||"info")));a.appendChild(el("small","Research cost "+money(g.costUsd)));c.appendChild(a)});
-    host.appendChild(c);
-  });
-  $("dirEmpty").hidden=d.profiles.length>0;$("dirBox").hidden=false;$("notice").hidden=true;
+  directory=(await r.json()).profiles;
+  const kinds=[...new Set(directory.flatMap(p=>p.pages.map(stageOf)))],sel=$("statusBy");
+  [...sel.options].slice(1).forEach(o=>o.remove());
+  kinds.forEach(k=>{const o=el("option",STAGE_NAME(k));o.value=k;sel.appendChild(o)});
+  renderDirectory();$("dirBox").hidden=false;$("notice").hidden=true;
 }
+$("sortBy").addEventListener("change",renderDirectory);$("statusBy").addEventListener("change",renderDirectory);
 async function route(){
   try{if(onPage)await showPage();else await showDirectory()}
   catch(e){fail(e&&e.status===404?"This page doesn't exist.":"We couldn't load this page. Check your connection and try again.")}

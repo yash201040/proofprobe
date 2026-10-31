@@ -255,13 +255,13 @@ async function submit(env: Env, row: CaseRow, key: string, ray: string) {
 
 async function directory(env: Env) {
   const profiles = await env.DB.prepare("SELECT id, slug, name FROM profiles ORDER BY created_at").all<any>();
-  const pages = await env.DB.prepare(`SELECT c.profile_id, c.slug, c.title, c.status,
+  const pages = await env.DB.prepare(`SELECT c.profile_id, c.slug, c.title, c.status, c.created_at, c.updated_at,
     (SELECT COALESCE(SUM(e.usd_micro), 0) FROM cost_entries e WHERE e.case_id = c.id) AS micro,
     EXISTS (SELECT 1 FROM reroutes r WHERE r.case_id = c.id AND r.handled_at IS NULL) AS rerouting
     FROM cases c WHERE c.status != 'draft' ORDER BY c.created_at`).all<any>();
   return profiles.results.map((p) => ({
     slug: p.slug, name: p.name,
-    pages: pages.results.filter((c) => c.profile_id === p.id).map((c) => ({ slug: c.slug, title: c.title, status: c.status, costUsd: c.micro / 1_000_000, rerouting: !!c.rerouting })),
+    pages: pages.results.filter((c) => c.profile_id === p.id).map((c) => ({ slug: c.slug, title: c.title, status: c.status, createdAt: c.created_at, updatedAt: c.updated_at, costUsd: c.micro / 1_000_000, rerouting: !!c.rerouting })),
   })).filter((p) => p.pages.length);
 }
 
@@ -304,6 +304,7 @@ async function pageApi(request: Request, env: Env, row: CaseRow, rest: string, r
     await env.DB.batch([
       env.DB.prepare("UPDATE reroutes SET handled_at = ? WHERE case_id = ? AND handled_at IS NULL").bind(at, row.id),
       env.DB.prepare("INSERT INTO reroutes(case_id, message, at) VALUES (?,?,?)").bind(row.id, message, at),
+      env.DB.prepare("UPDATE cases SET updated_at = ? WHERE id = ?").bind(at, row.id),
       audit(env, row.id, "editor", "reroute", null, ray),
     ]);
     return json({ message, at });
@@ -328,9 +329,12 @@ async function pageApi(request: Request, env: Env, row: CaseRow, rest: string, r
   const conflicts = entries.map(([id]) => id).filter((id) => (current[id]?.updatedAt ?? null) !== (body.bases?.[id] ?? null));
   if (conflicts.length) return json({ error: "conflict", conflicts }, 409);
   const updatedAt = new Date().toISOString();
-  await env.DB.batch(entries.map(([id, text]) =>
-    env.DB.prepare("INSERT INTO answers(case_id, question_id, text, updated_at) VALUES (?,?,?,?) ON CONFLICT(case_id, question_id) DO UPDATE SET text = excluded.text, updated_at = excluded.updated_at")
-      .bind(row.id, id, text as string, updatedAt)));
+  await env.DB.batch([
+    ...entries.map(([id, text]) =>
+      env.DB.prepare("INSERT INTO answers(case_id, question_id, text, updated_at) VALUES (?,?,?,?) ON CONFLICT(case_id, question_id) DO UPDATE SET text = excluded.text, updated_at = excluded.updated_at")
+        .bind(row.id, id, text as string, updatedAt)),
+    env.DB.prepare("UPDATE cases SET updated_at = ? WHERE id = ?").bind(updatedAt, row.id),
+  ]);
   return json({ saved: entries.length, updatedAt });
 }
 
@@ -446,6 +450,7 @@ async function adminSite(request: Request, env: Env, parts: string[], ray: strin
     const at = new Date().toISOString();
     await env.DB.batch([
       ...entries.map(([k, v]) => env.DB.prepare("INSERT INTO answers(case_id, question_id, text, updated_at) VALUES (?,?,?,?) ON CONFLICT(case_id, question_id) DO UPDATE SET text = excluded.text, updated_at = excluded.updated_at").bind(id, k, v as string, at)),
+      env.DB.prepare("UPDATE cases SET updated_at = ? WHERE id = ?").bind(at, id),
       audit(env, id, "admin", "answers_edited", entries.map(([k]) => k).join(","), ray),
     ]);
     return json({ ok: true });

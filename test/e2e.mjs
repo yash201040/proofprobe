@@ -39,8 +39,15 @@ ok((await page.$eval('.cta[href*="github"]', (e) => e.target)) === "_blank", "Gi
 ok((await page.$('.adminlink[href="/admin"]')) !== null, "the Admin link is on the home page");
 await page.goto(base + "/probes", { waitUntil: "networkidle0" });
 await page.waitForSelector(".profile");
+const titles = () => page.$$eval(".pagelink b", (l) => l.map((e) => e.textContent));
+ok((await titles())[0] === "Other goal" && (await txt(".pagelink small")).includes("Created") && (await txt(".pagelink small")).includes("Updated"), "probes show dates and start newest first");
+await page.select("#sortBy", "profile");
 const cards = await page.$$eval(".profile", (l) => l.map((c) => [c.querySelector("h2").textContent, c.querySelectorAll(".pagelink").length]));
-ok(cards.some(([n, c]) => n === "Test Person" && c === 2), "one profile can hold several pages");
+ok(cards.some(([n, c]) => n === "Test Person" && c === 2), "sorting by profile groups each person's pages");
+pp("publish", second.id, "--status", "plan_ready"); await page.reload({ waitUntil: "networkidle0" }); await page.waitForSelector(".pagelink");
+await page.select("#sortBy", "updated"); ok((await titles())[0] === "Second goal", "sorting by last updated works");
+await page.select("#statusBy", "plan_ready"); ok((await titles()).length === 1 && (await txt("#dirCount")) === "1 probe", "the status filter works");
+pp("publish", second.id, "--status", "open");
 
 const paint = await browser.newPage();
 await paint.setRequestInterception(true);
