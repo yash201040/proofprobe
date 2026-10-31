@@ -36,6 +36,16 @@ Local test: put `ADMIN_TOKEN_SHA256=<hash>` in `.dev.vars`, run `npm run dev`, t
 - CVs and research notes stay in `.proofprobe/` on this machine, which git ignores. Only questions, intro, plan and costs go to the server.
 - Answer text and tokens are never logged.
 
-## Platform guide deviations
+## Design choices
 
-This is a tiny free-tier app, so it follows the guide's rule that tiny apps stay on D1. It skips Postgres, Hyperdrive, WorkOS and PostHog, which need paid plans or sign-in. It keeps `audit_log`, idempotency keys, structured logs with `ray_id`, access decisions in the Worker, and walls over conventions. D1 exports to Postgres through the guide's pgloader recipe if this outgrows it. The schema is applied on first request rather than through CLI migrations, because temporary accounts could not run them.
+This is a small free-tier app: one Cloudflare Worker and a D1 database, with no login. D1 can be moved to Postgres later with pgloader if the tool outgrows it. The schema is applied on first request, so there is no separate migration step.
+
+## Open source and access
+
+The code is public, but the running service is not. Cases, answers and links live in the owner's Cloudflare account, and nothing in this repo gives access to them. The admin token and case links stay in `.proofprobe/`, which is never committed. The Worker holds only a hash of the token, as a Cloudflare secret.
+
+To run your own copy, replace `account_id` and `database_id` in `wrangler.jsonc` with your own.
+
+## License
+
+MIT

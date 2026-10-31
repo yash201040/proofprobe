@@ -13,9 +13,9 @@ Two-step research that ends in a clear, data-backed path.
 Submitting answers never starts anything. Run Step 2 only when the user asks.
 
 Helper, shown below as `proofprobe`, works from any folder:
-`node /Users/guts/HOME/Coding/Projects/personal/proofprobe/bin/proofprobe.mjs <command>`
+`node ~/HOME/Coding/Projects/personal/proofprobe/bin/proofprobe.mjs <command>`
 
-Keep working files in `/Users/guts/HOME/Coding/Projects/personal/proofprobe/.proofprobe/cases/<id>/`, which git ignores, and pass full paths to the helper. Paths below are shown relative to the project. If a project already has its own research folder, keep the research there and put only the JSON files in the case folder.
+Keep working files in `~/HOME/Coding/Projects/personal/proofprobe/.proofprobe/cases/<id>/`, which git ignores, and pass full paths to the helper. Paths below are shown relative to the project. If a project already has its own research folder, keep the research there and put only the JSON files in the case folder.
 
 ## Choose the track
 

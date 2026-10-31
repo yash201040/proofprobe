@@ -17,7 +17,7 @@ The full procedure is in `skills/proofprobe/SKILL.md`, available in any Claude C
 You don't need to change this repo to host a case. Run the helper by its full path from any folder:
 
 ```
-node /Users/guts/HOME/Coding/Projects/personal/proofprobe/bin/proofprobe.mjs <command>
+node ~/HOME/Coding/Projects/personal/proofprobe/bin/proofprobe.mjs <command>
 ```
 
 Run it with no command to see the options. The Cloudflare and admin details are already set up in `.proofprobe/config.json`, so don't ask the owner for them.
