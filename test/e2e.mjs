@@ -55,6 +55,11 @@ pp("publish", second.id, "--status", "plan_ready"); await page.reload({ waitUnti
 await page.select("#sortBy", "updated"); ok((await titles())[0] === "Second goal", "sorting by last updated works");
 await page.select("#statusBy", "plan_ready"); ok((await titles()).length === 1 && (await txt("#dirCount")) === "1 probe", "the status filter works");
 pp("publish", second.id, "--status", "open");
+await page.goto(base + "/probes", { waitUntil: "networkidle0" }); await page.waitForSelector(".profile.single .who");
+await Promise.all([page.waitForNavigation({ waitUntil: "networkidle0" }), page.click(".profile.single .who")]);
+ok(new URL(page.url()).pathname.split("/").length === 4, "clicking anywhere on a probe card opens the page");
+const brand = await page.$(".brandlink"); await brand.hover();
+ok((await page.$eval(".brandlink", (e) => getComputedStyle(e).animationName)) === "rainbow", "the ProofProbe link shimmers on hover");
 
 const paint = await browser.newPage();
 await paint.setRequestInterception(true);

@@ -90,6 +90,19 @@ dialog{width:min(420px,calc(100vw - 32px));padding:22px;border:1px solid var(--l
 .dirtools{display:flex;flex-wrap:wrap;align-items:flex-end;gap:12px;margin-bottom:16px}.dirtools label{display:grid;gap:4px;font-size:14px;font-weight:600;color:var(--muted)}.dirtools select{min-height:42px;min-width:170px;padding:8px 34px 8px 11px;font:600 16px var(--body);color:var(--ink);background:var(--surface);border:1px solid var(--line);border-radius:6px;cursor:pointer}.dirtools select:hover{border-color:var(--accent)}#sortDir{min-height:42px;min-width:136px}.dircount{margin-left:auto;font-size:15px;color:var(--muted)}
 .profile .who{font:500 12.5px var(--mono);text-transform:uppercase;letter-spacing:.05em;color:var(--accent);margin-bottom:2px}.profile.single .pagelink{border-top:0;margin-top:0;padding-top:4px}
 @media (max-width:640px){#sortDir{flex:1 1 120px}.dirtools label{flex:1 1 150px}.dirtools select{width:100%;min-width:0}.dircount{margin-left:0;flex-basis:100%}}
+@keyframes rainbow{to{background-position:200% 50%}}
+.brandlink{display:inline-block;transition:transform .2s ease}.brandlink:hover,.brandlink:focus-visible{background:linear-gradient(90deg,#FF5E7E,#FFB454,#7BE495,#5FC6C9,#7C8CFF,#D478FF,#FF5E7E);background-size:200% auto;-webkit-background-clip:text;background-clip:text;color:transparent;animation:rainbow 1.4s linear infinite;transform:translateY(-1px) scale(1.03)}.brandlink:active{transform:scale(.97)}
+@media (prefers-reduced-motion:reduce){.brandlink:hover,.brandlink:focus-visible{animation:none;transform:none}}
+.profile{position:relative;overflow:hidden;transition:transform .22s cubic-bezier(.2,1.2,.4,1),border-color .2s ease,box-shadow .22s ease}
+.profile.single{cursor:pointer}.profile.single .pagelink::after{content:"";position:absolute;inset:0;z-index:1}
+.profile.single::before,.pagelink.row::before{content:"";position:absolute;top:0;bottom:0;left:-60%;width:45%;background:linear-gradient(100deg,transparent,color-mix(in srgb,var(--accent) 26%,transparent),transparent);transform:skewX(-18deg);opacity:0;pointer-events:none}
+.profile.single:hover,.profile.single:focus-within{transform:translateY(-3px);border-color:var(--accent);box-shadow:0 12px 30px color-mix(in srgb,var(--accent) 22%,transparent)}
+.profile.single:hover::before,.profile.single:focus-within::before{opacity:1;animation:cardflash .7s ease-out}
+.profile.single:active{transform:translateY(0) scale(.99)}
+.profile.single:hover .pagelink b{color:var(--accent)}
+.pagelink.row{position:relative;overflow:hidden;margin-inline:-10px;padding-inline:10px;border-radius:6px;transition:background .18s ease}.pagelink.row:hover{background:var(--accent-soft)}.pagelink.row:hover::before{opacity:1;animation:cardflash .7s ease-out}.pagelink.row:active{transform:scale(.995)}
+@keyframes cardflash{to{left:115%}}
+@media (prefers-reduced-motion:reduce){.profile,.pagelink.row{transition:none}.profile.single:hover,.profile.single:active{transform:none}.profile.single:hover::before,.pagelink.row:hover::before{animation:none;opacity:0}}
 </style></head><body><div id="loadbar" role="progressbar" aria-label="Loading"></div><div class="wrap">
 <div class="topbar"><a class="brandlink" href="/">ProofProbe</a></div>
 <header><div class="eyebrow" id="eyebrow"></div><h1 id="title"></h1>
@@ -318,8 +331,8 @@ function renderDirectory(){
   if(sort==="profile"){
     directory.slice().sort((x,y)=>flip*x.name.localeCompare(y.name,undefined,{sensitivity:"base"})).forEach(p=>{
       const pages=p.pages.filter(keep);if(!pages.length)return;
-      const c=el("article",null,"profile");c.appendChild(el("h2",p.name));
-      pages.slice().sort((x,y)=>y.createdAt.localeCompare(x.createdAt)).forEach(g=>c.appendChild(pageLink(p,g)));host.appendChild(c);
+      const c=el("article",null,"profile"+(pages.length===1?" single":""));c.appendChild(el("h2",p.name));
+      pages.slice().sort((x,y)=>y.createdAt.localeCompare(x.createdAt)).forEach(g=>{const a=pageLink(p,g);if(pages.length>1)a.classList.add("row");c.appendChild(a)});host.appendChild(c);
     });
   }else{
     const cmp=sort==="cost"?(x,y)=>x.g.costUsd-y.g.costUsd:sort==="updated"?(x,y)=>x.g.updatedAt.localeCompare(y.g.updatedAt):(x,y)=>x.g.createdAt.localeCompare(y.g.createdAt);

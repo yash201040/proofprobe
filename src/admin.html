@@ -44,6 +44,9 @@ footer{margin-top:24px;color:var(--muted);font-size:15px}
   table.cards .chip{justify-self:start;white-space:normal}
 }
 @media (max-width:640px){table.cards td.act{display:block}table.cards .row input{min-width:0}}
+@keyframes rainbow{to{background-position:200% 50%}}
+.brand{display:inline-block;transition:transform .2s ease}.brand:hover,.brand:focus-visible{background:linear-gradient(90deg,#FF5E7E,#FFB454,#7BE495,#5FC6C9,#7C8CFF,#D478FF,#FF5E7E);background-size:200% auto;-webkit-background-clip:text;background-clip:text;color:transparent;animation:rainbow 1.4s linear infinite;transform:translateY(-1px) scale(1.03)}.brand:active{transform:scale(.97)}
+@media (prefers-reduced-motion:reduce){.brand:hover,.brand:focus-visible{animation:none;transform:none}}
 </style></head><body><div id="loadbar" role="progressbar" aria-label="Loading"></div><div class="wrap">
 <div class="top"><a class="brand" href="/">ProofProbe</a><div class="row"><a href="/probes">Probes</a><button type="button" class="ghost" id="logout" hidden>Log out</button></div></div>
 
