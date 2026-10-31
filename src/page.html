@@ -87,9 +87,9 @@ dialog{width:min(420px,calc(100vw - 32px));padding:22px;border:1px solid var(--l
 .cellwrap{display:inline-flex;align-items:center;max-width:100%;min-width:0}
 #tip{position:fixed;z-index:40;max-width:320px;padding:10px 13px;border:1px solid var(--line);border-radius:10px;background:var(--surface);color:var(--ink);font-size:15.5px;line-height:1.45;box-shadow:0 10px 30px rgba(0,0,0,.28)}
 @media (max-width:640px){#tip{left:12px!important;right:12px;top:auto!important;bottom:calc(env(safe-area-inset-bottom,0px) + 14px);max-width:none;padding:14px 16px;font-size:16px}}
-.dirtools{display:flex;flex-wrap:wrap;align-items:flex-end;gap:12px;margin-bottom:16px}.dirtools label{display:grid;gap:4px;font-size:14px;font-weight:600;color:var(--muted)}.dirtools select{min-height:42px;min-width:170px;padding:8px 34px 8px 11px;font:600 16px var(--body);color:var(--ink);background:var(--surface);border:1px solid var(--line);border-radius:6px;cursor:pointer}.dirtools select:hover{border-color:var(--accent)}.dircount{margin-left:auto;font-size:15px;color:var(--muted)}
+.dirtools{display:flex;flex-wrap:wrap;align-items:flex-end;gap:12px;margin-bottom:16px}.dirtools label{display:grid;gap:4px;font-size:14px;font-weight:600;color:var(--muted)}.dirtools select{min-height:42px;min-width:170px;padding:8px 34px 8px 11px;font:600 16px var(--body);color:var(--ink);background:var(--surface);border:1px solid var(--line);border-radius:6px;cursor:pointer}.dirtools select:hover{border-color:var(--accent)}#sortDir{min-height:42px;min-width:136px}.dircount{margin-left:auto;font-size:15px;color:var(--muted)}
 .profile .who{font:500 12.5px var(--mono);text-transform:uppercase;letter-spacing:.05em;color:var(--accent);margin-bottom:2px}.profile.single .pagelink{border-top:0;margin-top:0;padding-top:4px}
-@media (max-width:640px){.dirtools label{flex:1 1 150px}.dirtools select{width:100%;min-width:0}.dircount{margin-left:0;flex-basis:100%}}
+@media (max-width:640px){#sortDir{flex:1 1 120px}.dirtools label{flex:1 1 150px}.dirtools select{width:100%;min-width:0}.dircount{margin-left:0;flex-basis:100%}}
 </style></head><body><div id="loadbar" role="progressbar" aria-label="Loading"></div><div class="wrap">
 <div class="topbar"><a class="brandlink" href="/">ProofProbe</a></div>
 <header><div class="eyebrow" id="eyebrow"></div><h1 id="title"></h1>
@@ -100,7 +100,7 @@ dialog{width:min(420px,calc(100vw - 32px));padding:22px;border:1px solid var(--l
 <div class="skel" id="skel" aria-hidden="true"><i></i><i></i><i></i></div>
 <div id="tip" role="tooltip" hidden></div>
 <div id="fatal" class="alert" hidden><p id="fatalText"></p><p style="margin-top:9px"><button type="button" id="retry">Try again</button></p></div>
-<section id="dirBox" hidden><div class="dirtools"><label for="sortBy">Sort by<select id="sortBy"><option value="created">Date created</option><option value="updated">Last updated</option><option value="profile">Profile</option></select></label><label for="statusBy">Status<select id="statusBy"><option value="">All</option></select></label><span class="dircount" id="dirCount" role="status"></span></div><div id="profiles" class="profiles"></div><p id="dirEmpty" hidden></p></section>
+<section id="dirBox" hidden><div class="dirtools"><label for="sortBy">Sort by<select id="sortBy"><option value="created">Date created</option><option value="updated">Last updated</option><option value="profile">Profile</option><option value="cost">Cost</option></select></label><button type="button" id="sortDir" class="ghost" aria-label="Change sort direction"></button><label for="statusBy">Status<select id="statusBy"><option value="">All</option></select></label><span class="dircount" id="dirCount" role="status"></span></div><div id="profiles" class="profiles"></div><p id="dirEmpty" hidden></p></section>
 <section id="planBox" hidden><div class="stack"><h2>Recommended path</h2><div id="plan" class="blocks"></div></div></section>
 <section id="introBox" hidden><div id="intro" class="blocks"></div></section>
 <section id="viewQs" hidden><div class="stack"><h2>Questions and answers</h2><p id="viewNote"></p><div id="viewList" class="stack"></div></div></section>
@@ -308,19 +308,22 @@ function pageLink(p,g){
   a.appendChild(el("b",g.title));a.appendChild(el("span",STAGE_NAME(k),"chip "+(k==="rerouting"?"warn":TONE[k]||"info")));
   a.appendChild(el("small","Created "+day(g.createdAt)+" · Updated "+day(g.updatedAt)+" · Research cost "+money(g.costUsd)));return a;
 }
+const SORTS={created:["Newest first","Oldest first","desc"],updated:["Latest first","Earliest first","desc"],profile:["A to Z","Z to A","asc"],cost:["Highest first","Lowest first","desc"]};
+let sortDir="desc";
 function renderDirectory(){
-  const sort=$("sortBy").value,want=$("statusBy").value,host=$("profiles");host.textContent="";
+  const sort=$("sortBy").value,want=$("statusBy").value,host=$("profiles"),flip=sortDir==="asc"?1:-1;host.textContent="";
+  $("sortDir").textContent=(sortDir===SORTS[sort][2]?SORTS[sort][0]:SORTS[sort][1])+(sortDir==="asc"?" ↑":" ↓");
   const keep=g=>!want||stageOf(g)===want;
   const rows=directory.flatMap(p=>p.pages.filter(keep).map(g=>({p,g})));
   if(sort==="profile"){
-    directory.forEach(p=>{
+    directory.slice().sort((x,y)=>flip*x.name.localeCompare(y.name,undefined,{sensitivity:"base"})).forEach(p=>{
       const pages=p.pages.filter(keep);if(!pages.length)return;
       const c=el("article",null,"profile");c.appendChild(el("h2",p.name));
       pages.slice().sort((x,y)=>y.createdAt.localeCompare(x.createdAt)).forEach(g=>c.appendChild(pageLink(p,g)));host.appendChild(c);
     });
   }else{
-    const key=sort==="updated"?"updatedAt":"createdAt";
-    rows.sort((x,y)=>y.g[key].localeCompare(x.g[key])).forEach(({p,g})=>{const c=el("article",null,"profile single");c.append(el("div",p.name,"who"),pageLink(p,g));host.appendChild(c)});
+    const cmp=sort==="cost"?(x,y)=>x.g.costUsd-y.g.costUsd:sort==="updated"?(x,y)=>x.g.updatedAt.localeCompare(y.g.updatedAt):(x,y)=>x.g.createdAt.localeCompare(y.g.createdAt);
+    rows.sort((x,y)=>flip*cmp(x,y)).forEach(({p,g})=>{const c=el("article",null,"profile single");c.append(el("div",p.name,"who"),pageLink(p,g));host.appendChild(c)});
   }
   $("dirCount").textContent=rows.length+(rows.length===1?" probe":" probes");
   const e=$("dirEmpty");e.textContent=directory.length?"No probes have this status.":"No probes published yet.";e.hidden=rows.length>0;
@@ -334,7 +337,8 @@ async function showDirectory(){
   kinds.forEach(k=>{const o=el("option",STAGE_NAME(k));o.value=k;sel.appendChild(o)});
   renderDirectory();$("dirBox").hidden=false;$("notice").hidden=true;
 }
-$("sortBy").addEventListener("change",renderDirectory);$("statusBy").addEventListener("change",renderDirectory);
+$("sortBy").addEventListener("change",()=>{sortDir=SORTS[$("sortBy").value][2];renderDirectory()});
+$("sortDir").addEventListener("click",()=>{sortDir=sortDir==="asc"?"desc":"asc";renderDirectory()});$("statusBy").addEventListener("change",renderDirectory);
 async function route(){
   try{if(onPage)await showPage();else await showDirectory()}
   catch(e){fail(e&&e.status===404?"This page doesn't exist.":"We couldn't load this page. Check your connection and try again.")}

@@ -44,6 +44,13 @@ ok((await titles())[0] === "Other goal" && (await txt(".pagelink small")).includ
 await page.select("#sortBy", "profile");
 const cards = await page.$$eval(".profile", (l) => l.map((c) => [c.querySelector("h2").textContent, c.querySelectorAll(".pagelink").length]));
 ok(cards.some(([n, c]) => n === "Test Person" && c === 2), "sorting by profile groups each person's pages");
+ok(cards.map(([n]) => n).join() === [...cards.map(([n]) => n)].sort((a, b) => a.localeCompare(b)).join() && (await txt("#sortDir")).startsWith("A to Z"), "profiles sort alphabetically");
+await page.click("#sortDir"); ok((await page.$eval(".profile h2", (e) => e.textContent)) === cards[cards.length - 1][0] && (await txt("#sortDir")).startsWith("Z to A"), "the profile sort can be reversed");
+pp("cost", second.id, "0.5", "test"); pp("cost", other.id, "0.1", "test");
+await page.reload({ waitUntil: "networkidle0" }); await page.waitForSelector(".pagelink");
+await page.select("#sortBy", "cost"); ok((await titles())[0] === "Second goal" && (await txt("#sortDir")).startsWith("Highest"), "sorting by cost starts with the highest");
+await page.click("#sortDir"); ok((await titles()).at(-1) === "Second goal", "the cost sort can be reversed");
+await page.select("#sortBy", "created"); await page.click("#sortDir"); ok((await titles())[0] === "First goal", "the date sort can be reversed");
 pp("publish", second.id, "--status", "plan_ready"); await page.reload({ waitUntil: "networkidle0" }); await page.waitForSelector(".pagelink");
 await page.select("#sortBy", "updated"); ok((await titles())[0] === "Second goal", "sorting by last updated works");
 await page.select("#statusBy", "plan_ready"); ok((await titles()).length === 1 && (await txt("#dirCount")) === "1 probe", "the status filter works");
