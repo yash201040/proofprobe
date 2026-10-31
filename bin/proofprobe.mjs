@@ -95,6 +95,8 @@ switch (cmd) {
     console.log(`Saved ${r.steps.length} step(s) to ${join(dirname(CFG), "cases", a[0])}/step-N`);
     break;
   }
+  case "approve-profile": out(await api("POST", `/profiles/${encodeURIComponent(a.join(" "))}/approve`)); break;
+  case "reject-profile": out(await api("POST", `/profiles/${encodeURIComponent(a.join(" "))}/reject`)); break;
   case "requests": out((await api("GET", "/requests")).requests); break;
   case "request": {
     const r = await api("GET", "/requests/" + a[0]);
@@ -136,5 +138,5 @@ switch (cmd) {
     break;
   }
   case "purge": out(await api("DELETE", "/cases/" + a[0])); break;
-  default: console.log("proofprobe init [--url U] | new --profile NAME --title T [--new-profile] | profiles | pending | requests | request ID | approve ID | reject ID | request-started ID --case CASE | export ID | import ID --answers F | cost ID USD [label] | password ID [--set P] | admin-setup | publish ID [--intro F] [--questions F] [--plan F] [--status S] [--new-step TITLE | --step N] [--allow-drop] | list | link ID | status ID | fetch ID [--seq N] [--out F] | purge ID");
+  default: console.log("proofprobe init [--url U] | new --profile NAME --title T [--new-profile] | profiles | pending | approve-profile NAME | reject-profile NAME | requests | request ID | approve ID | reject ID | request-started ID --case CASE | export ID | import ID --answers F | cost ID USD [label] | password ID [--set P] | admin-setup | publish ID [--intro F] [--questions F] [--plan F] [--status S] [--new-step TITLE | --step N] [--allow-drop] | list | link ID | status ID | fetch ID [--seq N] [--out F] | purge ID");
 }

@@ -65,6 +65,9 @@ td,li,p,h1,h2,summary,.qa{overflow-wrap:anywhere}
 <main id="app" hidden>
   <h1>Admin</h1>
   <div class="tiles" id="tiles"></div>
+  <h2>Profile requests</h2>
+  <div class="tablebox" id="applyBox" style="margin-block:10px 24px"><table class="cards"><thead><tr><th>Name</th><th>Reason</th><th>Password</th><th>Received</th><th>Decision</th></tr></thead><tbody id="applications"></tbody></table></div>
+  <p class="muted" id="noApply" hidden style="margin-block:10px 24px">No profile requests waiting.</p>
   <h2>Goal requests</h2>
   <div class="tablebox" id="reqBox" style="margin-block:10px 8px"><table class="cards"><thead><tr><th>From</th><th>Goal</th><th>Status</th><th>Files</th><th>Received</th><th></th></tr></thead><tbody id="requests"></tbody></table></div>
   <p class="muted" id="noReq" hidden style="margin-block:10px 8px">No requests yet.</p>
@@ -130,13 +133,19 @@ function profileRows(list,pages){
     go.addEventListener("click",async()=>{try{await api("/profiles/"+p.id+"/password",{method:"POST",body:JSON.stringify({password:inp.value})});await loadApp();$("pwMsg").textContent="Saved for "+p.name+". Devices using the old password are locked out."}catch(e){$("pwMsg").textContent=e.status===400?"Use 4 or more characters.":"Couldn't save."}});
     box.append(inp,go);set.appendChild(box);
     if(!p.pages){const del=el("button","Delete profile","link");del.type="button";del.className="link del";del.addEventListener("click",async()=>{if(del.dataset.armed){await api("/profiles/"+p.id,{method:"DELETE"}).catch(()=>{});loadApp()}else{del.dataset.armed="1";del.textContent="Press again to delete"}});box.appendChild(del)}
-    tr.append(el("td",p.name),el("td",String(p.pages),"num"),pw,set);body.appendChild(tr);
+    const nm=el("td",p.name);if(p.status==="rejected")nm.append(" ",el("span","Rejected","chip bad"));tr.append(nm,el("td",String(p.pages),"num"),pw,set);body.appendChild(tr);
   });
 }
 $("addProfile").addEventListener("click",async()=>{const n=$("newProfile");try{await api("/profiles",{method:"POST",body:JSON.stringify({name:n.value})});n.value="";loadApp()}catch(e){$("pwMsg").textContent="Enter a name for the profile."}});
 async function loadApp(){
   const d=await api("/overview");view(["app","foot","logout"]);
-  profileRows(d.profiles);
+  const pendingP=d.profiles.filter(p=>p.status==="pending"),ab=$("applications");ab.textContent="";
+  pendingP.forEach(p=>{const tr=el("tr"),pw=el("td"),show=el("button","Show","link show"),act=el("td");show.type="button";show.addEventListener("click",()=>reveal(p.id,pw));pw.appendChild(show);act.className="act";
+    const decide=(label,cls,status)=>{const x=el("button",label);x.type="button";x.className=cls;x.dataset.decide=status;x.addEventListener("click",async()=>{await api("/profiles/"+p.id+"/status",{method:"POST",body:JSON.stringify({status})});loadApp()});return x};
+    const r=el("div",null,"row");r.append(decide("Approve","","active"),decide("Reject","ghost","rejected"));act.appendChild(r);
+    tr.append(el("td",p.name),el("td",p.reason||""),pw,el("td",fmt(p.created_at)),act);ab.appendChild(tr)});
+  $("applyBox").hidden=!pendingP.length;$("noApply").hidden=pendingP.length>0;
+  profileRows(d.profiles.filter(p=>p.status!=="pending"));
   const REQ={new:["Needs a decision","warn"],approved:["Approved, queued","info"],rejected:["Rejected","bad"],started:["Research started","good"]};
   const rb=$("requests");rb.textContent="";
   d.requests.forEach(q=>{const tr=el("tr"),st=el("td"),act=el("td"),b=el("button","Review","link"),[n,tone]=REQ[q.status]||[q.status,"info"];st.appendChild(el("span",n,"chip "+tone));b.type="button";b.addEventListener("click",()=>loadRequest(q.id));act.className="act";act.appendChild(b);tr.append(el("td",q.name),el("td",q.title),st,el("td",String(q.files),"num"),el("td",fmt(q.created_at)),act);rb.appendChild(tr)});
@@ -166,7 +175,7 @@ async function loadApp(){
 }
 async function loadRequest(id){
   const q=await api("/requests/"+id),box=$("reqDetail");box.textContent="";box.hidden=false;
-  box.appendChild(el("h2",q.title));box.appendChild(el("p","From "+q.name+" · Contact: "+q.contact+" · "+fmt(q.created_at)));
+  box.appendChild(el("h2",q.title));box.appendChild(el("p","From "+q.profile+" · Contact: "+q.contact+" · "+fmt(q.created_at)));
   const b=el("p",q.body);b.style.whiteSpace="pre-wrap";box.appendChild(b);
   q.files.forEach(f=>{const a=el("a",f.name+" ("+Math.max(1,Math.round(f.size/1024))+" KB)");a.href="/api/admin/requests/"+q.id+"/files/"+f.id;a.setAttribute("download","");box.appendChild(a)});
   const row=el("div",null,"row"),msg=el("span",null,"muted");msg.id="reqMsg";

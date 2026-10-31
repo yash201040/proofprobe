@@ -1,0 +1,131 @@
+// Shared sign-in control for the home, Probes, research and request pages.
+(function () {
+  const LOCK = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>';
+  const PERSON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg>';
+  const css = `
+#acct{position:fixed;z-index:25;top:calc(env(safe-area-inset-top,0px) + 9px);right:max(16px,calc((100vw - 1440px)/2 + 16px),env(safe-area-inset-right,0px));display:flex;align-items:center;gap:8px;max-width:calc(100vw - 132px);font-family:"Source Sans 3","Instrument Sans","Segoe UI",system-ui,sans-serif}
+#acct button{font:600 16px/1.2 sans-serif;font-family:inherit;cursor:pointer}
+#acct svg{width:18px;height:18px;flex:none}
+#acct[hidden],#acctMenu[hidden]{display:none}
+.acctpill{display:inline-flex;align-items:center;gap:8px;min-height:48px;max-width:100%;padding:10px 20px;border-radius:999px;border:1px solid transparent;background:var(--accent,#5FC6C9);color:var(--surface,#071019);box-shadow:0 8px 24px rgba(0,0,0,.26);transition:transform .25s cubic-bezier(.2,1.4,.4,1),box-shadow .2s ease}
+.acctpill:active{transform:scale(.96)}
+.acctpill.me{background:var(--surface,#132029);color:var(--ink,#F2F7F6);border-color:var(--line,rgba(255,255,255,.2));min-width:0}
+.acctpill .nm{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.acctpill .pre{color:var(--muted,#9FB6BC);font-weight:500;flex:none}
+@media (hover:hover){.acctpill:hover{transform:translateY(-2px);box-shadow:0 12px 28px rgba(0,0,0,.3)}}
+#acctMenu{position:absolute;top:calc(100% + 8px);right:0;min-width:210px;padding:7px;display:grid;gap:2px;background:var(--surface,#132029);color:var(--ink,#F2F7F6);border:1px solid var(--line,rgba(255,255,255,.2));border-radius:12px;box-shadow:0 14px 34px rgba(0,0,0,.3)}
+#acctMenu a,#acctMenu button{display:block;width:100%;min-height:42px;padding:10px 12px;border:0;border-radius:8px;background:transparent;color:inherit;font-weight:600;font-size:16px;text-align:left;text-decoration:none}
+@media (hover:hover){#acctMenu a:hover,#acctMenu button:hover{background:var(--accent-soft,rgba(255,255,255,.1))}}
+#acctDlg{width:min(430px,calc(100vw - 28px));max-height:calc(100dvh - 28px);overflow:auto;padding:24px;border:1px solid var(--line,rgba(255,255,255,.2));border-radius:14px;background:var(--surface,#132029);color:var(--ink,#F2F7F6);font-family:"Source Sans 3","Instrument Sans","Segoe UI",system-ui,sans-serif;font-size:17px}
+#acctDlg::backdrop{background:rgba(0,0,0,.5)}
+#acctDlg h3{margin:0 0 6px;font:700 24px/1.2 "Familjen Grotesk","Bricolage Grotesque","Segoe UI",system-ui,sans-serif}
+#acctDlg p{margin:0}.acctnote{font-size:15px;color:var(--muted,#9FB6BC);margin-top:4px}
+#acctDlg form{display:grid;gap:12px;margin-top:14px}#acctDlg label{display:grid;gap:5px;font-weight:600;min-width:0}
+#acctDlg input,#acctDlg textarea{width:100%;box-sizing:border-box;padding:10px 12px;font:400 16px/1.45 sans-serif;font-family:inherit;color:inherit;background:var(--bg,#071019);border:1px solid var(--line,rgba(255,255,255,.2));border-radius:6px}
+#acctDlg textarea{min-height:92px;resize:vertical}
+.acctrow{display:flex;justify-content:flex-end;gap:8px;margin-top:4px}.acctrow button{min-height:44px;padding:9px 18px;border-radius:8px;border:1px solid var(--accent,#5FC6C9);font:600 16px sans-serif;font-family:inherit;cursor:pointer;background:var(--accent,#5FC6C9);color:var(--surface,#071019)}.acctrow button.gh{background:transparent;color:var(--accent,#5FC6C9)}
+.accterr{min-height:22px;color:var(--stop,#F0978C);font-size:15.5px}.acctok{color:var(--go,#6FD09D)}
+.acctswitch{margin-top:12px;font-size:15.5px;color:var(--muted,#9FB6BC)}.acctswitch button{background:none;border:0;padding:6px 2px;color:var(--accent,#5FC6C9);font:600 15.5px sans-serif;font-family:inherit;text-decoration:underline;cursor:pointer}
+@media (max-width:640px){.acctpill .pre{display:none}.acctpill{padding:10px 16px}}
+@media (prefers-reduced-motion:reduce){.acctpill{transition:none}}
+`;
+  const style = document.createElement("style"); style.textContent = css; document.head.appendChild(style);
+  const root = document.createElement("div"); root.id = "acct"; root.hidden = true; document.body.appendChild(root);
+  const el = (t, text, cls) => { const e = document.createElement(t); if (text != null) e.textContent = text; if (cls) e.className = cls; return e; };
+  const PP = (window.PP = { me: null, profileHint: "", extra: el("span"), open: null, ready: null });
+  PP.extra.style.cssText = "display:contents";
+
+  const dlg = el("dialog"); dlg.id = "acctDlg"; document.body.appendChild(dlg);
+  const field = (label, id, type, attrs = {}) => {
+    const l = el("label", label), i = el(type === "area" ? "textarea" : "input"); i.id = id;
+    if (type !== "area") i.type = type;
+    Object.entries(attrs).forEach(([k, v]) => i.setAttribute(k, v)); l.appendChild(i); return { l, i };
+  };
+  function shell(title, note) { dlg.textContent = ""; dlg.appendChild(el("h3", title)); if (note) dlg.appendChild(el("p", note, "acctnote")); }
+  function actions(form, label) {
+    const err = el("p", null, "accterr"); err.setAttribute("role", "alert");
+    const row = el("div", null, "acctrow"), no = el("button", "Cancel", "gh"), go = el("button", label); no.type = "button"; go.type = "submit"; go.id = "acctGo";
+    no.addEventListener("click", () => dlg.close()); row.append(no, go); form.append(err, row); return { err, go };
+  }
+  function signIn(name) {
+    shell("Sign in", "Use your approved profile.");
+    const form = el("form"), n = field("Profile name", "acctName", "text", { autocomplete: "username", maxlength: "80" }), p = field("Password", "acctPass", "password", { autocomplete: "current-password" });
+    n.i.value = name || ""; form.append(n.l, p.l); const { err, go } = actions(form, "Sign in"); dlg.appendChild(form);
+    const sw = el("p", "No profile yet? ", "acctswitch"), b = el("button", "Request a profile"); b.type = "button"; b.id = "acctApply"; b.addEventListener("click", () => apply(n.i.value)); sw.appendChild(b); dlg.appendChild(sw); dlg.appendChild(el("p", "Forgotten your password? Ask the site owner.", "acctnote"));
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault(); err.textContent = ""; go.disabled = true;
+      try {
+        const r = await fetch("/api/session", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: n.i.value, password: p.i.value }) });
+        if (r.ok) { try { sessionStorage.setItem("pp-just-signed-in", "1"); } catch (x) {} location.reload(); return; }
+        const d = r.status === 403 ? await r.json().catch(() => ({})) : {};
+        err.textContent = r.status !== 403 ? "That name or password isn't right." : d.status === "pending" ? "This profile is still waiting for approval." : "This profile wasn't approved.";
+      } catch (x) { err.textContent = "Couldn't sign in. Check your connection and try again."; }
+      go.disabled = false;
+    });
+    if (!dlg.open) dlg.showModal();
+    (name ? p.i : n.i).focus();
+  }
+  function apply(name) {
+    shell("Request a profile", "You can sign in once it's approved.");
+    const form = el("form"), n = field("Profile name", "applyName", "text", { autocomplete: "username", maxlength: "60" }), p = field("Password", "applyPass", "password", { autocomplete: "new-password" }), r = field("Why do you want a profile?", "applyReason", "area", { maxlength: "500" });
+    n.i.value = name || ""; form.append(n.l, p.l, el("p", "Use 8 or more characters, and choose a new password. The site owner can see it, so don't reuse one from anywhere else.", "acctnote"), r.l);
+    const { err, go } = actions(form, "Send request"); dlg.appendChild(form);
+    const sw = el("p", "Already approved? ", "acctswitch"), b = el("button", "Sign in"); b.type = "button"; b.addEventListener("click", () => signIn(n.i.value)); sw.appendChild(b); dlg.appendChild(sw);
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault(); err.textContent = "";
+      if (n.i.value.trim().length < 2) return void (err.textContent = "Enter a profile name.");
+      if (p.i.value.length < 8) return void (err.textContent = "Use 8 or more characters for the password.");
+      if (r.i.value.trim().length < 10) return void (err.textContent = "Please add a short reason.");
+      go.disabled = true;
+      try {
+        const res = await fetch("/api/profiles", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: n.i.value, password: p.i.value, reason: r.i.value }) });
+        if (res.ok) { shell("Request sent", "We'll review it. You can sign in once it's approved."); const row = el("div", null, "acctrow"), ok = el("button", "Done"); ok.addEventListener("click", () => dlg.close()); row.appendChild(ok); dlg.appendChild(row); return; }
+        err.textContent = res.status === 409 ? "That name is taken. Please choose another." : res.status === 429 ? "Too many requests right now. Please try again later." : "Please check the form and try again.";
+      } catch (x) { err.textContent = "That wasn't sent. Check your connection and try again."; }
+      go.disabled = false;
+    });
+    if (!dlg.open) dlg.showModal();
+    n.i.focus();
+  }
+  function changePassword() {
+    shell("Change password", "This signs out your other devices.");
+    const form = el("form"), c = field("Current password", "pwCurrent", "password", { autocomplete: "current-password" }), n = field("New password", "pwNew", "password", { autocomplete: "new-password" }), r = field("Repeat new password", "pwRepeat", "password", { autocomplete: "new-password" });
+    form.append(c.l, n.l, r.l, el("p", "Use 8 or more characters. The site owner can see it, so don't reuse one from anywhere else.", "acctnote"));
+    const { err, go } = actions(form, "Change password"); dlg.appendChild(form);
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault(); err.textContent = "";
+      if (!c.i.value) return void (err.textContent = "Enter your current password.");
+      if (n.i.value.length < 8) return void (err.textContent = "Use 8 or more characters for the new password.");
+      if (n.i.value !== r.i.value) return void (err.textContent = "The new passwords don't match.");
+      if (n.i.value === c.i.value) return void (err.textContent = "Choose a password you aren't using now.");
+      go.disabled = true;
+      try {
+        const res = await fetch("/api/session/password", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ current: c.i.value, next: n.i.value }) });
+        if (res.ok) { shell("Password changed", "Use your new password next time you sign in."); const row = el("div", null, "acctrow"), ok = el("button", "Done"); ok.id = "pwDone"; ok.addEventListener("click", () => dlg.close()); row.appendChild(ok); dlg.appendChild(row); return; }
+        err.textContent = res.status === 403 ? "Your current password isn't right." : res.status === 401 ? "Your session has ended. Please sign in again." : "Please check the form and try again.";
+      } catch (x) { err.textContent = "That wasn't saved. Check your connection and try again."; }
+      go.disabled = false;
+    });
+    dlg.showModal(); c.i.focus();
+  }
+  PP.open = (name) => signIn(name ?? PP.profileHint);
+  PP.apply = apply;
+  function render() {
+    root.textContent = ""; root.appendChild(PP.extra);
+    if (!PP.me) {
+      const b = el("button", null, "acctpill"); b.type = "button"; b.id = "acctBtn"; b.innerHTML = LOCK; b.appendChild(el("span", "Sign in")); b.addEventListener("click", () => PP.open()); root.appendChild(b);
+    } else {
+      const b = el("button", null, "acctpill me"); b.type = "button"; b.id = "acctMe"; b.setAttribute("aria-expanded", "false"); b.setAttribute("aria-haspopup", "true"); b.innerHTML = PERSON; b.append(el("span", "Signed in as", "pre"), el("span", PP.me.name, "nm"));
+      const menu = el("div"); menu.id = "acctMenu"; menu.hidden = true;
+      const mine = el("a", "My probes"); mine.href = "/probes#mine"; const req = el("a", "Request a probe"); req.href = "/request";
+      const pw = el("button", "Change password"); pw.type = "button"; pw.id = "acctPw"; pw.addEventListener("click", changePassword);
+      const out = el("button", "Sign out"); out.type = "button"; out.id = "acctOut";
+      out.addEventListener("click", async () => { await fetch("/api/session", { method: "DELETE" }).catch(() => {}); location.reload(); });
+      menu.append(mine, req, pw, out); root.append(b, menu);
+      b.addEventListener("click", (e) => { e.stopPropagation(); menu.hidden = !menu.hidden; b.setAttribute("aria-expanded", String(!menu.hidden)); });
+      document.addEventListener("click", () => { menu.hidden = true; b.setAttribute("aria-expanded", "false"); });
+      document.addEventListener("keydown", (e) => { if (e.key === "Escape") { menu.hidden = true; b.setAttribute("aria-expanded", "false"); } });
+    }
+    root.hidden = false;
+  }
+  PP.ready = fetch("/api/session").then((r) => r.json()).then((d) => { PP.me = d.signedIn ? { name: d.name, slug: d.slug } : null; }).catch(() => {}).then(() => { render(); return PP.me; });
+})();

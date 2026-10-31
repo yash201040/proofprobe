@@ -8,7 +8,7 @@ Two-step research that turns any starting point into a clear, data-backed path: 
 2. **In-depth research:** when asked, read the latest submission and publish the path on the same page, as one recommendation or up to three alternatives.
 
 - **`/proofprobe` skill** (`skills/proofprobe/SKILL.md`): runs in Claude Code. Opus does the thinking and treg does the live research, so the server needs no AI key.
-- **Worker** (`src/`): hosts the home page and the Probes directory, organised as profiles with one or more pages. Anyone can view a page, and the profile's password unlocks editing.
+- **Worker** (`src/`): hosts the home page and the Probes directory, organised as profiles with one or more pages. Anyone can view a page, and signing in to the profile unlocks editing.
 - **`bin/proofprobe.mjs`**: admin helper to create, publish, check and fetch cases.
 
 ## For agents and other chats
@@ -32,7 +32,7 @@ Local test: put `ADMIN_TOKEN_SHA256=<hash>` and `PASSWORD_KEY=<base64 key>` in `
 
 ## Data rules
 
-- Anyone can read each page's research, questions, status and cost, and a notice says so. Answers stay private to the profile's password holder and the owner. Each profile has one password, which unlocks all of its pages and no others.
+- Anyone can read each page's research, questions, status and cost, and a notice says so. Answers stay private to the signed-in profile and the owner. People apply for a profile, the owner approves it, and signing in unlocks that profile's pages and no others. People can change their own password once signed in.
 - Each research stage is a step, shown as a view on the same page. New research adds a step and never replaces one.
 - Submitting stores a log and starts nothing. Research continues only when `/proofprobe` is run.
 - The cost shown on a page is treg data spend logged with `proofprobe cost`. Claude usage is not included.

@@ -2,6 +2,7 @@ import APP from "./page.html";
 import LANDING from "./landing.html";
 import ADMIN from "./admin.html";
 import REQUEST from "./request.html";
+import ACCOUNT from "./account.txt";
 import { SCHEMA } from "./schema";
 
 export interface Env { DB: D1Database; APP_VERSION: string; ADMIN_TOKEN_SHA256: string; PASSWORD_KEY: string }
@@ -14,7 +15,9 @@ const ADMIN_DAYS = 90;
 const ADMIN_MAX_FAILS = 6;
 const ADMIN_LOCK_MINUTES = 15;
 const ADMIN_SESSION = "__admin";
-const SCHEMA_VERSION = "5";
+const SCHEMA_VERSION = "6";
+const MAX_PENDING_PROFILES = 100;
+const APPLICATIONS_PER_HOUR = 5;
 const MAX_FILES = 5;
 const MAX_UPLOAD = 10 * 1024 * 1024;
 const CHUNK = 1024 * 1024;
@@ -34,7 +37,7 @@ const SEC: Record<string, string> = {
   "X-Content-Type-Options": "nosniff",
   "X-Frame-Options": "DENY",
 };
-const CSP = "default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; connect-src 'self'; img-src 'self' data:; base-uri 'none'; form-action 'none'";
+const CSP = "default-src 'none'; script-src 'self' 'unsafe-inline'; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; connect-src 'self'; img-src 'self' data:; base-uri 'none'; form-action 'none'";
 
 const json = (body: unknown, status = 200, extra: Record<string, string> = {}) =>
   new Response(JSON.stringify(body), { status, headers: { ...SEC, "Content-Type": "application/json; charset=utf-8", ...extra } });
@@ -63,10 +66,10 @@ interface Section { title: string; note?: string; first?: boolean; questions: Qu
 interface CaseRow {
   id: string; title: string; first_name: string; status: string;
   created_at: string; updated_at: string; profile_id: string | null; slug: string | null;
-  p_name: string; p_slug: string; p_hash: string | null; p_salt: string | null; p_version: number;
+  p_name: string; p_slug: string;
 }
 interface Step { n: number; title: string; intro: unknown[]; sections: Section[]; plan: unknown[]; createdAt: string }
-interface ProfileRow { id: string; slug: string; name: string; password_hash: string | null; password_salt: string | null; password_enc: string | null; password_iv: string | null; pw_version: number }
+interface ProfileRow { id: string; slug: string; name: string; status: string; reason: string | null; password_hash: string | null; password_salt: string | null; password_enc: string | null; password_iv: string | null; pw_version: number }
 
 async function freeSlug(env: Env, table: "profiles" | "cases", base: string, scope?: string) {
   for (let i = 1; ; i++) {
@@ -98,6 +101,11 @@ async function schemaCurrent(env: Env) {
 }
 async function migrate(env: Env) {
   await env.DB.batch(SCHEMA.map((q) => env.DB.prepare(q)));
+  const pcols = new Set((await env.DB.prepare("SELECT name FROM pragma_table_info('profiles')").all()).results.map((r: any) => r.name as string));
+  if (!pcols.has("status")) await env.DB.prepare("ALTER TABLE profiles ADD COLUMN status TEXT NOT NULL DEFAULT 'active'").run();
+  if (!pcols.has("reason")) await env.DB.prepare("ALTER TABLE profiles ADD COLUMN reason TEXT").run();
+  const rcols = new Set((await env.DB.prepare("SELECT name FROM pragma_table_info('requests')").all()).results.map((r: any) => r.name as string));
+  if (!rcols.has("profile_id")) await env.DB.prepare("ALTER TABLE requests ADD COLUMN profile_id TEXT").run();
   const subs = new Set((await env.DB.prepare("SELECT name FROM pragma_table_info('submissions')").all()).results.map((r: any) => r.name as string));
   if (!subs.has("step_n")) await env.DB.prepare("ALTER TABLE submissions ADD COLUMN step_n INTEGER NOT NULL DEFAULT 1").run();
   const cols = new Set((await env.DB.prepare("SELECT name FROM pragma_table_info('cases')").all()).results.map((r: any) => r.name as string));
@@ -164,23 +172,31 @@ async function pendingWork(env: Env) {
     return c.last_submitted && c.last_submitted > c.latest_step ? [{ ...base, kind: "answers", since: c.last_submitted, detail: null }] : [];
   })];
 }
+async function setProfileStatus(env: Env, id: string, status: string, ray: string) {
+  await env.DB.batch([
+    env.DB.prepare("UPDATE profiles SET status = ? WHERE id = ?").bind(status, id),
+    ...(status === "active" ? [] : [env.DB.prepare("DELETE FROM sessions WHERE case_id = ?").bind(id)]),
+    audit(env, null, "admin", "profile_" + status, "profile=" + id, ray),
+  ]);
+}
 async function createRequest(request: Request, env: Env, ray: string) {
+  const me = await signedIn(request, env);
+  if (!me) return json({ error: "sign_in_required" }, 401);
   const form = await request.formData().catch(() => null);
   if (!form) return json({ error: "bad_request" }, 400);
   const text = (k: string) => { const v = form.get(k); return typeof v === "string" ? v.trim() : ""; };
-  if (text("website")) return json({ ref: "PP-000000" }); // A hidden field only bots fill in.
-  const name = text("name"), contact = text("contact"), title = text("title"), body = text("body");
-  if (!name || !contact || !title || body.length < 40 || name.length > 80 || contact.length > 160 || title.length > 140 || body.length > MAX_REQUEST_BODY) return json({ error: "bad_request" }, 400);
+  const name = me.name, contact = text("contact"), title = text("title"), body = text("body");
+  if (!contact || !title || body.length < 40 || contact.length > 160 || title.length > 140 || body.length > MAX_REQUEST_BODY) return json({ error: "bad_request" }, 400);
   const files = form.getAll("files").filter((f): f is File => typeof f !== "string" && f.size > 0);
   if (files.length > MAX_FILES || files.reduce((a, f) => a + f.size, 0) > MAX_UPLOAD) return json({ error: "too_large" }, 413);
-  const ip = await sha256("ip:" + (request.headers.get("cf-connecting-ip") ?? "local")), hourAgo = new Date(Date.now() - 3_600_000).toISOString();
+  const ip = await sha256("profile:" + me.id), hourAgo = new Date(Date.now() - 3_600_000).toISOString();
   const [recent, open] = await env.DB.batch([
     env.DB.prepare("SELECT COUNT(*) AS n FROM requests WHERE ip_hash = ? AND created_at > ?").bind(ip, hourAgo),
     env.DB.prepare("SELECT COUNT(*) AS n FROM requests WHERE status = 'new'"),
   ]);
   if ((recent.results[0] as any).n >= REQUESTS_PER_HOUR || (open.results[0] as any).n >= MAX_OPEN_REQUESTS) return json({ error: "rate_limited" }, 429);
   const id = crypto.randomUUID().slice(0, 8), now = new Date().toISOString();
-  const writes = [env.DB.prepare("INSERT INTO requests(id, name, contact, title, body, ip_hash, created_at) VALUES (?,?,?,?,?,?,?)").bind(id, name, contact, title, body, ip, now)];
+  const writes = [env.DB.prepare("INSERT INTO requests(id, profile_id, name, contact, title, body, ip_hash, created_at) VALUES (?,?,?,?,?,?,?,?)").bind(id, me.id, name, contact, title, body, ip, now)];
   for (const f of files) {
     const fid = crypto.randomUUID().slice(0, 12), bytes = new Uint8Array(await f.arrayBuffer());
     writes.push(env.DB.prepare("INSERT INTO request_files(id, request_id, name, size, created_at) VALUES (?,?,?,?,?)").bind(fid, id, f.name.slice(0, 180) || "file", f.size, now));
@@ -191,7 +207,7 @@ async function createRequest(request: Request, env: Env, ray: string) {
   return json({ ref: "PP-" + id.toUpperCase() }, 201);
 }
 async function requestDetail(env: Env, id: string) {
-  const q = await env.DB.prepare("SELECT id, name, contact, title, body, status, case_id, created_at, decided_at FROM requests WHERE id = ?").bind(id).first<any>();
+  const q = await env.DB.prepare("SELECT id, name AS profile, contact, title, body, status, case_id, created_at, decided_at FROM requests WHERE id = ?").bind(id).first<any>();
   if (!q) return null;
   const f = await env.DB.prepare("SELECT id, name, size FROM request_files WHERE request_id = ? ORDER BY created_at, name").bind(id).all();
   return { ...q, files: f.results };
@@ -252,7 +268,6 @@ async function currentAnswers(env: Env, caseId: string) {
 const audit = (env: Env, caseId: string | null, actor: string, action: string, detail: string | null, ray: string) =>
   env.DB.prepare("INSERT INTO audit_log(case_id, actor, action, detail, ray_id, at) VALUES (?,?,?,?,?,?)").bind(caseId, actor, action, detail, ray, new Date().toISOString());
 
-const cookieName = (profileId: string) => `pp_edit_${profileId}`;
 function readCookie(request: Request, name: string) {
   for (const part of (request.headers.get("Cookie") ?? "").split(";")) {
     const [k, ...v] = part.trim().split("=");
@@ -261,11 +276,12 @@ function readCookie(request: Request, name: string) {
   return null;
 }
 const profileOf = (env: Env, id: string | null) => env.DB.prepare("SELECT * FROM profiles WHERE id = ?").bind(id).first<ProfileRow>();
-async function canEdit(request: Request, env: Env, row: CaseRow) {
-  const token = readCookie(request, cookieName(row.profile_id!));
-  if (!token) return false;
-  const s = await env.DB.prepare("SELECT pw_version, expires_at FROM sessions WHERE token_hash = ? AND case_id = ?").bind(await sha256(token), row.profile_id).first<any>();
-  return !!s && s.pw_version === row.p_version && s.expires_at > new Date().toISOString();
+// One sign-in covers every page in that person's profile, and nobody else's.
+async function signedIn(request: Request, env: Env) {
+  const token = readCookie(request, "pp_session");
+  if (!token) return null;
+  return env.DB.prepare(`SELECT p.id, p.slug, p.name FROM sessions s JOIN profiles p ON p.id = s.case_id
+    WHERE s.token_hash = ? AND s.pw_version = p.pw_version AND s.expires_at > ? AND p.status = 'active'`).bind(await sha256(token), new Date().toISOString()).first<{ id: string; slug: string; name: string }>();
 }
 
 const b64 = (u: ArrayBuffer | Uint8Array) => btoa(String.fromCharCode(...new Uint8Array(u instanceof Uint8Array ? u.buffer : u)));
@@ -288,20 +304,61 @@ async function setProfilePassword(env: Env, id: string, password: string, actor:
   ]);
 }
 
-// There is deliberately no lockout: visitors are welcome to try passwords while this is a showcase.
-async function unlock(request: Request, env: Env, row: CaseRow, ray: string) {
-  const body = await request.json().catch(() => null) as { password?: unknown } | null;
-  if (typeof body?.password !== "string" || body.password.length > 200) return json({ error: "bad_request" }, 400);
-  if (!row.p_hash || !row.p_salt) return json({ error: "no_password" }, 409);
-  if ((await sha256(row.p_salt + body.password)) !== row.p_hash) return json({ error: "wrong_password" }, 401);
-  const now = new Date(), id = row.profile_id!;
-  const token = randomToken(), expires = new Date(now.getTime() + SESSION_DAYS * 86_400_000).toISOString();
+// There is deliberately no lockout on profile passwords.
+async function signIn(request: Request, env: Env, ray: string) {
+  const body = await request.json().catch(() => null) as { name?: unknown; password?: unknown } | null;
+  if (typeof body?.name !== "string" || typeof body.password !== "string" || body.password.length > 200) return json({ error: "bad_request" }, 400);
+  const { match } = await findProfile(env, body.name);
+  const profile = match ? await profileOf(env, match.id) : null;
+  const right = !!profile?.password_hash && !!profile.password_salt && (await sha256(profile.password_salt + body.password)) === profile.password_hash;
+  if (!profile || !right) return json({ error: "wrong_details" }, 401);
+  if (profile.status !== "active") return json({ error: "not_approved", status: profile.status }, 403);
+  const cookie = await newSession(env, profile.id);
   await env.DB.batch([
-    env.DB.prepare("INSERT INTO sessions(token_hash, case_id, pw_version, expires_at) VALUES (?,?,?,?)").bind(await sha256(token), id, row.p_version, expires),
-    env.DB.prepare("DELETE FROM sessions WHERE expires_at < ?").bind(now.toISOString()),
-    audit(env, null, "editor", "unlock", "profile=" + id, ray),
+    env.DB.prepare("DELETE FROM sessions WHERE expires_at < ?").bind(new Date().toISOString()),
+    audit(env, null, "editor", "sign_in", "profile=" + profile.id, ray),
   ]);
-  return json({ ok: true }, 200, { "Set-Cookie": `${cookieName(id)}=${token}; Path=/; Max-Age=${SESSION_DAYS * 86_400}; HttpOnly; Secure; SameSite=Strict` });
+  return json({ name: profile.name, slug: profile.slug }, 200, { "Set-Cookie": cookie });
+}
+async function newSession(env: Env, id: string) {
+  const token = randomToken(), expires = new Date(Date.now() + SESSION_DAYS * 86_400_000).toISOString();
+  await env.DB.prepare("INSERT INTO sessions(token_hash, case_id, pw_version, expires_at) SELECT ?, id, pw_version, ? FROM profiles WHERE id = ?").bind(await sha256(token), expires, id).run();
+  return `pp_session=${token}; Path=/; Max-Age=${SESSION_DAYS * 86_400}; HttpOnly; Secure; SameSite=Lax`;
+}
+// Changing a password signs out every other device, and this one stays signed in.
+async function changePassword(request: Request, env: Env, ray: string) {
+  const me = await signedIn(request, env);
+  if (!me) return json({ error: "sign_in_required" }, 401);
+  const b = await request.json().catch(() => null) as { current?: unknown; next?: unknown } | null;
+  if (typeof b?.current !== "string" || typeof b.next !== "string" || b.current.length > 200 || b.next.length < 8 || b.next.length > 200) return json({ error: "bad_request" }, 400);
+  const profile = await profileOf(env, me.id);
+  if (!profile?.password_salt || (await sha256(profile.password_salt + b.current)) !== profile.password_hash) return json({ error: "wrong_password" }, 403);
+  if (b.next === b.current) return json({ error: "same_password" }, 400);
+  await setProfilePassword(env, me.id, b.next, "editor", ray);
+  return json({ ok: true }, 200, { "Set-Cookie": await newSession(env, me.id) });
+}
+async function signOut(request: Request, env: Env) {
+  const token = readCookie(request, "pp_session");
+  if (token) await env.DB.prepare("DELETE FROM sessions WHERE token_hash = ?").bind(await sha256(token)).run();
+  return json({ ok: true }, 200, { "Set-Cookie": "pp_session=; Path=/; Max-Age=0; HttpOnly; Secure; SameSite=Lax" });
+}
+async function applyForProfile(request: Request, env: Env, ray: string) {
+  const b = await request.json().catch(() => null) as { name?: unknown; password?: unknown; reason?: unknown } | null;
+  const name = typeof b?.name === "string" ? tidyName(b.name) : "", reason = typeof b?.reason === "string" ? b.reason.trim() : "";
+  if (name.length < 2 || name.length > 60 || typeof b?.password !== "string" || b.password.length < 8 || b.password.length > 200 || reason.length < 10 || reason.length > 500) return json({ error: "bad_request" }, 400);
+  const ip = await sha256("apply:" + (request.headers.get("cf-connecting-ip") ?? "local")), hourAgo = new Date(Date.now() - 3_600_000).toISOString();
+  const [recent, pending] = await env.DB.batch([
+    env.DB.prepare("SELECT COUNT(*) AS n FROM audit_log WHERE action = 'profile_applied' AND detail = ? AND at > ?").bind(ip, hourAgo),
+    env.DB.prepare("SELECT COUNT(*) AS n FROM profiles WHERE status = 'pending'"),
+  ]);
+  if ((recent.results[0] as any).n >= APPLICATIONS_PER_HOUR || (pending.results[0] as any).n >= MAX_PENDING_PROFILES) return json({ error: "rate_limited" }, 429);
+  if ((await findProfile(env, name)).match) return json({ error: "name_taken" }, 409);
+  const id = crypto.randomUUID().slice(0, 8), now = new Date().toISOString(), slug = await freeSlug(env, "profiles", slugify(name)), salt = randomToken(), sealed = await seal(env, b.password);
+  await env.DB.batch([
+    env.DB.prepare("INSERT INTO profiles(id, slug, name, status, reason, password_hash, password_salt, password_enc, password_iv, created_at) VALUES (?,?,?,'pending',?,?,?,?,?,?)").bind(id, slug, name, reason, await sha256(salt + b.password), salt, sealed.enc, sealed.iv, now),
+    audit(env, null, "visitor", "profile_applied", ip, ray),
+  ]);
+  return json({ ok: true }, 201);
 }
 
 async function submit(env: Env, row: CaseRow, key: string, ray: string) {
@@ -338,7 +395,7 @@ async function submit(env: Env, row: CaseRow, key: string, ray: string) {
 }
 
 async function directory(env: Env) {
-  const profiles = await env.DB.prepare("SELECT id, slug, name FROM profiles ORDER BY created_at").all<any>();
+  const profiles = await env.DB.prepare("SELECT id, slug, name FROM profiles WHERE status = 'active' ORDER BY created_at").all<any>();
   const pages = await env.DB.prepare(`SELECT c.profile_id, c.slug, c.title, c.status, c.created_at, c.updated_at,
     (SELECT COALESCE(SUM(e.usd_micro), 0) FROM cost_entries e WHERE e.case_id = c.id) AS micro,
     EXISTS (SELECT 1 FROM reroutes r WHERE r.case_id = c.id AND r.handled_at IS NULL) AS rerouting
@@ -350,7 +407,7 @@ async function directory(env: Env) {
 }
 
 async function pageApi(request: Request, env: Env, row: CaseRow, rest: string, ray: string) {
-  const editable = await canEdit(request, env, row);
+  const editable = (await signedIn(request, env))?.id === row.profile_id;
   if (rest === "" && request.method === "GET") {
     const [stepR, costR, rerouteR] = await env.DB.batch([
       env.DB.prepare("SELECT * FROM steps WHERE case_id = ? ORDER BY n").bind(row.id),
@@ -360,21 +417,15 @@ async function pageApi(request: Request, env: Env, row: CaseRow, rest: string, r
     const steps: Step[] = (stepR.results as any[]).map((x) => ({ n: x.n, title: x.title, intro: parse(x.intro_json, []), sections: parse<Section[]>(x.questions_json, []), plan: parse(x.plan_json, []), createdAt: x.created_at }));
     const open = answerStep(steps);
     // Answers and requested directions are private to the profile. Visitors get research, questions, status and cost.
-    const pub = { title: row.title, name: row.p_name, profileSlug: row.p_slug, status: row.status, costUsd: ((costR.results[0] as any)?.micro ?? 0) / 1_000_000, hasPassword: !!row.p_hash, editable, steps, openStep: open?.n ?? null, rerouting: !!rerouteR.results[0] };
+    const pub = { title: row.title, name: row.p_name, profileSlug: row.p_slug, status: row.status, costUsd: ((costR.results[0] as any)?.micro ?? 0) / 1_000_000, editable, steps, openStep: open?.n ?? null, rerouting: !!rerouteR.results[0] };
     if (!editable) return json(pub);
     const subs = await env.DB.prepare("SELECT seq, step_n, submitted_at, payload FROM submissions WHERE case_id = ? ORDER BY seq").bind(row.id).all<any>();
     const logs: Record<string, unknown> = {};
     for (const x of subs.results) logs[x.step_n] = { seq: x.seq, submittedAt: x.submitted_at, items: parse(x.payload, []) };
     return json({ ...pub, reroute: rerouteR.results[0] ?? null, answers: await currentAnswers(env, row.id), submissions: await summaries(env, row.id), logs });
   }
-  if (rest === "unlock" && request.method === "POST") return unlock(request, env, row, ray);
-  if (rest === "lock" && request.method === "POST") {
-    const token = readCookie(request, cookieName(row.profile_id!));
-    if (token) await env.DB.prepare("DELETE FROM sessions WHERE token_hash = ?").bind(await sha256(token)).run();
-    return json({ ok: true }, 200, { "Set-Cookie": `${cookieName(row.profile_id!)}=; Path=/; Max-Age=0; HttpOnly; Secure; SameSite=Strict` });
-  }
   if (!(rest === "answers" && request.method === "PUT") && !((rest === "submit" || rest === "reroute") && request.method === "POST")) return notFound();
-  if (!editable) return json({ error: "locked" }, 401);
+  if (!editable) return json({ error: "sign_in_required" }, 401);
   if (row.status === "closed") return json({ error: "closed" }, 403);
 
   if (rest === "reroute") {
@@ -491,7 +542,7 @@ async function adminSite(request: Request, env: Env, parts: string[], ray: strin
     return notFound();
   }
   if (what === "overview" && request.method === "GET") {
-    const profiles = await env.DB.prepare(`SELECT p.id, p.name, p.slug, p.password_hash IS NOT NULL AS has_password, (SELECT COUNT(*) FROM cases c WHERE c.profile_id = p.id) AS pages FROM profiles p ORDER BY p.created_at`).all();
+    const profiles = await env.DB.prepare(`SELECT p.id, p.name, p.slug, p.status, p.reason, p.created_at, p.password_hash IS NOT NULL AS has_password, (SELECT COUNT(*) FROM cases c WHERE c.profile_id = p.id) AS pages FROM profiles p ORDER BY p.created_at`).all();
     const stepRows = await env.DB.prepare("SELECT case_id, n, questions_json FROM steps ORDER BY n").all<any>();
     const totals = new Map<string, number>(), stepCount = new Map<string, number>();
     for (const x of stepRows.results) {
@@ -518,6 +569,12 @@ async function adminSite(request: Request, env: Env, parts: string[], ray: strin
   if (what === "profiles" && id) {
     const profile = await profileOf(env, id);
     if (!profile) return json({ error: "not_found" }, 404);
+    if (sub === "status" && request.method === "POST") {
+      const b = await request.json().catch(() => null) as { status?: unknown } | null;
+      if (b?.status !== "active" && b?.status !== "rejected") return json({ error: "bad_status" }, 400);
+      await setProfileStatus(env, id, b.status, ray);
+      return json({ ok: true });
+    }
     if (sub === "password" && request.method === "GET") {
       await audit(env, null, "admin", "password_viewed", "profile=" + id, ray).run();
       return json({ password: profile.password_enc && profile.password_iv ? await unseal(env, profile.password_enc, profile.password_iv) : null });
@@ -595,8 +652,14 @@ async function admin(request: Request, env: Env, parts: string[], ray: string) {
     }
     return notFound();
   }
-  if (root === "profiles" && request.method === "GET") {
-    const r = await env.DB.prepare("SELECT p.name, p.slug, p.password_hash IS NOT NULL AS has_password, (SELECT COUNT(*) FROM cases c WHERE c.profile_id = p.id) AS pages FROM profiles p ORDER BY p.created_at").all();
+  if (root === "profiles" && (request.method === "GET" || request.method === "POST")) {
+    if (id && (sub === "approve" || sub === "reject")) {
+      const { match } = await findProfile(env, decodeURIComponent(id));
+      if (!match) return json({ error: "not_found" }, 404);
+      await setProfileStatus(env, match.id, sub === "approve" ? "active" : "rejected", ray);
+      return json({ ok: true });
+    }
+    const r = await env.DB.prepare("SELECT p.name, p.slug, p.status, p.reason, p.password_hash IS NOT NULL AS has_password, (SELECT COUNT(*) FROM cases c WHERE c.profile_id = p.id) AS pages FROM profiles p ORDER BY p.created_at").all();
     return json({ profiles: r.results });
   }
   if (root !== "cases") return notFound();
@@ -713,6 +776,7 @@ export default {
     const page = request.method === "GET" || request.method === "HEAD";
     try {
       if (!parts.length && page) return html(LANDING, request);
+      if (parts[0] === "assets" && parts[1] === "account.js" && page) return new Response(ACCOUNT, { headers: { "Content-Type": "application/javascript; charset=utf-8", "Cache-Control": "public, max-age=300", "X-Content-Type-Options": "nosniff" } });
       if (parts[0] === "probes" && (parts.length === 1 || parts.length === 3) && page) return html(APP, request);
       if (parts[0] === "admin" && parts.length === 1 && page) return html(ADMIN, request);
       if (parts[0] === "request" && parts.length === 1 && page) return html(REQUEST, request);
@@ -721,9 +785,16 @@ export default {
       if (parts[0] === "admin") return await admin(request, env, parts.slice(1), ray);
       if (parts[0] !== "api") return notFound();
       if (parts[1] === "requests" && parts.length === 2 && request.method === "POST") return await createRequest(request, env, ray);
+      if (parts[1] === "profiles" && parts.length === 2 && request.method === "POST") return await applyForProfile(request, env, ray);
+      if (parts[1] === "session" && parts[2] === "password" && parts.length === 3 && request.method === "POST") return await changePassword(request, env, ray);
+      if (parts[1] === "session" && parts.length === 2) {
+        if (request.method === "GET") { const me = await signedIn(request, env); return json(me ? { signedIn: true, name: me.name, slug: me.slug } : { signedIn: false }); }
+        if (request.method === "POST") return await signIn(request, env, ray);
+        if (request.method === "DELETE") return await signOut(request, env);
+      }
       if (parts[1] === "probes" && parts.length === 2 && page) return json({ profiles: await directory(env) });
       if (parts[1] === "pages" && parts[2] && parts[3]) {
-        const row = await env.DB.prepare("SELECT c.*, p.name AS p_name, p.slug AS p_slug, p.password_hash AS p_hash, p.password_salt AS p_salt, p.pw_version AS p_version FROM cases c JOIN profiles p ON p.id = c.profile_id WHERE p.slug = ? AND c.slug = ? AND c.status != 'draft'").bind(parts[2], parts[3]).first<CaseRow>();
+        const row = await env.DB.prepare("SELECT c.*, p.name AS p_name, p.slug AS p_slug FROM cases c JOIN profiles p ON p.id = c.profile_id WHERE p.slug = ? AND c.slug = ? AND c.status != 'draft'").bind(parts[2], parts[3]).first<CaseRow>();
         if (!row) return json({ error: "not_found" }, 404);
         return await pageApi(request, env, row, parts.slice(4).join("/"), ray);
       }
