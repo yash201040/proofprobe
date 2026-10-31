@@ -5,7 +5,7 @@ import { randomBytes, createHash } from "node:crypto";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
-const CFG = join(ROOT, ".gap/config.json");
+const CFG = process.env.GAP_CONFIG ?? join(ROOT, ".gap/config.json");
 const cfg = () => { if (!existsSync(CFG)) throw new Error("run: gap init"); return JSON.parse(readFileSync(CFG, "utf8")); };
 const saveCfg = (c) => { mkdirSync(dirname(CFG), { recursive: true }); writeFileSync(CFG, JSON.stringify(c, null, 2)); chmodSync(CFG, 0o600); };
 const readJson = (p) => JSON.parse(readFileSync(p, "utf8"));
@@ -22,7 +22,11 @@ const out = (x) => console.log(JSON.stringify(x, null, 2));
 switch (cmd) {
   case "init": {
     const c = existsSync(CFG) ? cfg() : { adminToken: randomBytes(32).toString("base64url"), baseUrl: "http://localhost:8799", links: {} };
-    if (flag(a, "url")) c.baseUrl = flag(a, "url").replace(/\/$/, "");
+    if (flag(a, "url")) {
+      const next = flag(a, "url").replace(/\/$/, "");
+      for (const id of Object.keys(c.links)) c.links[id] = c.links[id].replace(c.baseUrl, next);
+      c.baseUrl = next;
+    }
     saveCfg(c);
     console.log("ADMIN_TOKEN_SHA256=" + createHash("sha256").update(c.adminToken).digest("hex"));
     console.log("baseUrl=" + c.baseUrl);
@@ -42,6 +46,10 @@ switch (cmd) {
       body.questions = readJson(flag(a, "questions"));
       const qs = body.questions.flatMap((s) => s.questions);
       if (!qs.length || !qs[qs.length - 1].catchAll) throw new Error('the last question must be an open "anything we missed?" with "catchAll": true');
+      const existing = (await api("GET", "/cases/" + a[0])).sections.flatMap((s) => s.questions.map((q) => q.id));
+      const kept = new Set(qs.map((q) => q.id));
+      const dropped = existing.filter((id) => !kept.has(id));
+      if (dropped.length && !a.includes("--allow-drop")) throw new Error(`this would drop questions ${dropped.join(", ")}. Publish the full list, or pass --allow-drop`);
     }
     if (flag(a, "plan")) body.plan = readJson(flag(a, "plan"));
     if (flag(a, "status")) body.status = flag(a, "status");
@@ -50,6 +58,12 @@ switch (cmd) {
     break;
   }
   case "cost": out(await api("POST", `/cases/${a[0]}/costs`, { usd: Number(a[1]), label: a.slice(2).join(" ") || "research" })); break;
+  case "rotate": {
+    const r = await api("POST", `/cases/${a[0]}/rotate`);
+    const c = cfg(); c.links[a[0]] = c.baseUrl + "/c/" + r.token; saveCfg(c);
+    console.log("new link: " + c.links[a[0]] + "\nThe old link has stopped working.");
+    break;
+  }
   case "list": out(await api("GET", "/cases")); break;
   case "link": console.log(cfg().links[a[0]] ?? "no local link for this case"); break;
   case "status": {
@@ -66,5 +80,5 @@ switch (cmd) {
     break;
   }
   case "purge": out(await api("DELETE", "/cases/" + a[0])); break;
-  default: console.log("gap init [--url U] | new --name N --title T | cost ID USD [label] | publish ID [--intro F] [--questions F] [--plan F] [--status S] | list | link ID | status ID | fetch ID [--seq N] [--out F] | purge ID");
+  default: console.log("gap init [--url U] | new --name N --title T | cost ID USD [label] | rotate ID | publish ID [--intro F] [--questions F] [--plan F] [--status S] [--allow-drop] | list | link ID | status ID | fetch ID [--seq N] [--out F] | purge ID");
 }

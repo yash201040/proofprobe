@@ -43,7 +43,7 @@ textarea{grid-column:2;width:100%;min-height:76px;margin-top:7px;padding:8px 10p
 <div id="fatal" class="alert" hidden><p id="fatalText"></p><p style="margin-top:9px"><button type="button" id="retry">Try again</button></p></div>
 <section id="groupBox" hidden><div class="stack"><p>Everyone has their own page. Open one to see the goal, the research and the answers. Other people's pages are read only.</p><div class="tablebox"><table><thead><tr><th>Name</th><th>Goal</th><th>Stage</th><th>Research cost</th></tr></thead><tbody id="people"></tbody></table></div></div></section>
 <section id="viewQs" hidden><div class="stack"><h2>Questions and answers</h2><p id="viewNote"></p><div id="viewList" class="stack"></div></div></section>
-<section id="planBox" hidden><div class="stack"><h2>Your path</h2><div id="plan" class="blocks"></div></div></section>
+<section id="planBox" hidden><div class="stack"><h2>Recommended path</h2><div id="plan" class="blocks"></div></div></section>
 <section id="introBox" hidden><div id="intro" class="blocks"></div></section>
 <section id="qBox" hidden><div class="stack">
   <h2 id="qTitle">Questions</h2>
@@ -60,7 +60,7 @@ textarea{grid-column:2;width:100%;min-height:76px;margin-top:7px;padding:8px 10p
 </div>
 <script>
 const API=location.pathname.replace(/\/+$/,"")+"/api";
-const DRAFT_KEY="gap-drafts-"+location.pathname.slice(-10);
+const DRAFT_KEY="gap-drafts-v2-"+location.pathname.slice(-10);
 const $=id=>document.getElementById(id);
 const fmt=iso=>new Date(iso).toLocaleString([],{dateStyle:"medium",timeStyle:"short"});
 let drafts={};try{drafts=JSON.parse(localStorage.getItem(DRAFT_KEY)||"{}")}catch(e){drafts={}}
@@ -72,13 +72,13 @@ function safeUrl(u){try{const x=new URL(u);return x.protocol==="https:"?x.href:n
 // Content blocks are rendered as text only, so nothing stored can inject markup.
 function renderBlocks(host,list){
   host.textContent="";
-  list.forEach(b=>{
+  list.forEach(b=>{try{
     if(b.t==="h2"||b.t==="h3"||b.t==="p")host.appendChild(el(b.t,b.text));
     else if(b.t==="callout")host.appendChild(el("p",b.text,"callout"));
     else if(b.t==="ul"||b.t==="ol"){const l=el(b.t);(b.items||[]).forEach(i=>l.appendChild(el("li",i)));host.appendChild(l)}
     else if(b.t==="links"){const l=el("ul");(b.links||[]).forEach(k=>{const u=safeUrl(k.url);const li=el("li");if(u){const a=el("a",k.label||u);a.href=u;a.target="_blank";a.rel="noopener noreferrer";li.appendChild(a)}else li.textContent=k.label||"";if(k.note)li.appendChild(document.createTextNode(" "+k.note));l.appendChild(li)});host.appendChild(l)}
     else if(b.t==="table"){const box=el("div",null,"tablebox"),t=el("table"),th=el("tr");(b.head||[]).forEach(c=>th.appendChild(el("th",c)));const hd=el("thead");hd.appendChild(th);t.appendChild(hd);const bd=el("tbody");(b.rows||[]).forEach(r=>{const tr=el("tr");r.forEach(c=>tr.appendChild(el("td",c)));bd.appendChild(tr)});t.appendChild(bd);box.appendChild(t);host.appendChild(box)}
-  });
+  }catch(e){}});
 }
 function renderForm(sections){
   const form=$("form");form.textContent="";ids=[];let n=0;
@@ -90,10 +90,11 @@ function renderForm(sections){
       const w=el("div",null,"q");const c=el("div");c.style.minWidth="0";
       const l=el("label",q.text);l.htmlFor=dom;c.appendChild(l);if(q.why)c.appendChild(el("div","Why it matters: "+q.why,"why"));
       const ta=el("textarea");ta.id=dom;ta.name=dom;ta.disabled=closed;
-      const row=el("div",null,"saverow"),st=el("span",null,"state");
-      row.append(st);w.append(el("div",String(n),"num"),c,ta,row);qs.appendChild(w);
-      blocks[q.id]={ta,st,n,saved:"",savedAt:null};
-      ta.addEventListener("input",()=>{const b=blocks[q.id];saveError=null;if(ta.value===b.saved)delete drafts[q.id];else drafts[q.id]=ta.value;putDrafts();paint(q.id);bar()});
+      const row=el("div",null,"saverow"),st=el("span",null,"state"),restore=el("button","Use my draft instead");restore.type="button";restore.hidden=true;
+      restore.addEventListener("click",()=>{const b=blocks[q.id];ta.value=b.conflict;drafts[q.id]={text:b.conflict,base:b.savedAt};b.conflict=null;putDrafts();paint(q.id);bar()});
+      row.append(st,restore);w.append(el("div",String(n),"num"),c,ta,row);qs.appendChild(w);
+      blocks[q.id]={ta,st,restore,n,saved:"",savedAt:null,conflict:null};
+      ta.addEventListener("input",()=>{const b=blocks[q.id];saveError=null;submitKey=null;b.conflict=null;if(ta.value===b.saved)delete drafts[q.id];else drafts[q.id]={text:ta.value,base:b.savedAt};putDrafts();paint(q.id);bar()});
     });
     box.appendChild(qs);form.appendChild(box);
   });
@@ -101,7 +102,9 @@ function renderForm(sections){
 const dirty=id=>blocks[id].ta.value!==blocks[id].saved;
 function paint(id){
   const b=blocks[id];
-  if(dirty(id)){b.st.textContent="Unsaved changes";b.st.className="state warn"}
+  b.restore.hidden=!b.conflict;
+  if(b.conflict){b.st.textContent="Saved elsewhere since this device's draft, so the newer saved answer is shown.";b.st.className="state warn"}
+  else if(dirty(id)){b.st.textContent="Unsaved changes";b.st.className="state warn"}
   else if(b.saved){b.st.textContent=b.savedAt?"Saved "+fmt(b.savedAt):"Saved";b.st.className="state ok"}
   else{b.st.textContent="";b.st.className="state"}
 }
@@ -122,14 +125,15 @@ async function call(path,opts){
 async function saveAll(){
   const list=ids.filter(dirty);if(!list.length)return;
   busy=true;saveError=null;bar();
-  const sent={};list.forEach(i=>sent[i]=blocks[i].ta.value);
+  const sent={},bases={};list.forEach(i=>{sent[i]=blocks[i].ta.value;bases[i]=blocks[i].savedAt});
   try{
-    const r=await call("/answers",{method:"PUT",body:JSON.stringify({answers:sent})});
+    const r=await call("/answers",{method:"PUT",body:JSON.stringify({answers:sent,bases})});
     list.forEach(i=>{const b=blocks[i];b.saved=sent[i];b.savedAt=r.updatedAt;if(b.ta.value===sent[i])delete drafts[i];paint(i)});
-    putDrafts();
+    putDrafts();submitKey=null;
   }catch(e){
+    const stale=e.status===409||e.status===404;
     const tooLong=e.status===413&&e.body&&e.body.id&&blocks[e.body.id];
-    saveError=tooLong?"Q"+tooLong.n+" is too long to save. Please shorten it.":"Not saved. Check your connection and try again. Your text is kept on this device.";
+    saveError=e.status===403?"This form is closed, so nothing was saved.":stale?"Something changed elsewhere. Refresh this page. Your text is kept on this device.":tooLong?"Q"+tooLong.n+" is too long to save. Please shorten it.":"Not saved. Check your connection and try again. Your text is kept on this device.";
   }
   busy=false;bar();
 }
@@ -148,11 +152,11 @@ $("submit").addEventListener("click",async()=>{
     st.textContent="Submission "+r.seq+" received with "+r.answered+" of "+r.total+" answers."+change+" You can close this page.";
     busy=false;bar();
     const d=await fetch(API+"/case").then(x=>x.json()).catch(()=>null);if(d)renderLog(d.submissions);
-  }catch(e){st.textContent="Your submission wasn't confirmed. Check your connection and press Submit answers again."}
+  }catch(e){st.textContent=e.status===403?"This form is closed, so nothing was submitted.":"Your submission wasn't confirmed. Check your connection and press Submit answers again."}
   busy=false;bar();
 });
 $("form").addEventListener("submit",e=>e.preventDefault());
-let me=null,loadedMine=false;
+let loadedMine=false;
 const money=n=>"$"+Number(n).toFixed(n>0&&n<1?3:2);
 const STAGE={draft:"Being prepared",open:"Answering questions",submitted:"Answers in",plan_ready:"Path ready",closed:"Closed"};
 function hideAll(){["groupBox","viewQs","planBox","introBox","qBox","fatal"].forEach(i=>$(i).hidden=true)}
@@ -170,13 +174,15 @@ function showMine(d){
 }
 async function loadMine(){
   const r=await fetch(API+"/case");if(!r.ok)throw new Error("http");
-  const d=await r.json();me=d;closed=d.status==="closed";
+  const d=await r.json();closed=d.status==="closed";
   if(!loadedMine&&d.sections.length){
     renderForm(d.sections);
     ids.forEach(id=>{
       const b=blocks[id],a=d.answers[id];b.saved=a?a.text:"";b.savedAt=a?a.updatedAt:null;
-      if(drafts[id]===b.saved)delete drafts[id];
-      b.ta.value=typeof drafts[id]==="string"?drafts[id]:b.saved;paint(id);
+      const dr=drafts[id];
+      if(dr&&dr.text===b.saved)delete drafts[id];
+      else if(dr&&dr.base!==b.savedAt){b.conflict=dr.text;delete drafts[id]}
+      b.ta.value=drafts[id]?drafts[id].text:b.saved;paint(id);
     });
     putDrafts();renderLog(d.submissions);bar();
     const last=d.submissions[d.submissions.length-1];

@@ -55,7 +55,15 @@ function validSections(v: unknown): v is Section[] {
   }
   return true;
 }
-const validBlocks = (v: unknown) => Array.isArray(v) && (v as { t?: unknown }[]).every((b) => typeof b?.t === "string");
+const isStrings = (v: unknown) => Array.isArray(v) && v.every((x) => typeof x === "string");
+function validBlock(b: any): boolean {
+  if (["h2", "h3", "p", "callout"].includes(b?.t)) return typeof b.text === "string";
+  if (b?.t === "ul" || b?.t === "ol") return isStrings(b.items);
+  if (b?.t === "table") return isStrings(b.head) && Array.isArray(b.rows) && b.rows.every(isStrings);
+  if (b?.t === "links") return Array.isArray(b.links) && b.links.every((k: any) => typeof k?.url === "string");
+  return false;
+}
+const validBlocks = (v: unknown) => Array.isArray(v) && v.every(validBlock);
 
 async function costUsd(env: Env, caseId: string) {
   const r = await env.DB.prepare("SELECT COALESCE(SUM(usd_micro), 0) AS micro FROM cost_entries WHERE case_id = ?").bind(caseId).first<{ micro: number }>();
@@ -135,7 +143,7 @@ async function respondent(request: Request, env: Env, row: CaseRow, rest: string
   }
   if (rest === "api/answers" && request.method === "PUT") {
     if (row.status === "closed") return json({ error: "closed" }, 403);
-    const body = await request.json().catch(() => null) as { answers?: Record<string, unknown> } | null;
+    const body = await request.json().catch(() => null) as { answers?: Record<string, unknown>; bases?: Record<string, string | null> } | null;
     if (!body?.answers || typeof body.answers !== "object") return json({ error: "bad_request" }, 400);
     const known = new Set(flatten(parse<Section[]>(row.questions_json, [])).map((q) => q.id));
     const entries = Object.entries(body.answers);
@@ -145,6 +153,10 @@ async function respondent(request: Request, env: Env, row: CaseRow, rest: string
       if (typeof text !== "string") return json({ error: "bad_request", id }, 400);
       if (text.length > MAX_ANSWER) return json({ error: "too_long", id, max: MAX_ANSWER }, 413);
     }
+    // Refuse to overwrite text saved elsewhere after this page loaded it.
+    const current = await currentAnswers(env, row.id);
+    const conflicts = entries.map(([id]) => id).filter((id) => (current[id]?.updatedAt ?? null) !== (body.bases?.[id] ?? null));
+    if (conflicts.length) return json({ error: "conflict", conflicts }, 409);
     const updatedAt = new Date().toISOString();
     await env.DB.batch(entries.map(([id, text]) =>
       env.DB.prepare("INSERT INTO answers(case_id, question_id, text, updated_at) VALUES (?,?,?,?) ON CONFLICT(case_id, question_id) DO UPDATE SET text = excluded.text, updated_at = excluded.updated_at")
@@ -208,9 +220,17 @@ async function admin(request: Request, env: Env, parts: string[], ray: string) {
   }
   if (sub === "costs" && request.method === "POST") {
     const b = await request.json().catch(() => null) as { usd?: unknown; label?: unknown } | null;
-    if (typeof b?.usd !== "number" || !(b.usd >= 0) || typeof b.label !== "string" || !b.label) return json({ error: "bad_request" }, 400);
+    if (typeof b?.usd !== "number" || !Number.isFinite(b.usd) || typeof b.label !== "string" || !b.label) return json({ error: "bad_request" }, 400);
     await env.DB.prepare("INSERT INTO cost_entries(case_id, usd_micro, label, at) VALUES (?,?,?,?)").bind(id, Math.round(b.usd * 1_000_000), b.label, now).run();
     return json({ costUsd: await costUsd(env, id) });
+  }
+  if (sub === "rotate" && request.method === "POST") {
+    const token = randomToken();
+    await env.DB.batch([
+      env.DB.prepare("UPDATE cases SET token_hash = ?, updated_at = ? WHERE id = ?").bind(await sha256(token), now, id),
+      audit(env, id, "admin", "rotate", null, ray),
+    ]);
+    return json({ token });
   }
   if (!sub && request.method === "DELETE") {
     await env.DB.batch([

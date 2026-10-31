@@ -15,10 +15,12 @@ Two-step research that turns any starting point into a clear, data-backed path: 
 npm install
 node bin/gap.mjs init --url https://<worker-url>
 ln -s "$PWD/skills/gap" ~/.claude/skills/gap
-npx wrangler deploy --var ADMIN_TOKEN_SHA256:<hash printed by init>
+npx wrangler login
+npx wrangler secret put ADMIN_TOKEN_SHA256     # paste the hash printed by init
+npx wrangler deploy
 ```
 
-Local run: put `ADMIN_TOKEN_SHA256=<hash>` in `.dev.vars`, run `npm run dev`, then `npm run test:e2e`.
+Local test: put `ADMIN_TOKEN_SHA256=<hash>` in `.dev.vars`, run `npm run dev`, then `npm run test:e2e`. The test only ever talks to localhost. `npm run typecheck` checks the Worker.
 
 ## Data rules
 
