@@ -14,12 +14,6 @@ a{color:inherit}
 :focus-visible{outline:2px solid var(--pulse);outline-offset:3px}
 .top{position:fixed;inset:0 0 auto;z-index:5;display:flex;align-items:center;justify-content:space-between;padding:calc(env(safe-area-inset-top,0px) + 16px) max(20px,env(safe-area-inset-right,0px)) 16px max(20px,env(safe-area-inset-left,0px))}
 .brand{font:800 19px var(--display);letter-spacing:-.02em;text-decoration:none}
-.burger{width:44px;height:44px;border:1px solid var(--line);border-radius:50%;background:transparent;color:inherit;cursor:pointer;display:grid;place-items:center;backdrop-filter:blur(8px)}
-.burger span,.burger span::before{display:block;width:16px;height:1.5px;background:currentColor;transition:transform .25s ease}
-.burger span{position:relative;transform:translateY(3px)}.burger span::before{content:"";position:absolute;top:-6px}
-.burger[aria-expanded=true] span{transform:rotate(45deg)}.burger[aria-expanded=true] span::before{transform:translateY(6px) rotate(-90deg)}
-.menu{position:fixed;top:calc(env(safe-area-inset-top,0px) + 70px);right:max(20px,env(safe-area-inset-right,0px));z-index:5;min-width:190px;padding:8px;border:1px solid var(--line);border-radius:16px;background:rgba(8,18,26,.82);backdrop-filter:blur(16px);color:#F2F7F6}
-.menu a{display:block;padding:11px 14px;border-radius:10px;text-decoration:none;font-weight:600}.menu a:hover{background:rgba(255,255,255,.1)}
 main{position:relative;z-index:1}
 .panel{min-height:100svh;display:flex;flex-direction:column;justify-content:center;padding:96px max(24px,env(safe-area-inset-right,0px)) 96px max(24px,env(safe-area-inset-left,0px));max-width:1320px;margin:0 auto}
 .panel.right{align-items:flex-end;text-align:right}.panel.center{align-items:center;text-align:center}
@@ -32,8 +26,18 @@ body.day .step{color:#A85E00}
 .tags{display:flex;flex-wrap:wrap;gap:10px;margin-top:26px;max-width:560px}
 .panel.right .tags{justify-content:flex-end}
 .tag{padding:9px 17px;border:1px solid var(--line);border-radius:999px;font-weight:500;font-size:16px;backdrop-filter:blur(6px)}
-.cta{display:inline-flex;align-items:center;gap:10px;margin-top:34px;padding:16px 28px;border-radius:999px;background:var(--pulse);color:#1B1203;font-weight:600;text-decoration:none;transition:transform .2s ease}
-.cta:hover{transform:translateY(-2px)}
+.actions{display:flex;flex-direction:column;align-items:center;gap:12px;margin-top:34px}
+.cta{--x:50%;--y:50%;--mx:0px;--my:0px;position:relative;overflow:hidden;isolation:isolate;display:inline-flex;align-items:center;justify-content:center;gap:10px;min-width:230px;padding:16px 28px;border-radius:999px;background:#0C1C24;color:#F2F7F6;font-weight:600;text-decoration:none;transform:translate(var(--mx),var(--my));box-shadow:0 8px 22px rgba(12,28,36,.2);transition:transform .35s cubic-bezier(.2,1.4,.4,1),box-shadow .3s ease,background .3s ease}
+.cta::before{content:"";position:absolute;inset:0;z-index:-1;background:radial-gradient(150px circle at var(--x) var(--y),rgba(255,180,84,.6),transparent 70%);opacity:0;transition:opacity .25s ease}
+.cta:hover{box-shadow:0 14px 32px rgba(12,28,36,.3)}.cta:hover::before{opacity:1}
+.cta:active{transform:translate(var(--mx),var(--my)) scale(.95);box-shadow:0 4px 12px rgba(12,28,36,.25);transition-duration:.08s}
+.cta .arrow{display:inline-block;transition:transform .3s cubic-bezier(.2,1.4,.4,1)}.cta:hover .arrow{transform:translateX(6px)}
+.cta .ico{transition:transform .3s cubic-bezier(.2,1.4,.4,1)}.cta:hover .ico{transform:rotate(-8deg) scale(1.12)}
+.cta.alt{background:transparent;color:#0C1C24;box-shadow:inset 0 0 0 1.5px #0C1C24}.cta.alt:hover{box-shadow:inset 0 0 0 1.5px #0C1C24,0 12px 26px rgba(12,28,36,.16)}.cta.alt::before{background:radial-gradient(150px circle at var(--x) var(--y),rgba(255,180,84,.42),transparent 70%)}
+.ripple{position:absolute;width:12px;height:12px;margin:-6px 0 0 -6px;border-radius:50%;background:rgba(255,200,120,.65);pointer-events:none;animation:ripple .6s ease-out forwards}
+@keyframes ripple{to{transform:scale(32);opacity:0}}
+.ico{width:18px;height:18px;flex:none}
+.adminlink{position:absolute;right:max(20px,env(safe-area-inset-right,0px));bottom:calc(env(safe-area-inset-bottom,0px) + 18px);display:inline-flex;align-items:center;gap:6px;padding:6px 8px;border-radius:8px;font-size:14px;color:var(--muted);text-decoration:none;opacity:.55;transition:opacity .2s ease,transform .2s ease}.adminlink .ico{width:14px;height:14px}.adminlink:hover{opacity:1;transform:translateY(-1px)}.adminlink:active{transform:scale(.96)}
 body.day .cta{background:#0C1C24;color:#F2F7F6}
 .cue{position:absolute;left:50%;bottom:26px;width:1px;height:46px;background:linear-gradient(var(--pulse),transparent);animation:cue 2s ease-in-out infinite}
 .hero{position:relative}
@@ -45,13 +49,10 @@ body.day .ticks i.on{background:#A85E00}
 @media (max-width:640px){.cue{display:none}}
 .reveal{opacity:0;transform:translateY(26px);transition:opacity .8s ease,transform .8s cubic-bezier(.2,.7,.2,1)}
 .reveal.in{opacity:1;transform:none}
-@media (prefers-reduced-motion:reduce){.reveal{opacity:1;transform:none;transition:none}.word>span{transform:none;transition:none}.cue{animation:none}.cta{transition:none}}
-.menu a{display:flex;align-items:center;gap:10px}.ico{width:18px;height:18px;flex:none}
+@media (prefers-reduced-motion:reduce){.reveal{opacity:1;transform:none;transition:none}.word>span{transform:none;transition:none}.cue{animation:none}.cta,.cta .arrow,.cta .ico{transition:none}}
 </style></head><body>
 <canvas id="c" aria-hidden="true"></canvas>
-<div class="top"><a class="brand" href="/">ProofProbe</a>
-  <button class="burger" id="burger" aria-label="Menu" aria-expanded="false" aria-controls="menu"><span></span></button></div>
-<nav class="menu" id="menu" hidden><a href="/probes"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4.5"/><path d="M12 12l6.4-6.4"/><circle cx="12" cy="12" r="1.2" fill="currentColor" stroke="none"/></svg>Probes</a><a href="https://github.com/yash201040/proofprobe" rel="noopener"><svg class="ico" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2a10 10 0 0 0-3.16 19.49c.5.09.68-.22.68-.48v-1.7c-2.78.6-3.37-1.34-3.37-1.34-.45-1.16-1.11-1.47-1.11-1.47-.91-.62.07-.61.07-.61 1 .07 1.53 1.03 1.53 1.03.89 1.53 2.34 1.09 2.91.83.09-.65.35-1.09.63-1.34-2.22-.25-4.55-1.11-4.55-4.94 0-1.09.39-1.98 1.03-2.68-.1-.25-.45-1.27.1-2.65 0 0 .84-.27 2.75 1.02A9.6 9.6 0 0 1 12 6.84c.85 0 1.7.11 2.5.34 1.91-1.29 2.75-1.02 2.75-1.02.55 1.38.2 2.4.1 2.65.64.7 1.03 1.59 1.03 2.68 0 3.84-2.34 4.68-4.57 4.93.36.31.68.92.68 1.85v2.74c0 .27.18.58.69.48A10 10 0 0 0 12 2z"/></svg>GitHub</a><a href="/admin"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>Admin</a></nav>
+<div class="top"><a class="brand" href="/">ProofProbe</a></div>
 <div class="ruler" aria-hidden="true"><span class="ticks" id="ticks"><i></i><i></i><i></i><i></i><i></i></span><span id="rulerLabel">Goal</span></div>
 <main>
   <section class="panel hero"><h1 class="reveal">Any goal.<br>One proven path.</h1><div class="cue"></div></section>
@@ -60,7 +61,8 @@ body.day .ticks i.on{background:#A85E00}
   <section class="panel right"><div class="reveal"><div class="step">Step one</div><h2>Probe wide.</h2><p>Live market data, checked at the source.</p></div></section>
   <section class="panel"><div class="reveal"><div class="step">Your turn</div><h2>Answer what<br>only you know.</h2></div></section>
   <section class="panel right"><div class="reveal"><div class="step">Step two</div><h2>Probe deep.</h2><p>Every option tested against your answers.</p></div></section>
-  <section class="panel center"><div class="reveal"><h2>One path.<br>Backed by proof.</h2><a class="cta" href="/probes">See the probes <span aria-hidden="true">→</span></a></div></section>
+  <section class="panel center"><div class="reveal"><h2>One path.<br>Backed by proof.</h2><div class="actions"><a class="cta" href="/probes">See the probes <span class="arrow" aria-hidden="true">→</span></a><a class="cta alt" href="https://github.com/yash201040/proofprobe" target="_blank" rel="noopener noreferrer"><svg class="ico" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2a10 10 0 0 0-3.16 19.49c.5.09.68-.22.68-.48v-1.7c-2.78.6-3.37-1.34-3.37-1.34-.45-1.16-1.11-1.47-1.11-1.47-.91-.62.07-.61.07-.61 1 .07 1.53 1.03 1.53 1.03.89 1.53 2.34 1.09 2.91.83.09-.65.35-1.09.63-1.34-2.22-.25-4.55-1.11-4.55-4.94 0-1.09.39-1.98 1.03-2.68-.1-.25-.45-1.27.1-2.65 0 0 .84-.27 2.75 1.02A9.6 9.6 0 0 1 12 6.84c.85 0 1.7.11 2.5.34 1.91-1.29 2.75-1.02 2.75-1.02.55 1.38.2 2.4.1 2.65.64.7 1.03 1.59 1.03 2.68 0 3.84-2.34 4.68-4.57 4.93.36.31.68.92.68 1.85v2.74c0 .27.18.58.69.48A10 10 0 0 0 12 2z"/></svg>GitHub</a></div></div></section>
+  <a class="adminlink" href="/admin"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>Admin</a>
 </main>
 <script>
 const canvas=document.getElementById("c"),ctx=canvas.getContext("2d");
@@ -145,7 +147,11 @@ document.querySelectorAll("h2").forEach(h=>{
 });
 const io=new IntersectionObserver(es=>es.forEach(e=>{if(e.isIntersecting)e.target.classList.add("in")}),{threshold:.25});
 document.querySelectorAll(".reveal").forEach(e=>io.observe(e));
-const burger=document.getElementById("burger"),menu=document.getElementById("menu");
-burger.addEventListener("click",()=>{const open=menu.hidden;menu.hidden=!open;burger.setAttribute("aria-expanded",String(open))});
+document.querySelectorAll(".cta").forEach(btn=>{
+  if(still)return;
+  btn.addEventListener("pointermove",e=>{const r=btn.getBoundingClientRect(),x=e.clientX-r.left,y=e.clientY-r.top;btn.style.setProperty("--x",x+"px");btn.style.setProperty("--y",y+"px");btn.style.setProperty("--mx",(x-r.width/2)*.12+"px");btn.style.setProperty("--my",(y-r.height/2)*.22+"px")});
+  btn.addEventListener("pointerleave",()=>{btn.style.setProperty("--mx","0px");btn.style.setProperty("--my","0px")});
+  btn.addEventListener("pointerdown",e=>{const r=btn.getBoundingClientRect(),s=document.createElement("span");s.className="ripple";s.style.left=e.clientX-r.left+"px";s.style.top=e.clientY-r.top+"px";btn.appendChild(s);s.addEventListener("animationend",()=>s.remove())});
+});
 layout();start();
 </script></body></html>

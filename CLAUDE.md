@@ -36,6 +36,7 @@ Run it with no command to see the options. The Cloudflare and admin details are 
 ## Rules for changes
 
 - Free tier only. No login or accounts for now.
+- Navigation is deliberate: there is no menu, so the home page's links sit at the end of the scroll.
 - Site map: home page at `/`, directory at `/probes`, and each page at `/probes/<profile>/<page>`. One profile can hold several pages.
 - The Admin page at `/admin` opens with a master password. It shows passwords, answers, logs and costs. Profile passwords are hashed for checking and AES-GCM encrypted with the `PASSWORD_KEY` secret for display. Master password guesses pause after 6 tries, but profile passwords never do.
 - Anyone can read every page and its submitted answers. Editing needs the profile's password, which unlocks all of that profile's pages and no others. A page notice covers this. Wrong guesses never lock anyone out.

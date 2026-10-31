@@ -99,7 +99,7 @@ function profileRows(list,pages){
     const tr=el("tr"),pw=el("td"),set=el("td"),box=el("div",null,"row"),inp=el("input"),go=el("button","Set");
     if(p.has_password){const b=el("button","Show","link show");b.type="button";b.addEventListener("click",()=>reveal(p.id,pw));pw.appendChild(b)}else pw.appendChild(el("span","Not set","chip bad"));
     inp.type="text";inp.autocomplete="off";inp.placeholder="4 or more characters";inp.setAttribute("aria-label","New password for "+p.name);inp.className="pwi";go.type="button";go.className="pwset ghost";
-    go.addEventListener("click",async()=>{try{await api("/profiles/"+p.id+"/password",{method:"POST",body:JSON.stringify({password:inp.value})});$("pwMsg").textContent="Saved for "+p.name+". Devices using the old password are locked out.";loadApp()}catch(e){$("pwMsg").textContent=e.status===400?"Use 4 or more characters.":"Couldn't save."}});
+    go.addEventListener("click",async()=>{try{await api("/profiles/"+p.id+"/password",{method:"POST",body:JSON.stringify({password:inp.value})});await loadApp();$("pwMsg").textContent="Saved for "+p.name+". Devices using the old password are locked out."}catch(e){$("pwMsg").textContent=e.status===400?"Use 4 or more characters.":"Couldn't save."}});
     box.append(inp,go);set.appendChild(box);tr.append(el("td",p.name),el("td",String(p.pages),"num"),pw,set);body.appendChild(tr);
   });
 }

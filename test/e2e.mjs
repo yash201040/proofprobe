@@ -29,7 +29,10 @@ const unlock = async (pw) => { await page.click("#unlockBtn"); await page.type("
 
 await page.goto(base + "/", { waitUntil: "networkidle0" });
 ok((await txt("h1")).includes("One proven path"), "home page loads");
-await page.click("#burger"); ok((await page.$eval("#menu a", (e) => e.getAttribute("href"))) === "/probes" && (await page.$$("#menu a svg")).length === 3, "menu links to Probes with icons");
+ok(!(await page.$("#burger")), "the home page has no menu");
+ok((await page.$eval('.cta[href="/probes"]', (e) => e.target)) === "", "See the probes stays in the same tab");
+ok((await page.$eval('.cta[href*="github"]', (e) => e.target)) === "_blank", "GitHub opens in a new tab");
+ok((await page.$('.adminlink[href="/admin"]')) !== null, "the Admin link is on the home page");
 await page.goto(base + "/probes", { waitUntil: "networkidle0" });
 await page.waitForSelector(".profile");
 const cards = await page.$$eval(".profile", (l) => l.map((c) => [c.querySelector("h2").textContent, c.querySelectorAll(".pagelink").length]));
