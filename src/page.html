@@ -142,6 +142,11 @@ th{overflow-wrap:normal}
 .bar{top:calc(env(safe-area-inset-top,0px) + 66px)}
 @media (max-width:640px){.pin{top:calc(env(safe-area-inset-top,0px) + 8px);gap:7px}.pin .editbtn{min-height:48px;padding:10px 20px;font-size:17px}.pin .unlocked{padding:0 11px}.pin #lockBtn{padding:6px 13px}.bar{top:calc(env(safe-area-inset-top,0px) + 62px)}}
 @media (max-width:370px){.pin .unlocked{font-size:0;gap:0}.pin .unlocked .lk{width:19px;height:19px}}
+#sortBtn{display:inline-flex;align-items:center;justify-content:space-between;gap:14px;min-height:42px;min-width:206px;padding-inline:14px 13px}#sortBtn::after,#filterBtn::after{content:"";width:8px;height:8px;margin-top:-4px;border-right:2px solid currentColor;border-bottom:2px solid currentColor;transform:rotate(45deg);transition:transform .15s ease;flex:none}#sortBtn[aria-expanded=true]::after,#filterBtn[aria-expanded=true]::after{transform:translateY(3px) rotate(225deg)}
+#filterBtn{display:inline-flex;align-items:center;justify-content:space-between;gap:14px;padding-inline:14px 13px}
+.reqlink{display:inline-flex;align-items:center;min-height:42px;padding:8px 16px;border-radius:999px;background:var(--accent);color:var(--surface);font-weight:600;text-decoration:none;transition:transform .25s cubic-bezier(.2,1.4,.4,1),box-shadow .2s ease}.reqlink:active{transform:scale(.96)}
+@media (hover:hover){.reqlink:hover{transform:translateY(-2px);box-shadow:0 8px 20px color-mix(in srgb,var(--accent) 34%,transparent)}}
+@media (max-width:640px){#sortBtn{width:100%;min-width:0}.reqlink{flex:1 1 100%;justify-content:center;order:5}}
 </style></head><body><div id="loadbar" role="progressbar" aria-label="Loading"></div><div class="wrap">
 <div class="topbar"><a class="brandlink" href="/">ProofProbe</a></div>
 <header><div class="eyebrow" id="eyebrow"></div><h1 id="title"></h1>
@@ -155,7 +160,7 @@ th{overflow-wrap:normal}
 <div class="skel" id="skel" aria-hidden="true"><i></i><i></i><i></i></div>
 <div id="tip" role="tooltip" hidden></div>
 <div id="fatal" class="alert" hidden><p id="fatalText"></p><p style="margin-top:9px"><button type="button" id="retry">Try again</button></p></div>
-<section id="dirBox" hidden><div class="dirtools"><label for="sortBy">Sort by<select id="sortBy"><option value="created">Date created</option><option value="updated">Last updated</option><option value="profile">Profile</option><option value="cost">Cost</option></select></label><button type="button" id="sortDir" class="ghost" aria-label="Change sort direction"></button><div class="filterwrap"><button type="button" id="filterBtn" class="ghost" aria-expanded="false" aria-controls="filterPanel">Filter</button><div class="filterpanel" id="filterPanel" hidden><fieldset id="filterStatus"><legend>Status</legend></fieldset><fieldset id="filterProfile"><legend>Profile</legend></fieldset><button type="button" class="ghost" id="filterClear">Clear filters</button></div></div><span class="dircount" id="dirCount" role="status"></span></div><div id="profiles" class="profiles"></div><p id="dirEmpty" hidden></p></section>
+<section id="dirBox" hidden><div class="dirtools"><div class="filterwrap"><button type="button" id="sortBtn" class="ghost" aria-expanded="false" aria-controls="sortPanel"></button><div class="filterpanel sortpanel" id="sortPanel" hidden><fieldset><legend>Sort by</legend><label><input type="radio" name="sortField" value="created">Date created</label><label><input type="radio" name="sortField" value="updated">Last updated</label><label><input type="radio" name="sortField" value="profile">Profile</label><label><input type="radio" name="sortField" value="cost">Cost</label></fieldset></div></div><button type="button" id="sortDir" class="ghost" aria-label="Change sort direction"></button><div class="filterwrap"><button type="button" id="filterBtn" class="ghost" aria-expanded="false" aria-controls="filterPanel">Filter</button><div class="filterpanel" id="filterPanel" hidden><fieldset id="filterStatus"><legend>Status</legend></fieldset><fieldset id="filterProfile"><legend>Profile</legend></fieldset><button type="button" class="ghost" id="filterClear">Clear filters</button></div></div><span class="dircount" id="dirCount" role="status"></span><a class="reqlink" href="/request">Request a probe</a></div><div id="profiles" class="profiles"></div><p id="dirEmpty" hidden></p></section>
 <section id="planBox" hidden><div class="stack"><h2>Recommended path</h2><div id="plan" class="blocks"></div></div></section>
 <section id="introBox" hidden><div id="intro" class="blocks"></div></section>
 <section id="viewQs" hidden><div class="stack"><h2>Questions and answers</h2><p id="viewNote"></p><div id="viewList" class="stack"></div></div></section>
@@ -385,7 +390,7 @@ function pageLink(p,g){
   a.appendChild(el("small","Created "+day(g.createdAt)+" · Updated "+day(g.updatedAt)+" · Research cost "+money(g.costUsd)));return a;
 }
 const SORTS={created:["Newest first","Oldest first","desc"],updated:["Latest first","Earliest first","desc"],profile:["A to Z","Z to A","asc"],cost:["Highest first","Lowest first","desc"]};
-let sortDir="desc";const picked={status:new Set(),profile:new Set()};
+let sortDir="desc",sortField="created";const SORT_NAMES={created:"Date created",updated:"Last updated",profile:"Profile",cost:"Cost"};const picked={status:new Set(),profile:new Set()};
 const STATUS_FILTERS=["open","submitted","rerouting","plan_ready","closed"];
 function filterBox(group,value,label){
   const l=el("label"),c=el("input");c.type="checkbox";c.dataset.group=group;c.value=value;c.checked=picked[group].has(value);
@@ -398,13 +403,14 @@ function buildFilters(){
   directory.slice().sort((x,y)=>x.name.localeCompare(y.name,undefined,{sensitivity:"base"})).forEach(x=>p.appendChild(filterBox("profile",x.slug,x.name)));
 }
 const VIEW_KEY="probes-view";
-function saveView(){try{sessionStorage.setItem(VIEW_KEY,JSON.stringify({sort:$("sortBy").value,dir:sortDir,status:[...picked.status],profile:[...picked.profile],y:scrollY}))}catch(e){}}
-function loadView(){try{const v=JSON.parse(sessionStorage.getItem(VIEW_KEY)||"null");if(!v)return 0;$("sortBy").value=SORTS[v.sort]?v.sort:"created";sortDir=v.dir==="asc"?"asc":"desc";picked.status=new Set(v.status);picked.profile=new Set(v.profile);return v.y||0}catch(e){return 0}}
+function saveView(){try{sessionStorage.setItem(VIEW_KEY,JSON.stringify({sort:sortField,dir:sortDir,status:[...picked.status],profile:[...picked.profile],y:scrollY}))}catch(e){}}
+function loadView(){try{const v=JSON.parse(sessionStorage.getItem(VIEW_KEY)||"null");if(!v)return 0;sortField=SORTS[v.sort]?v.sort:"created";sortDir=v.dir==="asc"?"asc":"desc";picked.status=new Set(v.status);picked.profile=new Set(v.profile);return v.y||0}catch(e){return 0}}
 function placeFilter(){const f=$("filterPanel");f.style.left="";if(innerWidth>640){const r=f.getBoundingClientRect();if(r.right>innerWidth-12)f.style.left=(innerWidth-12-r.right)+"px"}}
-function closeFilter(){$("filterPanel").hidden=true;$("filterBtn").setAttribute("aria-expanded","false")}
+function closeFilter(){$("filterPanel").hidden=true;$("filterBtn").setAttribute("aria-expanded","false");$("sortPanel").hidden=true;$("sortBtn").setAttribute("aria-expanded","false")}
 function renderDirectory(){
-  const sort=$("sortBy").value,host=$("profiles"),flip=sortDir==="asc"?1:-1;host.textContent="";
+  const sort=sortField,host=$("profiles"),flip=sortDir==="asc"?1:-1;host.textContent="";
   const count=picked.status.size+picked.profile.size,fb=$("filterBtn");fb.textContent=count?"Filter ("+count+")":"Filter";fb.classList.toggle("on",count>0);$("filterClear").hidden=!count;
+  $("sortBtn").textContent="Sort: "+SORT_NAMES[sort];document.querySelectorAll('input[name="sortField"]').forEach(r=>{r.checked=r.value===sort});
   $("sortDir").textContent=(sortDir===SORTS[sort][2]?SORTS[sort][0]:SORTS[sort][1])+(sortDir==="asc"?" ↑":" ↓");
   // OR inside a filter type, AND between filter types. Nothing checked means everything shows.
   const keep=(p,g)=>(!picked.status.size||picked.status.has(stageOf(g)))&&(!picked.profile.size||picked.profile.has(p.slug));
@@ -430,8 +436,10 @@ async function showDirectory(){
   renderDirectory();$("dirBox").hidden=false;$("notice").hidden=true;if(y)requestAnimationFrame(()=>scrollTo(0,y));
   addEventListener("pagehide",saveView);
 }
-$("sortBy").addEventListener("change",()=>{sortDir=SORTS[$("sortBy").value][2];renderDirectory()});
-$("sortDir").addEventListener("click",()=>{sortDir=sortDir==="asc"?"desc":"asc";renderDirectory()});$("filterBtn").addEventListener("click",e=>{e.stopPropagation();const open=$("filterPanel").hidden;$("filterPanel").hidden=!open;$("filterBtn").setAttribute("aria-expanded",String(open));if(open)placeFilter()});
+document.querySelectorAll('input[name="sortField"]').forEach(r=>r.addEventListener("change",()=>{sortField=r.value;sortDir=SORTS[r.value][2];renderDirectory();closeFilter()}));
+$("sortBtn").addEventListener("click",e=>{e.stopPropagation();const open=$("sortPanel").hidden;closeFilter();$("sortPanel").hidden=!open;$("sortBtn").setAttribute("aria-expanded",String(open))});
+$("sortPanel").addEventListener("click",e=>e.stopPropagation());
+$("sortDir").addEventListener("click",()=>{sortDir=sortDir==="asc"?"desc":"asc";renderDirectory()});$("filterBtn").addEventListener("click",e=>{e.stopPropagation();const open=$("filterPanel").hidden;closeFilter();$("filterPanel").hidden=!open;$("filterBtn").setAttribute("aria-expanded",String(open));if(open)placeFilter()});
 $("filterPanel").addEventListener("click",e=>e.stopPropagation());
 $("filterClear").addEventListener("click",()=>{picked.status.clear();picked.profile.clear();buildFilters();renderDirectory()});
 document.addEventListener("click",closeFilter);document.addEventListener("keydown",e=>{if(e.key==="Escape")closeFilter()});

@@ -95,6 +95,25 @@ switch (cmd) {
     console.log(`Saved ${r.steps.length} step(s) to ${join(dirname(CFG), "cases", a[0])}/step-N`);
     break;
   }
+  case "requests": out((await api("GET", "/requests")).requests); break;
+  case "request": {
+    const r = await api("GET", "/requests/" + a[0]);
+    const c = cfg(), dir = join(dirname(CFG), "requests", a[0]);
+    mkdirSync(dir, { recursive: true });
+    const saved = [];
+    for (const f of r.files) {
+      const res = await fetch(`${c.baseUrl}/admin/requests/${a[0]}/files/${f.id}`, { headers: { Authorization: "Bearer " + c.adminToken } });
+      if (!res.ok) throw new Error(`file ${f.name}: ${res.status}`);
+      const path = join(dir, `${f.id}-${f.name.replace(/[^\w.-]+/g, "_")}`);
+      writeFileSync(path, Buffer.from(await res.arrayBuffer()));
+      saved.push(path);
+    }
+    out({ ...r, files: saved });
+    break;
+  }
+  case "approve": out(await api("POST", "/requests/" + a[0], { status: "approved" })); break;
+  case "reject": out(await api("POST", "/requests/" + a[0], { status: "rejected" })); break;
+  case "request-started": out(await api("POST", "/requests/" + a[0], { status: "started", caseId: flag(a, "case") })); break;
   case "pending": out((await api("GET", "/pending")).pending); break;
   case "profiles": out(await api("GET", "/profiles")); break;
   case "import": {
@@ -117,5 +136,5 @@ switch (cmd) {
     break;
   }
   case "purge": out(await api("DELETE", "/cases/" + a[0])); break;
-  default: console.log("proofprobe init [--url U] | new --profile NAME --title T [--new-profile] | profiles | pending | export ID | import ID --answers F | cost ID USD [label] | password ID [--set P] | admin-setup | publish ID [--intro F] [--questions F] [--plan F] [--status S] [--new-step TITLE | --step N] [--allow-drop] | list | link ID | status ID | fetch ID [--seq N] [--out F] | purge ID");
+  default: console.log("proofprobe init [--url U] | new --profile NAME --title T [--new-profile] | profiles | pending | requests | request ID | approve ID | reject ID | request-started ID --case CASE | export ID | import ID --answers F | cost ID USD [label] | password ID [--set P] | admin-setup | publish ID [--intro F] [--questions F] [--plan F] [--status S] [--new-step TITLE | --step N] [--allow-drop] | list | link ID | status ID | fetch ID [--seq N] [--out F] | purge ID");
 }

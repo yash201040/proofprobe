@@ -1,6 +1,7 @@
 import APP from "./page.html";
 import LANDING from "./landing.html";
 import ADMIN from "./admin.html";
+import REQUEST from "./request.html";
 import { SCHEMA } from "./schema";
 
 export interface Env { DB: D1Database; APP_VERSION: string; ADMIN_TOKEN_SHA256: string; PASSWORD_KEY: string }
@@ -13,7 +14,13 @@ const ADMIN_DAYS = 90;
 const ADMIN_MAX_FAILS = 6;
 const ADMIN_LOCK_MINUTES = 15;
 const ADMIN_SESSION = "__admin";
-const SCHEMA_VERSION = "4";
+const SCHEMA_VERSION = "5";
+const MAX_FILES = 5;
+const MAX_UPLOAD = 10 * 1024 * 1024;
+const CHUNK = 1024 * 1024;
+const MAX_REQUEST_BODY = 20_000;
+const REQUESTS_PER_HOUR = 5;
+const MAX_OPEN_REQUESTS = 100;
 const FIRST_STEP = "Research and questions";
 const STATUSES = ["draft", "open", "submitted", "plan_ready", "closed"];
 const TONES = ["good", "warn", "bad", "info"];
@@ -149,11 +156,67 @@ async function pendingWork(env: Env) {
     (SELECT MAX(submitted_at) FROM submissions s WHERE s.case_id = c.id) AS last_submitted,
     (SELECT MAX(created_at) FROM steps t WHERE t.case_id = c.id) AS latest_step
     FROM cases c JOIN profiles p ON p.id = c.profile_id WHERE c.status NOT IN ('draft', 'closed') ORDER BY c.created_at`).all<any>();
-  return r.results.flatMap((c) => {
+  const approved = await env.DB.prepare("SELECT id, name, title, decided_at FROM requests WHERE status = 'approved' ORDER BY decided_at").all<any>();
+  const queued = approved.results.map((q) => ({ id: q.id, profile: q.name, title: q.title, path: null, prompt: `/proofprobe start request ${q.id}`, kind: "request", since: q.decided_at, detail: null }));
+  return [...queued, ...r.results.flatMap((c) => {
     const base = { id: c.id, profile: c.profile, title: c.title, path: `/probes/${c.profile_slug}/${c.slug}`, prompt: `/proofprobe continue ${c.profile}: ${c.title}` };
     if (c.reroute) return [{ ...base, kind: "reroute", since: c.reroute_at, detail: c.reroute }];
     return c.last_submitted && c.last_submitted > c.latest_step ? [{ ...base, kind: "answers", since: c.last_submitted, detail: null }] : [];
-  });
+  })];
+}
+async function createRequest(request: Request, env: Env, ray: string) {
+  const form = await request.formData().catch(() => null);
+  if (!form) return json({ error: "bad_request" }, 400);
+  const text = (k: string) => { const v = form.get(k); return typeof v === "string" ? v.trim() : ""; };
+  if (text("website")) return json({ ref: "PP-000000" }); // A hidden field only bots fill in.
+  const name = text("name"), contact = text("contact"), title = text("title"), body = text("body");
+  if (!name || !contact || !title || body.length < 40 || name.length > 80 || contact.length > 160 || title.length > 140 || body.length > MAX_REQUEST_BODY) return json({ error: "bad_request" }, 400);
+  const files = form.getAll("files").filter((f): f is File => typeof f !== "string" && f.size > 0);
+  if (files.length > MAX_FILES || files.reduce((a, f) => a + f.size, 0) > MAX_UPLOAD) return json({ error: "too_large" }, 413);
+  const ip = await sha256("ip:" + (request.headers.get("cf-connecting-ip") ?? "local")), hourAgo = new Date(Date.now() - 3_600_000).toISOString();
+  const [recent, open] = await env.DB.batch([
+    env.DB.prepare("SELECT COUNT(*) AS n FROM requests WHERE ip_hash = ? AND created_at > ?").bind(ip, hourAgo),
+    env.DB.prepare("SELECT COUNT(*) AS n FROM requests WHERE status = 'new'"),
+  ]);
+  if ((recent.results[0] as any).n >= REQUESTS_PER_HOUR || (open.results[0] as any).n >= MAX_OPEN_REQUESTS) return json({ error: "rate_limited" }, 429);
+  const id = crypto.randomUUID().slice(0, 8), now = new Date().toISOString();
+  const writes = [env.DB.prepare("INSERT INTO requests(id, name, contact, title, body, ip_hash, created_at) VALUES (?,?,?,?,?,?,?)").bind(id, name, contact, title, body, ip, now)];
+  for (const f of files) {
+    const fid = crypto.randomUUID().slice(0, 12), bytes = new Uint8Array(await f.arrayBuffer());
+    writes.push(env.DB.prepare("INSERT INTO request_files(id, request_id, name, size, created_at) VALUES (?,?,?,?,?)").bind(fid, id, f.name.slice(0, 180) || "file", f.size, now));
+    for (let i = 0, n = 0; i < bytes.length; i += CHUNK, n++) writes.push(env.DB.prepare("INSERT INTO file_chunks(file_id, i, data) VALUES (?,?,?)").bind(fid, n, bytes.slice(i, i + CHUNK).buffer));
+  }
+  writes.push(audit(env, null, "visitor", "request_created", "request=" + id, ray));
+  await env.DB.batch(writes);
+  return json({ ref: "PP-" + id.toUpperCase() }, 201);
+}
+async function requestDetail(env: Env, id: string) {
+  const q = await env.DB.prepare("SELECT id, name, contact, title, body, status, case_id, created_at, decided_at FROM requests WHERE id = ?").bind(id).first<any>();
+  if (!q) return null;
+  const f = await env.DB.prepare("SELECT id, name, size FROM request_files WHERE request_id = ? ORDER BY created_at, name").bind(id).all();
+  return { ...q, files: f.results };
+}
+async function setRequestStatus(env: Env, id: string, status: string, caseId: string | null, ray: string) {
+  await env.DB.batch([
+    env.DB.prepare("UPDATE requests SET status = ?, case_id = COALESCE(?, case_id), decided_at = ? WHERE id = ?").bind(status, caseId, new Date().toISOString(), id),
+    audit(env, null, "admin", "request_" + status, "request=" + id, ray),
+  ]);
+}
+async function downloadFile(env: Env, requestId: string, fileId: string) {
+  const f = await env.DB.prepare("SELECT name FROM request_files WHERE id = ? AND request_id = ?").bind(fileId, requestId).first<{ name: string }>();
+  if (!f) return notFound();
+  const rows = await env.DB.prepare("SELECT data FROM file_chunks WHERE file_id = ? ORDER BY i").bind(fileId).all<{ data: number[] }>();
+  const parts = rows.results.map((r) => new Uint8Array(r.data));
+  // Always a download, never rendered here, because the bytes came from the public form.
+  return new Response(new Blob(parts), { headers: { ...SEC, "Content-Type": "application/octet-stream", "Content-Disposition": `attachment; filename*=UTF-8''${encodeURIComponent(f.name)}` } });
+}
+async function deleteRequest(env: Env, id: string, ray: string) {
+  await env.DB.batch([
+    env.DB.prepare("DELETE FROM file_chunks WHERE file_id IN (SELECT id FROM request_files WHERE request_id = ?)").bind(id),
+    env.DB.prepare("DELETE FROM request_files WHERE request_id = ?").bind(id),
+    env.DB.prepare("DELETE FROM requests WHERE id = ?").bind(id),
+    audit(env, null, "admin", "request_deleted", "request=" + id, ray),
+  ]);
 }
 async function deleteCase(env: Env, id: string, ray: string) {
   await env.DB.batch([
@@ -415,6 +478,18 @@ async function adminSite(request: Request, env: Env, parts: string[], ray: strin
     await env.DB.prepare("DELETE FROM sessions WHERE token_hash = ?").bind(await sha256(readCookie(request, "pp_admin")!)).run();
     return json({ ok: true }, 200, { "Set-Cookie": "pp_admin=; Path=/; Max-Age=0; HttpOnly; Secure; SameSite=Strict" });
   }
+  if (what === "requests" && id) {
+    if (sub === "files" && parts[3] && request.method === "GET") return downloadFile(env, id, parts[3]);
+    if (!sub && request.method === "GET") { const q = await requestDetail(env, id); return q ? json(q) : json({ error: "not_found" }, 404); }
+    if (!sub && request.method === "DELETE") { await deleteRequest(env, id, ray); return json({ ok: true }); }
+    if (!sub && request.method === "POST") {
+      const b = await request.json().catch(() => null) as { status?: string } | null;
+      if (b?.status !== "approved" && b?.status !== "rejected") return json({ error: "bad_status" }, 400);
+      await setRequestStatus(env, id, b.status, null, ray);
+      return json({ ok: true });
+    }
+    return notFound();
+  }
   if (what === "overview" && request.method === "GET") {
     const profiles = await env.DB.prepare(`SELECT p.id, p.name, p.slug, p.password_hash IS NOT NULL AS has_password, (SELECT COUNT(*) FROM cases c WHERE c.profile_id = p.id) AS pages FROM profiles p ORDER BY p.created_at`).all();
     const stepRows = await env.DB.prepare("SELECT case_id, n, questions_json FROM steps ORDER BY n").all<any>();
@@ -430,7 +505,8 @@ async function adminSite(request: Request, env: Env, parts: string[], ray: strin
       EXISTS (SELECT 1 FROM reroutes r WHERE r.case_id = c.id AND r.handled_at IS NULL) AS rerouting,
       (SELECT COALESCE(SUM(e.usd_micro), 0) / 1000000.0 FROM cost_entries e WHERE e.case_id = c.id) AS cost_usd
       FROM cases c JOIN profiles p ON p.id = c.profile_id ORDER BY c.created_at`).all<any>();
-    return json({ pending: await pendingWork(env), profiles: profiles.results, pages: r.results.map((x) => ({ ...x, total: totals.get(x.id) ?? 0, steps: stepCount.get(x.id) ?? 1 })) });
+    const requests = await env.DB.prepare("SELECT r.id, r.name, r.title, r.status, r.created_at, (SELECT COUNT(*) FROM request_files f WHERE f.request_id = r.id) AS files FROM requests r ORDER BY CASE r.status WHEN 'new' THEN 0 WHEN 'approved' THEN 1 ELSE 2 END, r.created_at DESC LIMIT 100").all();
+    return json({ pending: await pendingWork(env), requests: requests.results, profiles: profiles.results, pages: r.results.map((x) => ({ ...x, total: totals.get(x.id) ?? 0, steps: stepCount.get(x.id) ?? 1 })) });
   }
   if (what === "profiles" && !id && request.method === "POST") {
     const b = await request.json().catch(() => null) as { name?: unknown } | null;
@@ -507,6 +583,18 @@ async function admin(request: Request, env: Env, parts: string[], ray: string) {
     return json({ code });
   }
   if (root === "pending" && request.method === "GET") return json({ pending: await pendingWork(env) });
+  if (root === "requests") {
+    if (!id && request.method === "GET") return json({ requests: (await env.DB.prepare("SELECT id, name, title, status, created_at FROM requests ORDER BY created_at DESC LIMIT 100").all()).results });
+    if (id && sub === "files" && which && request.method === "GET") return downloadFile(env, id, which);
+    if (id && !sub && request.method === "GET") { const q = await requestDetail(env, id); return q ? json(q) : json({ error: "not_found" }, 404); }
+    if (id && !sub && request.method === "POST") {
+      const b = await request.json().catch(() => null) as { status?: string; caseId?: string } | null;
+      if (!["approved", "rejected", "started"].includes(b?.status ?? "")) return json({ error: "bad_status" }, 400);
+      await setRequestStatus(env, id, b!.status!, b!.caseId ?? null, ray);
+      return json({ ok: true });
+    }
+    return notFound();
+  }
   if (root === "profiles" && request.method === "GET") {
     const r = await env.DB.prepare("SELECT p.name, p.slug, p.password_hash IS NOT NULL AS has_password, (SELECT COUNT(*) FROM cases c WHERE c.profile_id = p.id) AS pages FROM profiles p ORDER BY p.created_at").all();
     return json({ profiles: r.results });
@@ -627,10 +715,12 @@ export default {
       if (!parts.length && page) return html(LANDING, request);
       if (parts[0] === "probes" && (parts.length === 1 || parts.length === 3) && page) return html(APP, request);
       if (parts[0] === "admin" && parts.length === 1 && page) return html(ADMIN, request);
+      if (parts[0] === "request" && parts.length === 1 && page) return html(REQUEST, request);
       if (!schemaReady) { if (!(await schemaCurrent(env))) await migrate(env); schemaReady = true; }
       if (parts[0] === "api" && parts[1] === "admin") return await adminSite(request, env, parts.slice(2), ray);
       if (parts[0] === "admin") return await admin(request, env, parts.slice(1), ray);
       if (parts[0] !== "api") return notFound();
+      if (parts[1] === "requests" && parts.length === 2 && request.method === "POST") return await createRequest(request, env, ray);
       if (parts[1] === "probes" && parts.length === 2 && page) return json({ profiles: await directory(env) });
       if (parts[1] === "pages" && parts[2] && parts[3]) {
         const row = await env.DB.prepare("SELECT c.*, p.name AS p_name, p.slug AS p_slug, p.password_hash AS p_hash, p.password_salt AS p_salt, p.pw_version AS p_version FROM cases c JOIN profiles p ON p.id = c.profile_id WHERE p.slug = ? AND c.slug = ? AND c.status != 'draft'").bind(parts[2], parts[3]).first<CaseRow>();

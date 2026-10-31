@@ -65,7 +65,11 @@ td,li,p,h1,h2,summary,.qa{overflow-wrap:anywhere}
 <main id="app" hidden>
   <h1>Admin</h1>
   <div class="tiles" id="tiles"></div>
-  <h2>Pending research</h2>
+  <h2>Goal requests</h2>
+  <div class="tablebox" id="reqBox" style="margin-block:10px 8px"><table class="cards"><thead><tr><th>From</th><th>Goal</th><th>Status</th><th>Files</th><th>Received</th><th></th></tr></thead><tbody id="requests"></tbody></table></div>
+  <p class="muted" id="noReq" hidden style="margin-block:10px 8px">No requests yet.</p>
+  <section class="panel" id="reqDetail" hidden style="margin-bottom:8px"></section>
+  <h2 style="margin-top:24px">Pending research</h2>
   <p class="muted" style="margin-top:4px">For tracking only. Nothing starts from this page. Copy a prompt into Claude Code when you want to continue one.</p>
   <div class="tablebox" id="pendingBox" style="margin-block:10px 24px"><table class="cards"><thead><tr><th>Profile</th><th>Page</th><th>Waiting for</th><th>Since</th><th>Prompt</th></tr></thead><tbody id="pending"></tbody></table></div>
   <p class="muted" id="noPending" hidden style="margin-block:10px 24px">Nothing is pending.</p>
@@ -133,10 +137,14 @@ $("addProfile").addEventListener("click",async()=>{const n=$("newProfile");try{a
 async function loadApp(){
   const d=await api("/overview");view(["app","foot","logout"]);
   profileRows(d.profiles);
+  const REQ={new:["Needs a decision","warn"],approved:["Approved, queued","info"],rejected:["Rejected","bad"],started:["Research started","good"]};
+  const rb=$("requests");rb.textContent="";
+  d.requests.forEach(q=>{const tr=el("tr"),st=el("td"),act=el("td"),b=el("button","Review","link"),[n,tone]=REQ[q.status]||[q.status,"info"];st.appendChild(el("span",n,"chip "+tone));b.type="button";b.addEventListener("click",()=>loadRequest(q.id));act.className="act";act.appendChild(b);tr.append(el("td",q.name),el("td",q.title),st,el("td",String(q.files),"num"),el("td",fmt(q.created_at)),act);rb.appendChild(tr)});
+  $("reqBox").hidden=!d.requests.length;$("noReq").hidden=d.requests.length>0;
   const pb=$("pending");pb.textContent="";
   d.pending.forEach(w=>{
     const tr=el("tr"),type=el("td"),link=el("a",w.title),page=el("td"),act=el("td"),copy=el("button","Copy prompt");
-    type.appendChild(el("span",w.kind==="reroute"?"New direction":"In-depth research",w.kind==="reroute"?"chip warn":"chip info"));link.href=w.path;page.appendChild(link);
+    type.appendChild(el("span",w.kind==="reroute"?"New direction":w.kind==="request"?"First research":"In-depth research",w.kind==="reroute"?"chip warn":w.kind==="request"?"chip good":"chip info"));if(w.path){link.href=w.path;page.appendChild(link)}else page.textContent=w.title;
     copy.type="button";copy.className="ghost";copy.addEventListener("click",async()=>{try{await navigator.clipboard.writeText(w.prompt);copy.textContent="Copied"}catch(e){copy.textContent=w.prompt}});
     act.className="act";act.appendChild(copy);tr.append(el("td",w.profile),page,type,el("td",fmt(w.since)),act);pb.appendChild(tr);
   });
@@ -155,6 +163,19 @@ async function loadApp(){
     body.appendChild(tr);
   });
   document.querySelectorAll("table.cards").forEach(labelCards);
+}
+async function loadRequest(id){
+  const q=await api("/requests/"+id),box=$("reqDetail");box.textContent="";box.hidden=false;
+  box.appendChild(el("h2",q.title));box.appendChild(el("p","From "+q.name+" · Contact: "+q.contact+" · "+fmt(q.created_at)));
+  const b=el("p",q.body);b.style.whiteSpace="pre-wrap";box.appendChild(b);
+  q.files.forEach(f=>{const a=el("a",f.name+" ("+Math.max(1,Math.round(f.size/1024))+" KB)");a.href="/api/admin/requests/"+q.id+"/files/"+f.id;a.setAttribute("download","");box.appendChild(a)});
+  const row=el("div",null,"row"),msg=el("span",null,"muted");msg.id="reqMsg";
+  const act=(label,cls,status)=>{const x=el("button",label);x.type="button";x.id="req-"+status;if(cls)x.className=cls;x.addEventListener("click",async()=>{await api("/requests/"+id,{method:"POST",body:JSON.stringify({status})});await loadApp();loadRequest(id)});return x};
+  if(q.status==="new"||q.status==="rejected")row.appendChild(act("Approve",null,"approved"));
+  if(q.status==="new"||q.status==="approved")row.appendChild(act("Reject","ghost","rejected"));
+  const del=el("button","Delete request");del.type="button";del.className="ghost";del.id="req-delete";del.addEventListener("click",async()=>{if(del.dataset.armed){await api("/requests/"+id,{method:"DELETE"});box.hidden=true;loadApp()}else{del.dataset.armed="1";del.textContent="Press again to delete permanently"}});
+  row.append(del,msg);box.appendChild(row);
+  box.scrollIntoView({behavior:"auto",block:"nearest"});
 }
 async function loadDetail(id){
   const d=await api("/pages/"+id),box=$("detail");box.textContent="";box.hidden=false;

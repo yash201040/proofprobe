@@ -40,19 +40,21 @@ ok((await page.$('.adminlink[href="/admin"]')) !== null, "the Admin link is on t
 await page.goto(base + "/probes", { waitUntil: "networkidle0" });
 await page.waitForSelector(".profile");
 const titles = () => page.$$eval(".pagelink b", (l) => l.map((e) => e.textContent));
+const sortBy = async (v) => { await page.click("#sortBtn"); await page.click(`#sortPanel input[value="${v}"]`); };
+ok((await page.$("#sortPanel")) !== null && (await page.$("select")) === null, "the sort menu matches the filter panel");
 ok((await titles())[0] === "Other goal" && (await txt(".pagelink small")).includes("Created") && (await txt(".pagelink small")).includes("Updated"), "probes show dates and start newest first");
-await page.select("#sortBy", "profile");
+await sortBy("profile");
 const cards = await page.$$eval(".profile", (l) => l.map((c) => [c.querySelector("h2").textContent, c.querySelectorAll(".pagelink").length]));
 ok(cards.some(([n, c]) => n === "Test Person" && c === 2), "sorting by profile groups each person's pages");
 ok(cards.map(([n]) => n).join() === [...cards.map(([n]) => n)].sort((a, b) => a.localeCompare(b)).join() && (await txt("#sortDir")).startsWith("A to Z"), "profiles sort alphabetically");
 await page.click("#sortDir"); ok((await page.$eval(".profile h2", (e) => e.textContent)) === cards[cards.length - 1][0] && (await txt("#sortDir")).startsWith("Z to A"), "the profile sort can be reversed");
 pp("cost", second.id, "0.5", "test"); pp("cost", other.id, "0.1", "test");
 await page.reload({ waitUntil: "networkidle0" }); await page.waitForSelector(".pagelink");
-await page.select("#sortBy", "cost"); ok((await titles())[0] === "Second goal" && (await txt("#sortDir")).startsWith("Highest"), "sorting by cost starts with the highest");
+await sortBy("cost"); ok((await titles())[0] === "Second goal" && (await txt("#sortDir")).startsWith("Highest"), "sorting by cost starts with the highest");
 await page.click("#sortDir"); ok((await titles()).at(-1) === "Second goal", "the cost sort can be reversed");
-await page.select("#sortBy", "created"); await page.click("#sortDir"); ok((await titles())[0] === "First goal", "the date sort can be reversed");
+await sortBy("created"); await page.click("#sortDir"); ok((await titles())[0] === "First goal", "the date sort can be reversed");
 pp("publish", second.id, "--status", "plan_ready"); await page.reload({ waitUntil: "networkidle0" }); await page.waitForSelector(".pagelink");
-await page.select("#sortBy", "updated"); ok((await titles())[0] === "Second goal", "sorting by last updated works");
+await sortBy("updated"); ok((await titles())[0] === "Second goal", "sorting by last updated works");
 ok((await txt("#filterBtn")) === "Filter" && (await page.$("#statusBy")) === null && (await titles()).length === 3, "filters start empty and show everything");
 await page.click("#filterBtn"); await page.waitForSelector("#filterPanel:not([hidden])");
 ok((await page.$$("#filterPanel input:checked")).length === 0 && (await page.$$('#filterStatus input')).length === 5, "status options are unchecked checkboxes");
@@ -265,5 +267,25 @@ ok(burst.filter((s) => s === 401).length <= 5 && burst[24] === 429, "a burst of 
 ok((await fetch(base + "/api/admin/login", { method: "POST", body: JSON.stringify({ password: "test-master-pass" }) })).status === 429, "the pause also applies to the right password");
 ok((await fetch(base + "/probes/none/none/x")).status === 404, "unknown paths are refused");
 ok((await fetch(base + "/admin/cases")).status === 404, "admin needs its token");
+// Goal requests
+const req = await browser.createBrowserContext(); const rp = await req.newPage(); await rp.goto(base + "/request", { waitUntil: "networkidle0" });
+ok((await rp.$eval(".tips", (e) => e.textContent)).includes("Tips"), "the request page starts with tips");
+await rp.click("#send"); await rp.waitForFunction(() => document.querySelector("#err").textContent.length > 0); ok(true, "an empty request is refused");
+await rp.type("#name", "Request Person"); await rp.type("#contact", "person@example.com"); await rp.type("#goalTitle", "Become a product manager");
+await rp.type("#body", "I want to move from support into product management within a year, in Bengaluru.");
+const upload = "/tmp/proofprobe-upload-" + process.pid + ".txt"; writeFileSync(upload, "x".repeat(2_500_000));
+await (await rp.$("#files")).uploadFile(upload); await rp.waitForSelector("#list li");
+await rp.click("#send"); await rp.waitForSelector("#done:not([hidden])");
+const ref = (await rp.$eval("#ref", (e) => e.textContent)).replace("PP-", "").toLowerCase();
+ok(ref.length === 8, "a visitor can send a request with a file");
+ok(!(await (await fetch(base + "/api/probes")).text()).includes("Become a product manager"), "requests stay out of the public list");
+ok((await fetch(base + "/api/admin/requests/" + ref)).status === 401 && (await fetch(base + "/admin/requests")).status === 404, "requests need an admin login");
+await req.close();
+ok(JSON.parse(pp("requests")).some((q) => q.id === ref && q.status === "new") && JSON.parse(pp("pending")).every((w) => w.id !== ref), "a new request waits for a decision");
+const got = JSON.parse(pp("request", ref)); ok(readFileSync(got.files[0]).length === 2_500_000, "files larger than one chunk download intact");
+pp("approve", ref); ok(JSON.parse(pp("pending")).some((w) => w.id === ref && w.kind === "request"), "approving queues it as pending research");
+pp("request-started", ref, "--case", first.id); ok(JSON.parse(pp("pending")).every((w) => w.id !== ref), "starting research clears it from pending");
+const spam = []; for (let i = 0; i < 6; i++) { const f = new FormData(); f.append("name", "S"); f.append("contact", "s"); f.append("title", "T"); f.append("body", "z".repeat(50)); spam.push((await fetch(base + "/api/requests", { method: "POST", body: f })).status); }
+ok(spam.includes(429), "too many requests from one visitor are refused");
 console.log("ALL PASSED");
 } finally { await browser.close(); for (const id of cleanup) pp("purge", id); }
