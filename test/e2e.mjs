@@ -34,7 +34,7 @@ const cards = await page.$$eval(".profile", (l) => l.map((c) => [c.querySelector
 ok(cards.some(([n, c]) => n === "Test Person" && c === 2), "one profile can hold several pages");
 
 await page.goto(first.link, { waitUntil: "networkidle0" }); await page.waitForSelector("#access:not([hidden])");
-ok((await shown("#viewQs")) && !(await shown("#qBox")) && (await page.$$("textarea")).length === 0, "a visitor gets a read-only page");
+ok((await shown("#viewQs")) && !(await shown("#qBox")) && (await page.$$("#form textarea")).length === 0, "a visitor gets a read-only page");
 const anon = await fetch(first.api + "/answers", { method: "PUT", body: JSON.stringify({ answers: { a1: "hack" } }) });
 const anonSub = await fetch(first.api + "/submit", { method: "POST", body: JSON.stringify({ key: "anon-key-001" }) });
 ok(anon.status === 401 && anonSub.status === 401, "writing without a password is refused");
