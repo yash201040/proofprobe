@@ -27,7 +27,7 @@ const unlock = async (pw) => { await page.click("#unlockBtn"); await page.type("
 
 await page.goto(base + "/", { waitUntil: "networkidle0" });
 ok((await txt("h1")).includes("One proven path"), "home page loads");
-await page.click("#burger"); ok((await page.$eval("#menu a", (e) => e.getAttribute("href"))) === "/probes", "menu links to Probes");
+await page.click("#burger"); ok((await page.$eval("#menu a", (e) => e.getAttribute("href"))) === "/probes" && (await page.$$("#menu a svg")).length === 2, "menu links to Probes with icons");
 await page.goto(base + "/probes", { waitUntil: "networkidle0" });
 await page.waitForSelector(".profile");
 const cards = await page.$$eval(".profile", (l) => l.map((c) => [c.querySelector("h2").textContent, c.querySelectorAll(".pagelink").length]));

@@ -12,6 +12,8 @@ Two-step research that ends in a clear, data-backed path.
 
 Submitting answers never starts anything. Run Step 2 only when the user asks.
 
+**This applies to every track.** On any page with questions, the person can skip answering and send a new direction. When the user asks you to continue, always check for that first, because it sends the work back to Step 1. See "Changing direction".
+
 Helper, shown below as `proofprobe`, works from any folder:
 `node ~/HOME/Coding/Projects/personal/proofprobe/bin/proofprobe.mjs <command>`
 
@@ -30,7 +32,7 @@ Any one starting input is enough. Profiles are optional. If there is no usable i
 
 ## Changing direction
 
-Someone with a page's password can send a new direction at the top of the questions, and skip answering. It starts nothing. When the user asks you to continue and `reroute` is set:
+This works the same for jobs, side income, startups and any other goal. Someone with a page's password can send a new direction at the top of the questions, and skip answering. It starts nothing. When the user asks you to continue and `reroute` is set:
 
 1. Treat the message as the new goal. It outranks the old analysis and any answers on the page.
 2. Run Step 1 again, reusing whatever earlier research still applies. Tell the user the budget first.
