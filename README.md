@@ -9,6 +9,10 @@ Two-step research that turns any starting point into a clear, data-backed path: 
 - **Worker** (`src/`): hosts each case at a private link. No sign-in. People save and submit answers, and the plan appears on the same page.
 - **`bin/proofprobe.mjs`**: admin helper to create, publish, check and fetch cases.
 
+## For agents and other chats
+
+Read `CLAUDE.md` for the expected flow. In any Claude Code chat, `/proofprobe` runs it, including moving research that was started elsewhere onto a page.
+
 ## Setup
 
 ```

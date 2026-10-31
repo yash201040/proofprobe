@@ -1,6 +1,6 @@
 ---
 name: proofprobe
-description: Use when the user wants a researched path from where someone is to a goal, starting from any input, such as a LinkedIn profile, CV, job description, scheduled interview, part-time income question, or a startup idea, product document or prototype. Also use to check a ProofProbe case for answers, continue a case, or publish its final path.
+description: Use when the user wants a researched path from where someone is to a goal, starting from any input, such as a LinkedIn profile, CV, job description, scheduled interview, part-time income question, or a startup idea, product document or prototype. Also use to check a ProofProbe case for answers, continue a case, publish its final path, or host questions and pages for research already done in another chat.
 ---
 
 # ProofProbe
@@ -12,7 +12,10 @@ Two-step research that ends in a clear, data-backed path.
 
 Submitting answers never starts anything. Run Step 2 only when the user asks.
 
-Project: `/Users/guts/HOME/Coding/Projects/personal/proofprobe`. Run the helper from there: `node bin/proofprobe.mjs <command>`, shown below as `proofprobe`. Keep all working files in `.proofprobe/cases/<id>/`, which git ignores, and pass those full paths to the helper.
+Helper, shown below as `proofprobe`, works from any folder:
+`node /Users/guts/HOME/Coding/Projects/personal/proofprobe/bin/proofprobe.mjs <command>`
+
+Keep working files in `/Users/guts/HOME/Coding/Projects/personal/proofprobe/.proofprobe/cases/<id>/`, which git ignores, and pass full paths to the helper. Paths below are shown relative to the project. If a project already has its own research folder, keep the research there and put only the JSON files in the case folder.
 
 ## Choose the track
 
@@ -24,6 +27,19 @@ Any one starting input is enough. Profiles are optional. If there is no usable i
 | Side income | CV or LinkedIn, plus an open goal | Demand and real pay for each candidate path, and what blocks each | The route to take, roles and portals to target, topics to bridge, first applications |
 | Startup idea | Product document, prototype or idea, with or without founder profiles | Demand, competitors, pricing, substitutes, regulation, funding climate | What to build first and what to skip, first customers, who to reach and how to pitch, with verified contacts |
 | Anything else | Whatever is given | The market and constraints around the goal | A path with concrete next actions |
+
+## Moving existing research in
+
+Use this when Step 1 already happened in another chat or folder. Don't repeat the research.
+
+1. Read the existing notes, findings and questions.
+2. Create the case with `proofprobe new`, using the person, team or product name.
+3. Convert the existing questions to `questions.json` without changing their meaning, and fill gaps the flow requires: gate questions first, a `why` on each, and a final `catchAll` question.
+4. Summarise the findings so far into `intro.json`.
+5. Record what the research already cost with `proofprobe cost`, using the spend reported in that chat.
+6. Publish with `--status open`, give the user the link, and tell them which older page or file it replaces. If answers already exist elsewhere, tell the user, because they don't move across on their own.
+
+Then carry on with Step 2 as normal.
 
 ## Step 1: broad probing
 
