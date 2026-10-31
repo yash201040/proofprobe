@@ -1,13 +1,18 @@
 import APP from "./page.html";
 import LANDING from "./landing.html";
+import ADMIN from "./admin.html";
 import { SCHEMA } from "./schema";
 
-export interface Env { DB: D1Database; APP_VERSION: string; ADMIN_TOKEN_SHA256: string }
+export interface Env { DB: D1Database; APP_VERSION: string; ADMIN_TOKEN_SHA256: string; PASSWORD_KEY: string }
 
 const MAX_ANSWER = 30_000;
 const MAX_DOC = 300_000;
 const MAX_REROUTE = 5_000;
 const SESSION_DAYS = 30;
+const ADMIN_HOURS = 12;
+const ADMIN_MAX_FAILS = 6;
+const ADMIN_LOCK_MINUTES = 15;
+const ADMIN_SESSION = "__admin";
 const STATUSES = ["draft", "open", "submitted", "plan_ready", "closed"];
 const TONES = ["good", "warn", "bad", "info"];
 
@@ -49,7 +54,7 @@ interface Section { title: string; note?: string; first?: boolean; questions: Qu
 interface CaseRow {
   id: string; title: string; first_name: string; status: string; intro_json: string; questions_json: string; plan_json: string;
   created_at: string; updated_at: string; profile_id: string | null; slug: string | null;
-  password_hash: string | null; password_salt: string | null; pw_version: number;
+  password_hash: string | null; password_salt: string | null; pw_version: number; password_enc: string | null; password_iv: string | null;
 }
 
 async function freeSlug(env: Env, table: "profiles" | "cases", base: string, scope?: string) {
@@ -73,7 +78,7 @@ async function profileFor(env: Env, name: string, now: string) {
 async function migrate(env: Env) {
   await env.DB.batch(SCHEMA.map((q) => env.DB.prepare(q)));
   const cols = new Set((await env.DB.prepare("SELECT name FROM pragma_table_info('cases')").all()).results.map((r: any) => r.name));
-  const add = [["profile_id", "TEXT"], ["slug", "TEXT"], ["password_hash", "TEXT"], ["password_salt", "TEXT"], ["pw_version", "INTEGER NOT NULL DEFAULT 0"]];
+  const add = [["profile_id", "TEXT"], ["slug", "TEXT"], ["password_hash", "TEXT"], ["password_salt", "TEXT"], ["pw_version", "INTEGER NOT NULL DEFAULT 0"], ["password_enc", "TEXT"], ["password_iv", "TEXT"]];
   for (const [name, type] of add) if (!cols.has(name)) await env.DB.prepare(`ALTER TABLE cases ADD COLUMN ${name} ${type}`).run();
   const old = await env.DB.prepare("SELECT id, title, first_name FROM cases WHERE profile_id IS NULL OR slug IS NULL").all<any>();
   const now = new Date().toISOString();
@@ -144,6 +149,26 @@ async function canEdit(request: Request, env: Env, row: CaseRow) {
   if (!token) return false;
   const s = await env.DB.prepare("SELECT pw_version, expires_at FROM sessions WHERE token_hash = ? AND case_id = ?").bind(await sha256(token), row.id).first<any>();
   return !!s && s.pw_version === row.pw_version && s.expires_at > new Date().toISOString();
+}
+
+const b64 = (u: ArrayBuffer | Uint8Array) => btoa(String.fromCharCode(...new Uint8Array(u instanceof Uint8Array ? u.buffer : u)));
+const unb64 = (s: string) => Uint8Array.from(atob(s), (c) => c.charCodeAt(0));
+const aesKey = (env: Env) => crypto.subtle.importKey("raw", unb64(env.PASSWORD_KEY), "AES-GCM", false, ["encrypt", "decrypt"]);
+async function seal(env: Env, text: string) {
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  return { enc: b64(await crypto.subtle.encrypt({ name: "AES-GCM", iv }, await aesKey(env), new TextEncoder().encode(text))), iv: b64(iv) };
+}
+async function unseal(env: Env, enc: string, iv: string) {
+  return new TextDecoder().decode(await crypto.subtle.decrypt({ name: "AES-GCM", iv: unb64(iv) }, await aesKey(env), unb64(enc)));
+}
+// Page passwords are hashed for checking and encrypted separately, so only the admin page can show them.
+async function setPagePassword(env: Env, id: string, password: string, actor: string, ray: string) {
+  const salt = randomToken(), sealed = await seal(env, password), now = new Date().toISOString();
+  await env.DB.batch([
+    env.DB.prepare("UPDATE cases SET password_hash = ?, password_salt = ?, password_enc = ?, password_iv = ?, pw_version = pw_version + 1, updated_at = ? WHERE id = ?").bind(await sha256(salt + password), salt, sealed.enc, sealed.iv, now, id),
+    env.DB.prepare("DELETE FROM sessions WHERE case_id = ?").bind(id),
+    audit(env, id, actor, "password_changed", null, ray),
+  ]);
 }
 
 // There is deliberately no lockout: visitors are welcome to try passwords while this is a showcase.
@@ -268,10 +293,117 @@ async function pageApi(request: Request, env: Env, row: CaseRow, rest: string, r
   return json({ saved: entries.length, updatedAt });
 }
 
+async function getSettings(env: Env) {
+  const r = await env.DB.prepare("SELECT key, value FROM settings").all<{ key: string; value: string }>();
+  return Object.fromEntries(r.results.map((x) => [x.key, x.value])) as Record<string, string | undefined>;
+}
+const setSettings = (env: Env, kv: Record<string, string>) => env.DB.batch(Object.entries(kv).map(([k, v]) =>
+  env.DB.prepare("INSERT INTO settings(key, value) VALUES (?,?) ON CONFLICT(key) DO UPDATE SET value = excluded.value").bind(k, v)));
+async function adminLoggedIn(request: Request, env: Env) {
+  const token = readCookie(request, "pp_admin");
+  if (!token) return false;
+  const s = await env.DB.prepare("SELECT expires_at FROM sessions WHERE token_hash = ? AND case_id = ?").bind(await sha256(token), ADMIN_SESSION).first<any>();
+  return !!s && s.expires_at > new Date().toISOString();
+}
+
+// The site's admin area. It uses the master password, separate from the helper's bearer token.
+async function adminSite(request: Request, env: Env, parts: string[], ray: string) {
+  const [what, id, sub] = parts;
+  const conf = await getSettings(env);
+  if (what === "state" && request.method === "GET") return json({ configured: !!conf.master_hash, loggedIn: await adminLoggedIn(request, env) });
+  if (what === "setup" && request.method === "POST") {
+    const b = await request.json().catch(() => null) as { code?: unknown; password?: unknown } | null;
+    const valid = typeof b?.code === "string" && conf.setup_hash === await sha256(b.code) && (conf.setup_expires ?? "") > new Date().toISOString();
+    if (!valid) return json({ error: "invalid_code" }, 403);
+    if (typeof b?.password !== "string" || b.password.length < 10 || b.password.length > 200) return json({ error: "too_short" }, 400);
+    const salt = randomToken();
+    await setSettings(env, { master_salt: salt, master_hash: await sha256(salt + b.password), setup_hash: "", setup_expires: "", admin_fails: "0", admin_locked_until: "" });
+    await env.DB.batch([env.DB.prepare("DELETE FROM sessions WHERE case_id = ?").bind(ADMIN_SESSION), audit(env, null, "admin", "master_password_set", null, ray)]);
+    return json({ ok: true });
+  }
+  if (what === "login" && request.method === "POST") {
+    if (!conf.master_hash || !conf.master_salt) return json({ error: "not_configured" }, 409);
+    const b = await request.json().catch(() => null) as { password?: unknown } | null;
+    const now = new Date();
+    if ((conf.admin_locked_until ?? "") > now.toISOString()) return json({ error: "locked" }, 429);
+    if (typeof b?.password !== "string" || (await sha256(conf.master_salt + b.password)) !== conf.master_hash) {
+      const fails = Number(conf.admin_fails ?? 0) + 1, locked = fails >= ADMIN_MAX_FAILS;
+      await setSettings(env, { admin_fails: locked ? "0" : String(fails), admin_locked_until: locked ? new Date(now.getTime() + ADMIN_LOCK_MINUTES * 60_000).toISOString() : "" });
+      log(env, ray, "warn", "admin_login_failed", { fails });
+      return json({ error: locked ? "locked" : "wrong_password" }, locked ? 429 : 401);
+    }
+    const token = randomToken();
+    await setSettings(env, { admin_fails: "0", admin_locked_until: "" });
+    await env.DB.batch([
+      env.DB.prepare("INSERT INTO sessions(token_hash, case_id, pw_version, expires_at) VALUES (?,?,?,?)").bind(await sha256(token), ADMIN_SESSION, 0, new Date(now.getTime() + ADMIN_HOURS * 3_600_000).toISOString()),
+      audit(env, null, "admin", "login", null, ray),
+    ]);
+    return json({ ok: true }, 200, { "Set-Cookie": `pp_admin=${token}; Path=/; Max-Age=${ADMIN_HOURS * 3600}; HttpOnly; Secure; SameSite=Strict` });
+  }
+  if (!(await adminLoggedIn(request, env))) return json({ error: "login_required" }, 401);
+  if (what === "logout" && request.method === "POST") {
+    await env.DB.prepare("DELETE FROM sessions WHERE token_hash = ?").bind(await sha256(readCookie(request, "pp_admin")!)).run();
+    return json({ ok: true }, 200, { "Set-Cookie": "pp_admin=; Path=/; Max-Age=0; HttpOnly; Secure; SameSite=Strict" });
+  }
+  if (what === "overview" && request.method === "GET") {
+    const r = await env.DB.prepare(`SELECT c.id, c.title, c.status, c.updated_at, c.questions_json, p.name AS profile, p.slug AS profile_slug, c.slug, c.password_hash IS NOT NULL AS has_password,
+      (SELECT COUNT(*) FROM submissions s WHERE s.case_id = c.id) AS submissions,
+      (SELECT COUNT(*) FROM answers a WHERE a.case_id = c.id AND trim(a.text) != '') AS saved,
+      EXISTS (SELECT 1 FROM reroutes r WHERE r.case_id = c.id AND r.handled_at IS NULL) AS rerouting,
+      (SELECT COALESCE(SUM(e.usd_micro), 0) / 1000000.0 FROM cost_entries e WHERE e.case_id = c.id) AS cost_usd
+      FROM cases c JOIN profiles p ON p.id = c.profile_id ORDER BY c.created_at`).all<any>();
+    return json({ pages: r.results.map(({ questions_json, ...x }) => ({ ...x, total: flatten(parse<Section[]>(questions_json, [])).length })) });
+  }
+  if (what !== "pages" || !id) return notFound();
+  const row = await env.DB.prepare("SELECT * FROM cases WHERE id = ?").bind(id).first<CaseRow>();
+  if (!row) return json({ error: "not_found" }, 404);
+
+  if (sub === "password" && request.method === "GET") {
+    await audit(env, id, "admin", "password_viewed", null, ray).run();
+    return json({ password: row.password_enc && row.password_iv ? await unseal(env, row.password_enc, row.password_iv) : null });
+  }
+  if (sub === "password" && request.method === "POST") {
+    const b = await request.json().catch(() => null) as { password?: unknown } | null;
+    if (typeof b?.password !== "string" || b.password.length < 4 || b.password.length > 200) return json({ error: "bad_password" }, 400);
+    await setPagePassword(env, id, b.password, "admin", ray);
+    return json({ ok: true });
+  }
+  if (sub === "answers" && request.method === "PUT") {
+    const b = await request.json().catch(() => null) as { answers?: Record<string, unknown> } | null;
+    const known = new Set(flatten(parse<Section[]>(row.questions_json, [])).map((q) => q.id));
+    const entries = Object.entries(b?.answers ?? {});
+    if (!entries.length || entries.some(([k, v]) => !known.has(k) || typeof v !== "string" || (v as string).length > MAX_ANSWER)) return json({ error: "bad_request" }, 400);
+    const at = new Date().toISOString();
+    await env.DB.batch([
+      ...entries.map(([k, v]) => env.DB.prepare("INSERT INTO answers(case_id, question_id, text, updated_at) VALUES (?,?,?,?) ON CONFLICT(case_id, question_id) DO UPDATE SET text = excluded.text, updated_at = excluded.updated_at").bind(id, k, v as string, at)),
+      audit(env, id, "admin", "answers_edited", entries.map(([k]) => k).join(","), ray),
+    ]);
+    return json({ ok: true });
+  }
+  if (!sub && request.method === "GET") {
+    const p = await env.DB.prepare("SELECT name FROM profiles WHERE id = ?").bind(row.profile_id).first<any>();
+    const subs = await env.DB.prepare("SELECT * FROM submissions WHERE case_id = ? ORDER BY seq").bind(id).all<any>();
+    const auditRows = await env.DB.prepare("SELECT actor, action, detail, at FROM audit_log WHERE case_id = ? ORDER BY id DESC LIMIT 50").bind(id).all();
+    const costs = await env.DB.prepare("SELECT usd_micro, label, at FROM cost_entries WHERE case_id = ? ORDER BY id").bind(id).all<any>();
+    return json({
+      title: row.title, profile: p?.name, status: row.status, sections: parse(row.questions_json, []), answers: await currentAnswers(env, id),
+      reroute: await openReroute(env, id), costUsd: await costUsd(env, id), audit: auditRows.results,
+      costs: costs.results.map((c) => ({ usd: c.usd_micro / 1_000_000, label: c.label, at: c.at })),
+      submissions: await Promise.all(subs.results.map(async (s) => ({ seq: s.seq, submittedAt: s.submitted_at, answered: s.answered, total: s.total, intact: (await sha256(s.payload)) === s.sha256, items: parse(s.payload, null) }))),
+    });
+  }
+  return notFound();
+}
+
 async function admin(request: Request, env: Env, parts: string[], ray: string) {
   const auth = request.headers.get("Authorization") ?? "";
   if (!env.ADMIN_TOKEN_SHA256 || !auth.startsWith("Bearer ") || (await sha256(auth.slice(7))) !== env.ADMIN_TOKEN_SHA256) return notFound();
   const [root, id, sub, which] = parts;
+  if (root === "setup-code" && request.method === "POST") {
+    const code = randomToken();
+    await setSettings(env, { setup_hash: await sha256(code), setup_expires: new Date(Date.now() + 30 * 60_000).toISOString() });
+    return json({ code });
+  }
   if (root !== "cases") return notFound();
   const now = new Date().toISOString();
 
@@ -332,12 +464,7 @@ async function admin(request: Request, env: Env, parts: string[], ray: string) {
   if (sub === "password" && request.method === "POST") {
     const b = await request.json().catch(() => null) as { password?: unknown } | null;
     if (typeof b?.password !== "string" || b.password.length < 4 || b.password.length > 200) return json({ error: "password must be 4 to 200 characters" }, 400);
-    const salt = randomToken();
-    await env.DB.batch([
-      env.DB.prepare("UPDATE cases SET password_hash = ?, password_salt = ?, pw_version = pw_version + 1, updated_at = ? WHERE id = ?").bind(await sha256(salt + b.password), salt, now, id),
-      env.DB.prepare("DELETE FROM sessions WHERE case_id = ?").bind(id),
-      audit(env, id, "admin", "password", null, ray),
-    ]);
+    await setPagePassword(env, id, b.password, "cli", ray);
     return json({ ok: true });
   }
   if (!sub && request.method === "DELETE") {
@@ -373,7 +500,9 @@ export default {
     try {
       if (!parts.length && page) return html(LANDING, request);
       if (parts[0] === "probes" && (parts.length === 1 || parts.length === 3) && page) return html(APP, request);
+      if (parts[0] === "admin" && parts.length === 1 && page) return html(ADMIN, request);
       if (!schemaReady) { await migrate(env); schemaReady = true; }
+      if (parts[0] === "api" && parts[1] === "admin") return await adminSite(request, env, parts.slice(2), ray);
       if (parts[0] === "admin") return await admin(request, env, parts.slice(1), ray);
       if (parts[0] !== "api") return notFound();
       if (parts[1] === "probes" && parts.length === 2 && page) return json({ profiles: await directory(env) });

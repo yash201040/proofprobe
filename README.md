@@ -23,10 +23,12 @@ node bin/proofprobe.mjs init --url https://<worker-url>
 ln -s "$PWD/skills/proofprobe" ~/.claude/skills/proofprobe
 npx wrangler login
 npx wrangler secret put ADMIN_TOKEN_SHA256     # paste the hash printed by init
+openssl rand -base64 32 | npx wrangler secret put PASSWORD_KEY
 npx wrangler deploy
+node bin/proofprobe.mjs admin-setup             # open the link to choose the master password
 ```
 
-Local test: put `ADMIN_TOKEN_SHA256=<hash>` in `.dev.vars`, run `npm run dev`, then `npm run test:e2e`. The test only ever talks to localhost. `npm run typecheck` checks the Worker.
+Local test: put `ADMIN_TOKEN_SHA256=<hash>` and `PASSWORD_KEY=<base64 key>` in `.dev.vars`, run `npm run dev`, then `npm run test:e2e`. The test only ever talks to localhost. `npm run typecheck` checks the Worker.
 
 ## Data rules
 
@@ -44,7 +46,7 @@ This is a small free-tier app: one Cloudflare Worker and a D1 database, with no 
 
 ## Open source and access
 
-The code is public, but the running service is not. Cases, answers and links live in the owner's Cloudflare account, and nothing in this repo gives access to them. The admin token and page passwords stay in `.proofprobe/`, which is never committed. The Worker holds only a hash of the token, as a Cloudflare secret.
+The code is public, but the running service is not. Cases, answers and links live in the owner's Cloudflare account, and nothing in this repo gives access to them. The admin token stays in `.proofprobe/`, which is never committed. Page passwords are encrypted in the database, and the master password is stored only as a salted hash. The Worker holds only a hash of the token, as a Cloudflare secret.
 
 To run your own copy, replace `account_id` and `database_id` in `wrangler.jsonc` with your own.
 

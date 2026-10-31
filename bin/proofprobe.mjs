@@ -62,14 +62,12 @@ switch (cmd) {
   case "password": {
     const pw = flag(a, "set") ?? newPassword();
     await api("POST", `/cases/${a[0]}/password`, { password: pw });
-    const c = cfg(); c.passwords = { ...c.passwords, [a[0]]: pw }; saveCfg(c);
-    console.log(`password: ${pw}\nAny earlier password has stopped working, and devices using it are locked.`);
+    console.log(`Password set. The owner can see it on the Admin page.${flag(a, "set") ? "" : `\npassword: ${pw}`}`);
     break;
   }
-  case "passwords": {
-    const { cases } = await api("GET", "/cases");
-    const c = cfg();
-    out(cases.map((x) => ({ id: x.id, profile: x.profile, title: x.title, link: `${c.baseUrl}/probes/${x.profile_slug}/${x.slug}`, password: c.passwords?.[x.id] ?? (x.has_password ? "set elsewhere" : "not set") })));
+  case "admin-setup": {
+    const r = await api("POST", "/setup-code");
+    console.log(`Open this one-time link within 30 minutes to choose the master password:\n${cfg().baseUrl}/admin#setup=${r.code}`);
     break;
   }
   case "list": out(await api("GET", "/cases")); break;
@@ -88,5 +86,5 @@ switch (cmd) {
     break;
   }
   case "purge": out(await api("DELETE", "/cases/" + a[0])); break;
-  default: console.log("proofprobe init [--url U] | new --profile NAME --title T | cost ID USD [label] | password ID [--set P] | passwords | publish ID [--intro F] [--questions F] [--plan F] [--status S] [--allow-drop] | list | link ID | status ID | fetch ID [--seq N] [--out F] | purge ID");
+  default: console.log("proofprobe init [--url U] | new --profile NAME --title T | cost ID USD [label] | password ID [--set P] | admin-setup | publish ID [--intro F] [--questions F] [--plan F] [--status S] [--allow-drop] | list | link ID | status ID | fetch ID [--seq N] [--out F] | purge ID");
 }

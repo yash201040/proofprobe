@@ -26,6 +26,7 @@ Run it with no command to see the options. The Cloudflare and admin details are 
 
 - `src/index.ts`: Cloudflare Worker for pages, saving, submissions and the admin API
 - `src/landing.html`: the home page
+- `src/admin.html`: the owner's admin page
 - `src/page.html`: the Probes directory and research pages
 - `src/schema.ts`: D1 tables, applied on first request
 - `bin/proofprobe.mjs`: admin helper
@@ -36,6 +37,7 @@ Run it with no command to see the options. The Cloudflare and admin details are 
 
 - Free tier only. No login or accounts for now.
 - Site map: home page at `/`, directory at `/probes`, and each page at `/probes/<profile>/<page>`. One profile can hold several pages.
+- The Admin page at `/admin` opens with a master password. It shows passwords, answers, logs and costs. Page passwords are hashed for checking and AES-GCM encrypted with the `PASSWORD_KEY` secret for display. Master password guesses pause after 6 tries, but page passwords never do.
 - Anyone can read every page and its submitted answers. Editing needs that page's password, and a page notice says so. Wrong guesses never lock anyone out.
 - Submissions are append-only, and a database trigger enforces that.
 - The website never mentions Claude, treg or how the research is done. Source code and docs can.

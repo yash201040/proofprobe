@@ -48,7 +48,7 @@ Use this when Step 1 already happened in another chat or folder. Don't repeat th
 3. Convert the existing questions to `questions.json` without changing their meaning, and fill gaps the flow requires: gate questions first, a `why` on each, and a final `catchAll` question.
 4. Summarise the findings so far into `intro.json`.
 5. Record what the research already cost with `proofprobe cost`, using the spend reported in that chat.
-6. Publish with `--status open`, run `proofprobe password <id>`, give the user the link and password, and tell them which older page or file it replaces. If answers already exist elsewhere, tell the user, because they don't move across on their own.
+6. Publish with `--status open`, give the user the link, tell them to set the page's password on the Admin page, and tell them which older page or file it replaces. If answers already exist elsewhere, tell the user, because they don't move across on their own.
 
 Then carry on with Step 2 as normal.
 
@@ -67,7 +67,7 @@ Then carry on with Step 2 as normal.
    - The last question must be an open "anything we missed?", marked `"catchAll": true`. Publishing refuses without it.
 8. Write `intro.json` with what the research found so far, so they see why the questions matter.
 9. Record the spend first, so the page never shows an old total: `proofprobe cost <id> <usd> "Step 1 research"`. Use the sum of `charged_micro`, because other sessions share the treg balance. A negative amount corrects a mistake.
-10. Publish: `proofprobe publish <id> --questions .proofprobe/cases/<id>/questions.json --intro .proofprobe/cases/<id>/intro.json --status open`, then run `proofprobe password <id>`. Give the user the link and password to pass on.
+10. Publish: `proofprobe publish <id> --questions .proofprobe/cases/<id>/questions.json --intro .proofprobe/cases/<id>/intro.json --status open`, then tell the user to set the page's password on the Admin page. Give them the link.
 
 `questions.json`:
 ```json
@@ -113,7 +113,8 @@ These rules apply to every `intro.json` and `plan.json`. Check the page against 
 - Never name Claude, treg or any research tool on a page. Describe the research by what it found, and avoid even general terms like "AI tools" or "web scraping" unless the page needs them. A person's own use of those tools can still be asked about. This applies to the website only, not to this repo.
 - Never send a CV or private document to treg or any outside service. Search with public facts only.
 - Pages are public and read-only for anyone with the site address, including research, questions and submitted answers, and a notice on every page says so. Write them with that in mind.
-- Editing needs that page's own password. `proofprobe password <id> [--set <password>]` creates or changes it, and locks any device using the old one. `proofprobe passwords` lists every page with its link and password. There is no lockout for wrong guesses.
+- Editing needs that page's own password. The owner sets, views and changes passwords on the site's Admin page, so never ask for them or repeat them in chat. Wrong page password guesses never lock anyone out.
+- The Admin page at `/admin` uses a master password that only the owner knows. If they forget it, `proofprobe admin-setup` makes a one-time link to choose a new one.
 - Never advise hiding work from an employer, misrepresenting experience, or inflating a pitch.
 - Goals may be hypothetical, but research them seriously.
 - End with tools used, total cost, verified versus inferred, and gaps.

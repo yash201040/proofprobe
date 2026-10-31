@@ -1,0 +1,147 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>ProofProbe Admin</title>
+<link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Familjen+Grotesk:wght@500;700&family=Source+Sans+3:wght@400;600;700&family=JetBrains+Mono:wght@500&display=swap" onload="this.onload=null;this.rel='stylesheet'">
+<style>
+/* A control room: totals first, one table of every page, and detail that opens in place. */
+:root{--bg:#EDF1EF;--surface:#FBFCFB;--ink:#15242B;--muted:#50626A;--line:#C8D3D0;--accent:#0A6670;--accent-soft:#D5E8E7;--go:#1B7249;--go-soft:#D9EEE2;--wait:#8F5B00;--wait-soft:#F5E8CC;--stop:#A8352B;--stop-soft:#F6DDD9;--info:#1F5F99;--info-soft:#DBE8F5;--zebra:#F1F5F3;
+--display:"Familjen Grotesk","Segoe UI",system-ui,sans-serif;--body:"Source Sans 3","Segoe UI",system-ui,sans-serif;--mono:"JetBrains Mono",ui-monospace,Menlo,monospace}
+@media (prefers-color-scheme:dark){:root{--bg:#0F181C;--surface:#172329;--ink:#E5EEEE;--muted:#A0B1B6;--line:#31424A;--accent:#5FC6C9;--accent-soft:#17383D;--go:#6FD09D;--go-soft:#153527;--wait:#E9BC68;--wait-soft:#3A2C12;--stop:#F0978C;--stop-soft:#42201C;--info:#8FC1F0;--info-soft:#16304A;--zebra:#1C2A31;color-scheme:dark}}
+*{box-sizing:border-box}[hidden]{display:none!important}
+body{margin:0;background:var(--bg);color:var(--ink);font:400 17px/1.5 var(--body)}
+.wrap{max-width:1440px;margin:0 auto;padding-inline:max(16px,env(safe-area-inset-left,0px)) max(16px,env(safe-area-inset-right,0px));padding-bottom:50px}
+h1,h2,h3{font-family:var(--display);line-height:1.15;margin:0}h1{font-size:clamp(30px,5vw,42px)}h2{font-size:24px}h3{font-size:18px}p{margin:0}a{color:var(--accent)}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.top{display:flex;justify-content:space-between;align-items:center;gap:12px;padding-block:14px;border-bottom:1px solid var(--line);margin-bottom:24px}.brand{font:700 18px var(--display);color:var(--ink);text-decoration:none}
+button{font:600 15px var(--body);padding:7px 13px;border-radius:5px;border:1px solid var(--accent);background:var(--accent);color:var(--surface);cursor:pointer}button.ghost{background:transparent;color:var(--accent)}button:disabled{opacity:.55;cursor:not-allowed}
+input,textarea{width:100%;padding:9px 10px;font:400 16px var(--body);color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:4px}textarea{min-height:76px;resize:vertical}
+label{display:block;font-weight:600;margin-bottom:5px}
+.gate{max-width:420px;margin:12vh auto 0;background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:24px;display:grid;gap:12px}
+.err{color:var(--stop);min-height:22px}.ok{color:var(--go)}.muted{color:var(--muted);font-size:15px}
+.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px;margin-block:18px}.tile{background:var(--surface);border:1px solid var(--line);padding:14px 16px}.tile b{display:block;font:700 30px var(--display);font-variant-numeric:tabular-nums}.tile span{color:var(--muted);font-size:15px}
+.tablebox{overflow-x:auto;border:1px solid var(--line);background:var(--surface)}table{border-collapse:collapse;width:100%;font-size:15.5px}th,td{text-align:left;padding:9px 12px;border-bottom:1px solid var(--line);vertical-align:middle}th{font:500 12px var(--mono);text-transform:uppercase;background:var(--accent-soft);white-space:nowrap}tr:last-child td{border-bottom:0}tbody tr:nth-child(even) td{background:var(--zebra)}td.num{font-variant-numeric:tabular-nums}
+.chip{display:inline-block;padding:2px 9px;border-radius:999px;font-weight:600;font-size:14px;white-space:nowrap}.chip.good{color:var(--go);background:var(--go-soft)}.chip.warn{color:var(--wait);background:var(--wait-soft)}.chip.bad{color:var(--stop);background:var(--stop-soft)}.chip.info{color:var(--info);background:var(--info-soft)}
+.pw{font-family:var(--mono);font-size:14px;margin-right:6px}.link{background:none;border:0;padding:0;color:var(--accent);text-decoration:underline;font:600 15.5px var(--body)}
+.panel{background:var(--surface);border:1px solid var(--line);padding:18px;margin-top:16px;display:grid;gap:12px}
+details.fold{border-top:1px solid var(--line);padding-top:10px}details.fold>summary{cursor:pointer;font-weight:600}
+.grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,460px),1fr));gap:16px 30px}.qa b{display:block;font-weight:600;margin-bottom:5px}.qa p{white-space:pre-wrap;color:var(--muted)}
+.row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}.row input{flex:1;min-width:190px;width:auto}
+footer{margin-top:24px;color:var(--muted);font-size:15px}
+#loadbar{position:fixed;inset:0 0 auto;height:3px;z-index:30;overflow:hidden;background:color-mix(in srgb,var(--accent) 16%,transparent);transition:opacity .25s ease}
+#loadbar::before{content:"";position:absolute;inset:0 auto 0 0;width:38%;border-radius:0 3px 3px 0;background:linear-gradient(90deg,transparent,var(--accent));animation:loadslide .85s cubic-bezier(.45,.05,.3,1) infinite}
+#loadbar.done{opacity:0}#loadbar.done::before{width:100%;animation:none;left:0;background:var(--accent)}
+@keyframes loadslide{from{transform:translateX(-105%)}to{transform:translateX(270%)}}
+.skel{display:grid;gap:12px;padding-block:8px 26px}.skel i{display:block;height:64px;border-radius:6px;background:linear-gradient(100deg,var(--line) 30%,var(--surface) 50%,var(--line) 70%);background-size:220% 100%;opacity:.55;animation:shimmer 1.05s linear infinite}.skel i:first-child{height:120px}
+@keyframes shimmer{from{background-position:120% 0}to{background-position:-120% 0}}
+@media (prefers-reduced-motion:reduce){#loadbar::before{animation:none;width:100%}.skel i{animation:none}}
+</style></head><body><div id="loadbar" role="progressbar" aria-label="Loading"></div><div class="wrap">
+<div class="top"><a class="brand" href="/">ProofProbe</a><div class="row"><a href="/probes">Probes</a><button type="button" class="ghost" id="logout" hidden>Log out</button></div></div>
+
+<form class="gate" id="login" hidden><h1>Admin</h1><div><label for="master">Master password</label><input id="master" type="password" autocomplete="current-password"></div><button type="submit">Log in</button><p class="err" id="loginErr" role="alert"></p></form>
+
+<form class="gate" id="setup" hidden><h1>Create your master password</h1><p class="muted">Use at least 10 characters, and save it somewhere private. Nobody else can see it.</p><div><label for="newMaster">Master password</label><input id="newMaster" type="password" autocomplete="new-password"></div><div><label for="newMaster2">Type it again</label><input id="newMaster2" type="password" autocomplete="new-password"></div><button type="submit">Save password</button><p class="err" id="setupErr" role="alert"></p></form>
+
+<div class="gate" id="unset" hidden><h1>Admin isn't set up</h1><p class="muted">A one-time setup link is needed to create the master password.</p></div>
+
+<main id="app" hidden>
+  <h1>Admin</h1>
+  <div class="tiles" id="tiles"></div>
+  <div class="tablebox"><table><thead><tr><th>Profile</th><th>Page</th><th>Stage</th><th>Saved</th><th>Submissions</th><th>Cost</th><th>Password</th><th>Last change</th><th></th></tr></thead><tbody id="rows"></tbody></table></div>
+  <section class="panel" id="detail" hidden></section>
+</main>
+<footer id="foot" hidden>Everything here is private to this login. Every password reveal and answer edit is recorded in the activity log.</footer>
+</div>
+<script>
+const $=id=>document.getElementById(id);
+const el=(t,x,c)=>{const e=document.createElement(t);if(x!=null)e.textContent=x;if(c)e.className=c;return e};
+const fmt=i=>i?new Date(i).toLocaleString([],{dateStyle:"medium",timeStyle:"short"}):"—";
+const money=n=>"$"+Number(n).toFixed(n>0&&n<1?3:2);
+const STAGE={draft:["Being prepared","info"],open:["Answering questions","warn"],submitted:["Answers in","info"],plan_ready:["Path ready","good"],closed:["Closed","bad"]};
+async function api(path,opts={}){
+  const r=await fetch("/api/admin"+path,{...opts,headers:{"Content-Type":"application/json"}});
+  const body=await r.json().catch(()=>({}));
+  if(!r.ok){const e=new Error("http");e.status=r.status;e.body=body;throw e}
+  return body;
+}
+function view(which){["login","setup","unset","app","foot","logout"].forEach(i=>$(i).hidden=true);which.forEach(i=>$(i).hidden=false)}
+function loaded(){const b=$("loadbar"),s=$("skel");if(s)s.remove();if(!b||b.classList.contains("done"))return;b.classList.add("done");setTimeout(()=>b.remove(),280)}
+const setupCode=new URLSearchParams(location.hash.slice(1)).get("setup");
+async function start(){
+  const s=await api("/state");
+  if(setupCode)return view(["setup"]);
+  if(s.loggedIn)return loadApp();
+  view([s.configured?"login":"unset"]);if(s.configured)$("master").focus();
+}
+$("setup").addEventListener("submit",async e=>{
+  e.preventDefault();const a=$("newMaster").value,b=$("newMaster2").value,err=$("setupErr");err.textContent="";
+  if(a.length<10)return void(err.textContent="Use at least 10 characters.");
+  if(a!==b)return void(err.textContent="The two passwords don't match.");
+  try{await api("/setup",{method:"POST",body:JSON.stringify({code:setupCode,password:a})});history.replaceState(null,"","/admin");location.reload()}
+  catch(x){err.textContent=x.status===403?"This setup link has expired or was already used.":"Couldn't save. Please try again."}
+});
+$("login").addEventListener("submit",async e=>{
+  e.preventDefault();const err=$("loginErr");err.textContent="";
+  try{await api("/login",{method:"POST",body:JSON.stringify({password:$("master").value})});$("master").value="";await loadApp()}
+  catch(x){err.textContent=x.status===429?"Too many tries. Please wait 15 minutes.":x.status===401?"That password isn't right.":"Couldn't log in. Please try again."}
+});
+$("logout").addEventListener("click",async()=>{await api("/logout",{method:"POST",body:"{}"}).catch(()=>{});location.reload()});
+async function reveal(id,host){
+  host.textContent="";
+  try{const r=await api("/pages/"+id+"/password");host.appendChild(el("span",r.password||"Set a new one","pw"))}
+  catch(e){host.textContent="Couldn't load"}
+}
+async function loadApp(){
+  const d=await api("/overview");view(["app","foot","logout"]);
+  const pages=d.pages,sub=pages.reduce((a,p)=>a+p.submissions,0),cost=pages.reduce((a,p)=>a+p.cost_usd,0);
+  const t=$("tiles");t.textContent="";
+  [[new Set(pages.map(p=>p.profile)).size,"Profiles"],[pages.length,"Pages"],[sub,"Submissions"],[money(cost),"Research cost"]].forEach(([v,l])=>{const c=el("div",null,"tile");c.append(el("b",String(v)),el("span",l));t.appendChild(c)});
+  const body=$("rows");body.textContent="";
+  pages.forEach(p=>{
+    const tr=el("tr"),[s,tone]=p.rerouting?["Changing direction","warn"]:STAGE[p.status]||[p.status,"info"];
+    const open=el("button","Manage","link");open.type="button";open.addEventListener("click",()=>loadDetail(p.id));
+    const pw=el("td");if(p.has_password){const b=el("button","Show","link");b.type="button";b.addEventListener("click",()=>reveal(p.id,pw));pw.appendChild(b)}else pw.appendChild(el("span","Not set","chip bad"));
+    const stage=el("td");stage.appendChild(el("span",s,"chip "+tone));
+    const a=el("a",p.title);a.href="/probes/"+p.profile_slug+"/"+p.slug;const title=el("td");title.appendChild(a);
+    const act=el("td");act.appendChild(open);
+    tr.append(el("td",p.profile),title,stage,el("td",p.saved+" of "+p.total,"num"),el("td",String(p.submissions),"num"),el("td",money(p.cost_usd),"num"),pw,el("td",fmt(p.updated_at)),act);
+    body.appendChild(tr);
+  });
+}
+async function loadDetail(id){
+  const d=await api("/pages/"+id),box=$("detail");box.textContent="";box.hidden=false;
+  box.appendChild(el("h2",d.profile+": "+d.title));
+  if(d.reroute)box.appendChild(el("p","New direction requested "+fmt(d.reroute.at)+": "+d.reroute.message,"chip warn"));
+
+  const pwBox=el("div",null,"row"),pwIn=el("input");pwIn.id="pwInput";pwIn.type="text";pwIn.placeholder="New password for this page, 4 or more characters";pwIn.autocomplete="off";pwIn.setAttribute("aria-label","New page password");
+  const pwBtn=el("button","Set password");pwBtn.type="button";pwBtn.id="pwSet";const pwMsg=el("span",null,"muted");pwMsg.id="pwMsg";pwBox.append(pwIn,pwBtn,pwMsg);box.appendChild(pwBox);
+  pwBtn.addEventListener("click",async()=>{try{await api("/pages/"+id+"/password",{method:"POST",body:JSON.stringify({password:pwIn.value})});pwIn.value="";pwMsg.textContent="Saved. Devices using the old password are locked out.";loadApp()}catch(e){pwMsg.textContent=e.status===400?"Use 4 or more characters.":"Couldn't save."}});
+
+  const qs=d.sections.flatMap(s=>s.questions);
+  const ans=el("details",null,"fold");ans.open=true;const sm=el("summary","Saved answers ("+qs.filter(q=>(d.answers[q.id]?.text||"").trim()).length+" of "+qs.length+")");ans.appendChild(sm);
+  const g=el("div",null,"grid2");g.style.marginTop="12px";const fields={};
+  qs.forEach((q,i)=>{const w=el("div",null,"qa");const l=el("label",(i+1)+". "+q.text);l.htmlFor="a-"+q.id;const ta=el("textarea");ta.id="a-"+q.id;ta.value=d.answers[q.id]?.text||"";fields[q.id]=ta;w.append(l,ta);g.appendChild(w)});
+  ans.appendChild(g);
+  const saveRow=el("div",null,"row"),save=el("button","Save answer changes");save.type="button";save.id="saveAnswers";const saveMsg=el("span",null,"muted");saveMsg.id="saveMsg";saveRow.style.marginTop="12px";saveRow.append(save,saveMsg);ans.appendChild(saveRow);
+  save.addEventListener("click",async()=>{
+    const changed={};qs.forEach(q=>{if(fields[q.id].value!==(d.answers[q.id]?.text||""))changed[q.id]=fields[q.id].value});
+    if(!Object.keys(changed).length)return void(saveMsg.textContent="No changes to save.");
+    try{await api("/pages/"+id+"/answers",{method:"PUT",body:JSON.stringify({answers:changed})});saveMsg.textContent="Saved. Visitors see this after the next submission.";loadDetail(id);loadApp()}catch(e){saveMsg.textContent="Couldn't save."}
+  });
+  box.appendChild(ans);
+
+  const logs=el("details",null,"fold");logs.appendChild(el("summary","Submission logs ("+d.submissions.length+")"));
+  if(!d.submissions.length)logs.appendChild(el("p","Nothing submitted yet.","muted"));
+  d.submissions.slice().reverse().forEach(s=>{
+    const one=el("details",null,"fold"),h=el("summary","Submission "+s.seq+", "+fmt(s.submittedAt)+", "+s.answered+" of "+s.total+" answers"+(s.intact?"":" (failed integrity check)"));one.appendChild(h);
+    const inner=el("div",null,"grid2");inner.style.marginTop="10px";(s.items||[]).forEach((q,i)=>{const w=el("div",null,"qa");w.append(el("b",(i+1)+". "+q.question),el("p",q.answer||"Not answered"));inner.appendChild(w)});one.appendChild(inner);logs.appendChild(one);
+  });
+  box.appendChild(logs);
+
+  const costs=el("details",null,"fold");costs.appendChild(el("summary","Work done and cost ("+money(d.costUsd)+")"));
+  costs.appendChild(table(["Work","Cost","When"],d.costs.map(c=>[c.label,money(c.usd),fmt(c.at)])));box.appendChild(costs);
+  const act=el("details",null,"fold");act.appendChild(el("summary","Activity log"));
+  act.appendChild(table(["When","Who","What","Detail"],d.audit.map(a=>[fmt(a.at),a.actor,a.action,a.detail||""])));box.appendChild(act);
+  box.scrollIntoView({behavior:matchMedia("(prefers-reduced-motion:reduce)").matches?"auto":"smooth"});
+}
+function table(head,rows){const b=el("div",null,"tablebox");b.style.marginTop="10px";const t=el("table"),h=el("thead"),tr=el("tr");head.forEach(x=>tr.appendChild(el("th",x)));h.appendChild(tr);const bd=el("tbody");rows.forEach(r=>{const w=el("tr");r.forEach(c=>w.appendChild(el("td",c)));bd.appendChild(w)});t.append(h,bd);b.appendChild(t);return b}
+start().catch(()=>{view(["unset"]);$("unset").querySelector("p").textContent="Couldn't reach the server. Please refresh."}).finally(loaded);
+</script></body></html>
