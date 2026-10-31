@@ -8,15 +8,15 @@
 @media (prefers-color-scheme:dark){:root{--bg:#0F181C;--surface:#172329;--ink:#E5EEEE;--muted:#A0B1B6;--line:#31424A;--accent:#5FC6C9;--accent-soft:#17383D;--go:#6FD09D;--wait:#E9BC68;--stop:#F0978C;--stop-soft:#42201C;color-scheme:dark}}
 *{box-sizing:border-box}[hidden]{display:none!important}
 body{margin:0;background:var(--bg);color:var(--ink);font:400 17px/1.55 var(--body)}
-.wrap{max-width:860px;margin:0 auto;padding-inline:max(16px,env(safe-area-inset-left,0px)) max(16px,env(safe-area-inset-right,0px))}
+.wrap{max-width:1440px;margin:0 auto;padding-inline:max(16px,env(safe-area-inset-left,0px)) max(16px,env(safe-area-inset-right,0px))}
 h1,h2,h3{font-family:var(--display);line-height:1.15;text-wrap:balance;margin:0}
 h1{font-size:clamp(32px,6vw,46px)}h2{font-size:clamp(24px,4vw,30px)}h3{font-size:20px}
-p{margin:0;max-width:68ch}a{color:var(--accent)}
+p{margin:0}a{color:var(--accent)}
 :focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 header{padding-block:40px 24px}.eyebrow{font:500 12.5px var(--mono);letter-spacing:.06em;text-transform:uppercase;color:var(--accent)}
 section{padding-block:28px;border-top:1px solid var(--line)}
 .stack{display:grid;gap:14px}
-.blocks{display:grid;gap:12px}.blocks ul,.blocks ol{margin:0;padding-left:22px;max-width:68ch}.blocks li{margin-top:5px}
+.blocks{display:grid;gap:12px}.blocks ul,.blocks ol{margin:0;padding-left:22px}.blocks li{margin-top:5px}
 .callout{background:var(--accent-soft);padding:14px 16px}.tablebox{overflow-x:auto;border:1px solid var(--line);background:var(--surface)}
 table{border-collapse:collapse;width:100%;font-size:15.5px}th,td{text-align:left;padding:9px 12px;border-bottom:1px solid var(--line);vertical-align:top}
 th{font:500 12px var(--mono);text-transform:uppercase;color:var(--muted)}tr:last-child td{border-bottom:0}
@@ -26,7 +26,7 @@ button{font:600 15px var(--body);padding:7px 13px;border-radius:5px;border:1px s
 button:disabled{opacity:.55;cursor:not-allowed}
 .sec{background:var(--surface);border:1px solid var(--line);padding:18px;margin:0;min-width:0}
 .sec.first{border:2px solid var(--stop)}.sec h3 small{display:block;font:400 16px var(--body);color:var(--muted);margin-top:4px}
-.qs{display:grid;gap:20px;margin-top:14px}.q{display:grid;grid-template-columns:38px minmax(0,1fr);gap:0 8px}
+.qs{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,520px),1fr));gap:24px 36px;margin-top:14px}.q{display:grid;grid-template-columns:38px minmax(0,1fr);gap:0 8px}
 .num{font:500 14px/1.6 var(--mono);color:var(--accent)}.q label{font-weight:600;display:block}.why{font-size:15px;color:var(--muted);margin-top:2px}
 textarea{grid-column:2;width:100%;min-height:76px;margin-top:7px;padding:8px 10px;font:400 16px/1.45 var(--body);color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:4px;resize:vertical}
 .saverow{grid-column:2;display:flex;flex-wrap:wrap;gap:6px 10px;align-items:center;margin-top:7px}.saverow button{padding:4px 12px;font-size:14.5px}
@@ -34,9 +34,12 @@ textarea{grid-column:2;width:100%;min-height:76px;margin-top:7px;padding:8px 10p
 .alert{background:var(--stop-soft);padding:14px 16px}.log{list-style:none;padding:0;margin:10px 0 0;font-size:15.5px;color:var(--muted)}.log:empty{display:none}
 .tabs{display:flex;gap:18px;padding-block:14px;border-bottom:1px solid var(--line)}.tabs a{font-weight:600;font-size:15px;color:var(--muted);text-decoration:none}.tabs a.on{color:var(--accent)}
 .cost{font:500 14px var(--mono);color:var(--muted);margin-top:10px}
-.notice{padding-block:22px 40px;border-top:1px solid var(--line);font-size:15px;color:var(--muted);max-width:68ch}.qa b{display:block;font-weight:600}.qa p{white-space:pre-wrap;color:var(--muted);margin-top:3px}.qa p.has{color:var(--ink)}
+.notice{padding-block:22px 40px;border-top:1px solid var(--line);font-size:15px;color:var(--muted)}.qa b{display:block;font-weight:600}.qa p{white-space:pre-wrap;color:var(--muted);margin-top:3px}.qa p.has{color:var(--ink)}
+#viewList{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,520px),1fr));gap:18px 36px}
+@media (min-width:1100px){.blocks ul{columns:2;column-gap:44px}.blocks li{break-inside:avoid}}
+.you{color:var(--muted);font-size:14px;margin-left:6px}
 </style></head><body><div class="wrap">
-<nav class="tabs" aria-label="Pages"><a href="#mine" id="tabMine">My page</a><a href="#group" id="tabGroup">Group</a></nav>
+<nav class="tabs" aria-label="Pages"><a href="#mine" id="tabMine">This page</a><a href="#group" id="tabGroup">Group</a></nav>
 <header><div class="eyebrow" id="eyebrow">Loading</div><h1 id="title">ProofProbe</h1>
   <p class="cost" id="cost" hidden></p>
 </header>
@@ -174,7 +177,7 @@ function showMine(d){
 }
 async function loadMine(){
   const r=await fetch(API+"/case");if(!r.ok)throw new Error("http");
-  const d=await r.json();closed=d.status==="closed";
+  const d=await r.json();closed=d.status==="closed";$("tabMine").textContent=d.firstName+"'s page";
   if(!loadedMine&&d.sections.length){
     renderForm(d.sections);
     ids.forEach(id=>{
@@ -197,7 +200,7 @@ async function showGroup(){
   const r=await fetch(API+"/group");if(!r.ok)throw new Error("http");
   const d=await r.json(),body=$("people");body.textContent="";
   d.people.forEach(p=>{
-    const tr=el("tr"),who=el("td"),a=el("a",p.firstName+(p.mine?" (you)":""));a.href=p.mine?"#mine":"#view-"+p.id;who.appendChild(a);
+    const tr=el("tr"),who=el("td"),a=el("a",p.firstName);a.href=p.mine?"#mine":"#view-"+p.id;who.appendChild(a);if(p.mine)who.appendChild(el("span","this link","you"));
     tr.append(who,el("td",p.title),el("td",STAGE[p.status]||p.status),el("td",money(p.costUsd)));body.appendChild(tr);
   });
   $("groupBox").hidden=false;
