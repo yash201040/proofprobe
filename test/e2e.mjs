@@ -97,6 +97,7 @@ await page.waitForSelector("#q-a1"); ok(await shown("#qBox"), "the right passwor
 ok(await page.$eval("#unlockfx", (e) => !e.hidden), "the unlock animation plays");
 await page.waitForFunction(() => document.querySelector("#unlockfx").hidden, { timeout: 2500 });
 ok(await page.$eval("#unlockedTag", (e) => !e.hidden), "the page shows it is unlocked");
+ok((await txt("#lockBtn")).trim() === "Lock", "the pinned button says Lock");
 const pinned = async (w, h) => { await page.setViewport({ width: w, height: h }); await page.evaluate(() => scrollTo(0, document.documentElement.scrollHeight)); await new Promise((r) => setTimeout(r, 150)); return page.evaluate(() => { const p = document.querySelector("#pin").getBoundingClientRect(), b = document.querySelector(".bar").getBoundingClientRect(); return p.top >= 0 && p.top < 30 && p.right <= innerWidth && p.left >= 0 && (b.bottom <= p.top || b.top >= p.bottom - 1 || b.height === 0); }); };
 ok((await pinned(1280, 800)) && (await pinned(390, 700)) && (await pinned(320, 600)), "the pinned controls stay on screen at any scroll and clear the save bar");
 await page.setViewport({ width: 1280, height: 800 }); await page.evaluate(() => scrollTo(0, 0));
