@@ -5,7 +5,7 @@ import { randomBytes, createHash } from "node:crypto";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
-const CFG = process.env.GAP_CONFIG ?? join(ROOT, ".proofprobe/config.json");
+const CFG = process.env.PROOFPROBE_CONFIG ?? join(ROOT, ".proofprobe/config.json");
 const cfg = () => { if (!existsSync(CFG)) throw new Error("run: proofprobe init"); return JSON.parse(readFileSync(CFG, "utf8")); };
 const saveCfg = (c) => { mkdirSync(dirname(CFG), { recursive: true }); writeFileSync(CFG, JSON.stringify(c, null, 2)); chmodSync(CFG, 0o600); };
 const readJson = (p) => JSON.parse(readFileSync(p, "utf8"));
@@ -23,7 +23,7 @@ const [cmd, ...a] = process.argv.slice(2);
 const out = (x) => console.log(JSON.stringify(x, null, 2));
 switch (cmd) {
   case "init": {
-    const c = existsSync(CFG) ? cfg() : { adminToken: randomBytes(32).toString("base64url"), baseUrl: "http://localhost:8799", passwords: {} };
+    const c = existsSync(CFG) ? cfg() : { adminToken: randomBytes(32).toString("base64url"), baseUrl: "http://localhost:8799" };
     if (flag(a, "url")) {
       const next = flag(a, "url").replace(/\/$/, "");
       c.baseUrl = next;
@@ -34,10 +34,16 @@ switch (cmd) {
     break;
   }
   case "new": {
-    const profile = flag(a, "profile") ?? flag(a, "name");
-    const r = await api("POST", "/cases", { title: flag(a, "title"), profile });
+    const c = cfg(), profile = flag(a, "profile");
+    const res = await fetch(c.baseUrl + "/admin/cases", { method: "POST", headers: { Authorization: "Bearer " + c.adminToken, "Content-Type": "application/json" }, body: JSON.stringify({ title: flag(a, "title"), profile, create: a.includes("--new-profile") }) });
+    const r = await res.json();
+    if (res.status === 404 && r.error === "unknown_profile") {
+      console.error(`No profile named "${profile}". Existing profiles: ${r.profiles.join(", ") || "none"}.\nUse one of those exact names, or add --new-profile if this is a new person.`);
+      process.exit(1);
+    }
+    if (!res.ok) throw new Error(`new: ${res.status} ${JSON.stringify(r)}`);
     mkdirSync(join(dirname(CFG), "cases", r.id), { recursive: true });
-    out({ id: r.id, link: cfg().baseUrl + r.path, folder: join(dirname(CFG), "cases", r.id) });
+    out({ id: r.id, profile: r.profile, profileCreated: r.profileCreated, link: c.baseUrl + r.path, folder: join(dirname(CFG), "cases", r.id) });
     break;
   }
   case "publish": {
@@ -70,12 +76,17 @@ switch (cmd) {
     console.log(`Open this one-time link within 30 minutes to choose the master password:\n${cfg().baseUrl}/admin#setup=${r.code}`);
     break;
   }
+  case "profiles": out(await api("GET", "/profiles")); break;
+  case "import": {
+    out(await api("POST", `/cases/${a[0]}/import`, { answers: readJson(flag(a, "answers")) }));
+    break;
+  }
   case "list": out(await api("GET", "/cases")); break;
   case "link": console.log(cfg().baseUrl + (await api("GET", "/cases/" + a[0])).path); break;
   case "status": {
     const r = await api("GET", "/cases/" + a[0]);
-    const total = r.sections.flatMap((s) => s.questions).length;
-    out({ id: r.id, title: r.title, status: r.status, reroute: r.reroute, questions: total, savedAnswers: Object.values(r.answers).filter((x) => x.text.trim()).length, submissions: r.submissions });
+    const total = r.sections.flatMap((s) => s.questions).length, last = r.submissions[r.submissions.length - 1];
+    out({ id: r.id, title: r.title, status: r.status, reroute: r.reroute, submissionCurrent: !!last && (!r.questionsAt || last.submittedAt >= r.questionsAt), questions: total, savedAnswers: Object.values(r.answers).filter((x) => x.text.trim()).length, submissions: r.submissions });
     break;
   }
   case "fetch": {
@@ -86,5 +97,5 @@ switch (cmd) {
     break;
   }
   case "purge": out(await api("DELETE", "/cases/" + a[0])); break;
-  default: console.log("proofprobe init [--url U] | new --profile NAME --title T | cost ID USD [label] | password ID [--set P] | admin-setup | publish ID [--intro F] [--questions F] [--plan F] [--status S] [--allow-drop] | list | link ID | status ID | fetch ID [--seq N] [--out F] | purge ID");
+  default: console.log("proofprobe init [--url U] | new --profile NAME --title T [--new-profile] | profiles | import ID --answers F | cost ID USD [label] | password ID [--set P] | admin-setup | publish ID [--intro F] [--questions F] [--plan F] [--status S] [--allow-drop] | list | link ID | status ID | fetch ID [--seq N] [--out F] | purge ID");
 }

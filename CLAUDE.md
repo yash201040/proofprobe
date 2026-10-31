@@ -31,7 +31,7 @@ Run it with no command to see the options. The Cloudflare and admin details are 
 - `src/schema.ts`: D1 tables, applied on first request
 - `bin/proofprobe.mjs`: admin helper
 - `skills/proofprobe/SKILL.md`: the research procedure
-- `.proofprobe/` (git-ignored): admin token, personal links, and case files
+- `.proofprobe/` (git-ignored): admin token and case files
 
 ## Rules for changes
 

@@ -34,7 +34,7 @@ Local test: put `ADMIN_TOKEN_SHA256=<hash>` and `PASSWORD_KEY=<base64 key>` in `
 
 - Anyone can read every page, including submitted answers, and a notice says so. Each profile has one password, which unlocks all of its pages and no others.
 - Submitting stores a log and starts nothing. Research continues only when `/proofprobe` is run.
-- The cost shown on a page is treg data spend logged with `gap cost`. Claude usage is not included.
+- The cost shown on a page is treg data spend logged with `proofprobe cost`. Claude usage is not included.
 - Submissions are append-only. A database trigger blocks updates, and each log stores a SHA-256 so corruption is detectable.
 - Page content is rendered as text only, so stored content cannot inject markup.
 - CVs and research notes stay in `.proofprobe/` on this machine, which git ignores. Only questions, intro, plan and costs go to the server.
@@ -42,7 +42,7 @@ Local test: put `ADMIN_TOKEN_SHA256=<hash>` and `PASSWORD_KEY=<base64 key>` in `
 
 ## Design choices
 
-This is a small free-tier app: one Cloudflare Worker and a D1 database, with no login. D1 can be moved to Postgres later with pgloader if the tool outgrows it. The schema is applied on first request, so there is no separate migration step.
+This is a small free-tier app: one Cloudflare Worker and a D1 database, with no user accounts. D1 can be moved to Postgres later with pgloader if the tool outgrows it. The schema is applied on first request, so there is no separate migration step.
 
 ## Open source and access
 

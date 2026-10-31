@@ -13,6 +13,7 @@ const ADMIN_HOURS = 12;
 const ADMIN_MAX_FAILS = 6;
 const ADMIN_LOCK_MINUTES = 15;
 const ADMIN_SESSION = "__admin";
+const SCHEMA_VERSION = "2";
 const STATUSES = ["draft", "open", "submitted", "plan_ready", "closed"];
 const TONES = ["good", "warn", "bad", "info"];
 
@@ -54,7 +55,7 @@ interface Section { title: string; note?: string; first?: boolean; questions: Qu
 interface CaseRow {
   id: string; title: string; first_name: string; status: string; intro_json: string; questions_json: string; plan_json: string;
   created_at: string; updated_at: string; profile_id: string | null; slug: string | null;
-  password_hash: string | null; password_salt: string | null; password_enc: string | null; password_iv: string | null;
+  questions_at: string | null; p_name: string; p_slug: string; p_hash: string | null; p_salt: string | null; p_version: number;
 }
 interface ProfileRow { id: string; slug: string; name: string; password_hash: string | null; password_salt: string | null; password_enc: string | null; password_iv: string | null; pw_version: number }
 
@@ -67,37 +68,32 @@ async function freeSlug(env: Env, table: "profiles" | "cases", base: string, sco
     if (!hit) return slug;
   }
 }
-async function profileFor(env: Env, name: string, now: string) {
-  const found = await env.DB.prepare("SELECT id, slug FROM profiles WHERE lower(name) = lower(?)").bind(name).first<{ id: string; slug: string }>();
-  if (found) return found;
-  const id = crypto.randomUUID().slice(0, 8), slug = await freeSlug(env, "profiles", slugify(name));
-  await env.DB.prepare("INSERT INTO profiles(id, slug, name, created_at) VALUES (?,?,?,?)").bind(id, slug, name, now).run();
-  return { id, slug };
+const tidyName = (s: string) => s.normalize("NFKC").trim().replace(/\s+/g, " ");
+const sameName = (a: string, b: string) => tidyName(a).toLowerCase() === tidyName(b).toLowerCase();
+async function findProfile(env: Env, name: string) {
+  const all = await env.DB.prepare("SELECT id, slug, name FROM profiles ORDER BY created_at").all<{ id: string; slug: string; name: string }>();
+  return { match: all.results.find((p) => sameName(p.name, name)), names: all.results.map((p) => p.name) };
+}
+async function createProfile(env: Env, name: string, now: string) {
+  const id = crypto.randomUUID().slice(0, 8), clean = tidyName(name), slug = await freeSlug(env, "profiles", slugify(clean));
+  await env.DB.prepare("INSERT INTO profiles(id, slug, name, created_at) VALUES (?,?,?,?)").bind(id, slug, clean, now).run();
+  return { id, slug, name: clean };
 }
 
-// Columns added after the first release, plus a backfill for cases created before profiles existed.
+// One indexed read on a new isolate decides whether anything below needs to run.
+async function schemaCurrent(env: Env) {
+  try {
+    const r = await env.DB.prepare("SELECT value FROM settings WHERE key = 'schema_version'").first<{ value: string }>();
+    return r?.value === SCHEMA_VERSION;
+  } catch { return false; }
+}
 async function migrate(env: Env) {
   await env.DB.batch(SCHEMA.map((q) => env.DB.prepare(q)));
-  const cols = new Set((await env.DB.prepare("SELECT name FROM pragma_table_info('cases')").all()).results.map((r: any) => r.name));
-  const add = [["profile_id", "TEXT"], ["slug", "TEXT"], ["password_hash", "TEXT"], ["password_salt", "TEXT"], ["pw_version", "INTEGER NOT NULL DEFAULT 0"], ["password_enc", "TEXT"], ["password_iv", "TEXT"]];
-  for (const [name, type] of add) if (!cols.has(name)) await env.DB.prepare(`ALTER TABLE cases ADD COLUMN ${name} ${type}`).run();
-  const pcols = new Set((await env.DB.prepare("SELECT name FROM pragma_table_info('profiles')").all()).results.map((r: any) => r.name));
-  for (const [name, type] of [["password_hash", "TEXT"], ["password_salt", "TEXT"], ["password_enc", "TEXT"], ["password_iv", "TEXT"], ["pw_version", "INTEGER NOT NULL DEFAULT 0"]])
-    if (!pcols.has(name)) await env.DB.prepare(`ALTER TABLE profiles ADD COLUMN ${name} ${type}`).run();
-  const old = await env.DB.prepare("SELECT id, title, first_name FROM cases WHERE profile_id IS NULL OR slug IS NULL").all<any>();
-  const now = new Date().toISOString();
-  for (const c of old.results) {
-    const p = await profileFor(env, c.first_name, now);
-    await env.DB.prepare("UPDATE cases SET profile_id = ?, slug = ? WHERE id = ?").bind(p.id, await freeSlug(env, "cases", slugify(c.title), p.id), c.id).run();
-  }
-  // Passwords moved from pages to profiles. Carry each one up, then clear the page copy.
-  const moved = await env.DB.prepare("SELECT id, profile_id, password_hash, password_salt, password_enc, password_iv FROM cases WHERE password_hash IS NOT NULL").all<any>();
-  for (const c of moved.results) {
-    await env.DB.batch([
-      env.DB.prepare("UPDATE profiles SET password_hash = ?, password_salt = ?, password_enc = ?, password_iv = ?, pw_version = pw_version + 1 WHERE id = ? AND password_hash IS NULL").bind(c.password_hash, c.password_salt, c.password_enc, c.password_iv, c.profile_id),
-      env.DB.prepare("UPDATE cases SET password_hash = NULL, password_salt = NULL, password_enc = NULL, password_iv = NULL WHERE id = ?").bind(c.id),
-    ]);
-  }
+  const cols = new Set((await env.DB.prepare("SELECT name FROM pragma_table_info('cases')").all()).results.map((r: any) => r.name as string));
+  if (!cols.has("questions_at")) await env.DB.prepare("ALTER TABLE cases ADD COLUMN questions_at TEXT").run();
+  for (const old of ["password_hash", "password_salt", "password_enc", "password_iv", "pw_version"])
+    if (cols.has(old)) await env.DB.prepare(`ALTER TABLE cases DROP COLUMN ${old}`).run();
+  await setSettings(env, { schema_version: SCHEMA_VERSION });
 }
 
 function flatten(sections: Section[]) {
@@ -129,6 +125,7 @@ function validBlock(b: any): boolean {
 }
 const validBlocks = (v: unknown) => Array.isArray(v) && v.every(validBlock);
 
+const isCurrent = (submittedAt: string, questionsAt: string | null) => !questionsAt || submittedAt >= questionsAt;
 const openReroute = (env: Env, caseId: string) =>
   env.DB.prepare("SELECT message, at FROM reroutes WHERE case_id = ? AND handled_at IS NULL ORDER BY id DESC LIMIT 1").bind(caseId).first<{ message: string; at: string }>();
 async function costUsd(env: Env, caseId: string) {
@@ -157,11 +154,11 @@ function readCookie(request: Request, name: string) {
   return null;
 }
 const profileOf = (env: Env, id: string | null) => env.DB.prepare("SELECT * FROM profiles WHERE id = ?").bind(id).first<ProfileRow>();
-async function canEdit(request: Request, env: Env, profile: ProfileRow) {
-  const token = readCookie(request, cookieName(profile.id));
+async function canEdit(request: Request, env: Env, row: CaseRow) {
+  const token = readCookie(request, cookieName(row.profile_id!));
   if (!token) return false;
-  const s = await env.DB.prepare("SELECT pw_version, expires_at FROM sessions WHERE token_hash = ? AND case_id = ?").bind(await sha256(token), profile.id).first<any>();
-  return !!s && s.pw_version === profile.pw_version && s.expires_at > new Date().toISOString();
+  const s = await env.DB.prepare("SELECT pw_version, expires_at FROM sessions WHERE token_hash = ? AND case_id = ?").bind(await sha256(token), row.profile_id).first<any>();
+  return !!s && s.pw_version === row.p_version && s.expires_at > new Date().toISOString();
 }
 
 const b64 = (u: ArrayBuffer | Uint8Array) => btoa(String.fromCharCode(...new Uint8Array(u instanceof Uint8Array ? u.buffer : u)));
@@ -185,19 +182,19 @@ async function setProfilePassword(env: Env, id: string, password: string, actor:
 }
 
 // There is deliberately no lockout: visitors are welcome to try passwords while this is a showcase.
-async function unlock(request: Request, env: Env, profile: ProfileRow, ray: string) {
+async function unlock(request: Request, env: Env, row: CaseRow, ray: string) {
   const body = await request.json().catch(() => null) as { password?: unknown } | null;
   if (typeof body?.password !== "string" || body.password.length > 200) return json({ error: "bad_request" }, 400);
-  if (!profile.password_hash || !profile.password_salt) return json({ error: "no_password" }, 409);
-  if ((await sha256(profile.password_salt + body.password)) !== profile.password_hash) return json({ error: "wrong_password" }, 401);
-  const now = new Date();
+  if (!row.p_hash || !row.p_salt) return json({ error: "no_password" }, 409);
+  if ((await sha256(row.p_salt + body.password)) !== row.p_hash) return json({ error: "wrong_password" }, 401);
+  const now = new Date(), id = row.profile_id!;
   const token = randomToken(), expires = new Date(now.getTime() + SESSION_DAYS * 86_400_000).toISOString();
   await env.DB.batch([
-    env.DB.prepare("INSERT INTO sessions(token_hash, case_id, pw_version, expires_at) VALUES (?,?,?,?)").bind(await sha256(token), profile.id, profile.pw_version, expires),
+    env.DB.prepare("INSERT INTO sessions(token_hash, case_id, pw_version, expires_at) VALUES (?,?,?,?)").bind(await sha256(token), id, row.p_version, expires),
     env.DB.prepare("DELETE FROM sessions WHERE expires_at < ?").bind(now.toISOString()),
-    audit(env, null, "editor", "unlock", "profile=" + profile.id, ray),
+    audit(env, null, "editor", "unlock", "profile=" + id, ray),
   ]);
-  return json({ ok: true }, 200, { "Set-Cookie": `${cookieName(profile.id)}=${token}; Path=/; Max-Age=${SESSION_DAYS * 86_400}; HttpOnly; Secure; SameSite=Strict` });
+  return json({ ok: true }, 200, { "Set-Cookie": `${cookieName(id)}=${token}; Path=/; Max-Age=${SESSION_DAYS * 86_400}; HttpOnly; Secure; SameSite=Strict` });
 }
 
 async function submit(env: Env, row: CaseRow, key: string, ray: string) {
@@ -244,24 +241,29 @@ async function directory(env: Env) {
 }
 
 async function pageApi(request: Request, env: Env, row: CaseRow, rest: string, ray: string) {
-  const profile = await profileOf(env, row.profile_id);
-  if (!profile) return notFound();
-  const editable = await canEdit(request, env, profile);
+  const editable = await canEdit(request, env, row);
   if (rest === "" && request.method === "GET") {
-    const last = await env.DB.prepare("SELECT seq, submitted_at, payload FROM submissions WHERE case_id = ? ORDER BY seq DESC LIMIT 1").bind(row.id).first<any>();
+    const [lastR, costR, rerouteR] = await env.DB.batch([
+      env.DB.prepare("SELECT seq, submitted_at, payload FROM submissions WHERE case_id = ? ORDER BY seq DESC LIMIT 1").bind(row.id),
+      env.DB.prepare("SELECT COALESCE(SUM(usd_micro), 0) AS micro FROM cost_entries WHERE case_id = ?").bind(row.id),
+      env.DB.prepare("SELECT message, at FROM reroutes WHERE case_id = ? AND handled_at IS NULL ORDER BY id DESC LIMIT 1").bind(row.id),
+    ]);
+    const found = lastR.results[0] as any;
+    // Answers to retired questions stay in the logs, but they no longer belong on the page.
+    const last = found && isCurrent(found.submitted_at, row.questions_at) ? found : null;
     return json({
-      title: row.title, name: profile.name, profileSlug: profile.slug, status: row.status,
-      intro: parse(row.intro_json, []), plan: parse(row.plan_json, []), costUsd: await costUsd(env, row.id),
-      hasPassword: !!profile.password_hash, editable, reroute: await openReroute(env, row.id), seq: last?.seq ?? null, submittedAt: last?.submitted_at ?? null,
+      title: row.title, name: row.p_name, profileSlug: row.p_slug, status: row.status,
+      intro: parse(row.intro_json, []), plan: parse(row.plan_json, []), costUsd: ((costR.results[0] as any)?.micro ?? 0) / 1_000_000,
+      hasPassword: !!row.p_hash, editable, reroute: rerouteR.results[0] ?? null, seq: last?.seq ?? null, submittedAt: last?.submitted_at ?? null,
       items: last ? parse(last.payload, []) : flatten(parse<Section[]>(row.questions_json, [])).map((q) => ({ ...q, answer: "" })),
       ...(editable ? { sections: parse(row.questions_json, []), answers: await currentAnswers(env, row.id), submissions: await summaries(env, row.id) } : {}),
     });
   }
-  if (rest === "unlock" && request.method === "POST") return unlock(request, env, profile, ray);
+  if (rest === "unlock" && request.method === "POST") return unlock(request, env, row, ray);
   if (rest === "lock" && request.method === "POST") {
-    const token = readCookie(request, cookieName(profile.id));
+    const token = readCookie(request, cookieName(row.profile_id!));
     if (token) await env.DB.prepare("DELETE FROM sessions WHERE token_hash = ?").bind(await sha256(token)).run();
-    return json({ ok: true }, 200, { "Set-Cookie": `${cookieName(profile.id)}=; Path=/; Max-Age=0; HttpOnly; Secure; SameSite=Strict` });
+    return json({ ok: true }, 200, { "Set-Cookie": `${cookieName(row.profile_id!)}=; Path=/; Max-Age=0; HttpOnly; Secure; SameSite=Strict` });
   }
   if (!(rest === "answers" && request.method === "PUT") && !((rest === "submit" || rest === "reroute") && request.method === "POST")) return notFound();
   if (!editable) return json({ error: "locked" }, 401);
@@ -340,11 +342,16 @@ async function adminSite(request: Request, env: Env, parts: string[], ray: strin
     const b = await request.json().catch(() => null) as { password?: unknown } | null;
     const now = new Date();
     if ((conf.admin_locked_until ?? "") > now.toISOString()) return json({ error: "locked" }, 429);
+    if (conf.admin_locked_until) await setSettings(env, { admin_fails: "0", admin_locked_until: "" });
+    // Count the attempt first and atomically, so a burst of parallel guesses can't outrun the pause.
+    const counted = await env.DB.prepare("INSERT INTO settings(key, value) VALUES ('admin_fails', '1') ON CONFLICT(key) DO UPDATE SET value = CAST(value AS INTEGER) + 1 RETURNING value").first<{ value: string }>();
+    const fails = Number(counted?.value ?? 1);
+    const pause = () => setSettings(env, { admin_locked_until: new Date(now.getTime() + ADMIN_LOCK_MINUTES * 60_000).toISOString() });
+    if (fails > ADMIN_MAX_FAILS) { await pause(); return json({ error: "locked" }, 429); }
     if (typeof b?.password !== "string" || (await sha256(conf.master_salt + b.password)) !== conf.master_hash) {
-      const fails = Number(conf.admin_fails ?? 0) + 1, locked = fails >= ADMIN_MAX_FAILS;
-      await setSettings(env, { admin_fails: locked ? "0" : String(fails), admin_locked_until: locked ? new Date(now.getTime() + ADMIN_LOCK_MINUTES * 60_000).toISOString() : "" });
       log(env, ray, "warn", "admin_login_failed", { fails });
-      return json({ error: locked ? "locked" : "wrong_password" }, locked ? 429 : 401);
+      if (fails === ADMIN_MAX_FAILS) { await pause(); return json({ error: "locked" }, 429); }
+      return json({ error: "wrong_password" }, 401);
     }
     const token = randomToken();
     await setSettings(env, { admin_fails: "0", admin_locked_until: "" });
@@ -373,7 +380,8 @@ async function adminSite(request: Request, env: Env, parts: string[], ray: strin
     const b = await request.json().catch(() => null) as { name?: unknown } | null;
     const name = typeof b?.name === "string" ? b.name.trim() : "";
     if (!name || name.length > 80) return json({ error: "bad_name" }, 400);
-    return json(await profileFor(env, name, new Date().toISOString()), 201);
+    const { match } = await findProfile(env, name);
+    return json(match ?? await createProfile(env, name, new Date().toISOString()), 201);
   }
   if (what === "profiles" && id) {
     const profile = await profileOf(env, id);
@@ -430,6 +438,10 @@ async function admin(request: Request, env: Env, parts: string[], ray: string) {
     await setSettings(env, { setup_hash: await sha256(code), setup_expires: new Date(Date.now() + 30 * 60_000).toISOString() });
     return json({ code });
   }
+  if (root === "profiles" && request.method === "GET") {
+    const r = await env.DB.prepare("SELECT p.name, p.slug, p.password_hash IS NOT NULL AS has_password, (SELECT COUNT(*) FROM cases c WHERE c.profile_id = p.id) AS pages FROM profiles p ORDER BY p.created_at").all();
+    return json({ profiles: r.results });
+  }
   if (root !== "cases") return notFound();
   const now = new Date().toISOString();
 
@@ -443,16 +455,18 @@ async function admin(request: Request, env: Env, parts: string[], ray: string) {
     return json({ cases: r.results });
   }
   if (!id && request.method === "POST") {
-    const b = await request.json().catch(() => null) as { title?: string; profile?: string } | null;
+    const b = await request.json().catch(() => null) as { title?: string; profile?: string; create?: boolean } | null;
     if (!b?.title || !b.profile) return json({ error: "title and profile required" }, 400);
     const caseId = crypto.randomUUID().slice(0, 8);
-    const p = await profileFor(env, b.profile, now);
+    const { match, names } = await findProfile(env, b.profile);
+    if (!match && !b.create) return json({ error: "unknown_profile", profiles: names }, 404);
+    const p = match ?? await createProfile(env, b.profile, now);
     const slug = await freeSlug(env, "cases", slugify(b.title), p.id);
     await env.DB.batch([
-      env.DB.prepare("INSERT INTO cases(id, token_hash, title, first_name, profile_id, slug, created_at, updated_at) VALUES (?,?,?,?,?,?,?,?)").bind(caseId, await sha256(randomToken()), b.title, b.profile, p.id, slug, now, now),
+      env.DB.prepare("INSERT INTO cases(id, token_hash, title, first_name, profile_id, slug, created_at, updated_at) VALUES (?,?,?,?,?,?,?,?)").bind(caseId, await sha256(randomToken()), b.title, p.name, p.id, slug, now, now),
       audit(env, caseId, "admin", "create", null, ray),
     ]);
-    return json({ id: caseId, path: `/probes/${p.slug}/${slug}` }, 201);
+    return json({ id: caseId, path: `/probes/${p.slug}/${slug}`, profile: p.name, profileCreated: !match }, 201);
   }
   if (!id) return notFound();
   const row = await env.DB.prepare("SELECT * FROM cases WHERE id = ?").bind(id).first<CaseRow>();
@@ -460,7 +474,7 @@ async function admin(request: Request, env: Env, parts: string[], ray: string) {
 
   if (!sub && request.method === "GET") {
     const p = await env.DB.prepare("SELECT slug, name FROM profiles WHERE id = ?").bind(row.profile_id).first<any>();
-    return json({ id: row.id, title: row.title, profile: p?.name, path: `/probes/${p?.slug}/${row.slug}`, status: row.status, hasPassword: !!(await profileOf(env, row.profile_id))?.password_hash, costUsd: await costUsd(env, id), reroute: await openReroute(env, id), sections: parse(row.questions_json, []), answers: await currentAnswers(env, id), submissions: await summaries(env, id) });
+    return json({ id: row.id, title: row.title, profile: p?.name, path: `/probes/${p?.slug}/${row.slug}`, status: row.status, hasPassword: !!(await profileOf(env, row.profile_id))?.password_hash, costUsd: await costUsd(env, id), reroute: await openReroute(env, id), questionsAt: row.questions_at, sections: parse(row.questions_json, []), answers: await currentAnswers(env, id), submissions: await summaries(env, id) });
   }
   if (!sub && request.method === "PATCH") {
     const b = await request.json().catch(() => null) as { intro?: unknown; questions?: unknown; plan?: unknown; status?: string } | null;
@@ -471,15 +485,33 @@ async function admin(request: Request, env: Env, parts: string[], ray: string) {
     if (b.status !== undefined && !STATUSES.includes(b.status)) return json({ error: "invalid_status" }, 400);
     const intro = b.intro !== undefined ? JSON.stringify(b.intro) : row.intro_json;
     const questions = b.questions !== undefined ? JSON.stringify(b.questions) : row.questions_json;
-    const plan = b.plan !== undefined ? JSON.stringify(b.plan) : row.plan_json;
+    // New questions after a change of direction replace the old path, and new ids make earlier submissions out of date.
+    const rerouted = b.questions !== undefined ? await openReroute(env, id) : null;
+    const plan = b.plan !== undefined ? JSON.stringify(b.plan) : rerouted ? "[]" : row.plan_json;
+    const status = b.status ?? (rerouted ? "open" : row.status);
+    const oldIds = new Set(flatten(parse<Section[]>(row.questions_json, [])).map((q) => q.id));
+    const addsQuestions = b.questions !== undefined && flatten(b.questions as Section[]).some((q) => !oldIds.has(q.id));
+    const questionsAt = addsQuestions ? now : row.questions_at;
     if (intro.length + questions.length + plan.length > MAX_DOC) return json({ error: "too_large" }, 413);
     await env.DB.batch([
-      env.DB.prepare("UPDATE cases SET intro_json = ?, questions_json = ?, plan_json = ?, status = ?, updated_at = ? WHERE id = ?").bind(intro, questions, plan, b.status ?? row.status, now, id),
+      env.DB.prepare("UPDATE cases SET intro_json = ?, questions_json = ?, plan_json = ?, status = ?, questions_at = ?, updated_at = ? WHERE id = ?").bind(intro, questions, plan, status, questionsAt, now, id),
       // New questions answer an open change of direction.
       ...(b.questions !== undefined ? [env.DB.prepare("UPDATE reroutes SET handled_at = ? WHERE case_id = ? AND handled_at IS NULL").bind(now, id)] : []),
       audit(env, id, "admin", "update", Object.keys(b).join(","), ray),
     ]);
     return json({ ok: true });
+  }
+  if (sub === "import" && request.method === "POST") {
+    // Answers collected somewhere else become a normal submission.
+    const b = await request.json().catch(() => null) as { answers?: Record<string, unknown> } | null;
+    const known = new Set(flatten(parse<Section[]>(row.questions_json, [])).map((q) => q.id));
+    const entries = Object.entries(b?.answers ?? {});
+    if (!entries.length || entries.some(([k, v]) => !known.has(k) || typeof v !== "string" || (v as string).length > MAX_ANSWER)) return json({ error: "bad_answers" }, 400);
+    await env.DB.batch([
+      ...entries.map(([k, v]) => env.DB.prepare("INSERT INTO answers(case_id, question_id, text, updated_at) VALUES (?,?,?,?) ON CONFLICT(case_id, question_id) DO UPDATE SET text = excluded.text, updated_at = excluded.updated_at").bind(id, k, v as string, now)),
+      audit(env, id, "admin", "answers_imported", String(entries.length), ray),
+    ]);
+    return submit(env, row, "import-" + randomToken().slice(0, 16), ray);
   }
   if (sub === "costs" && request.method === "POST") {
     const b = await request.json().catch(() => null) as { usd?: unknown; label?: unknown } | null;
@@ -500,8 +532,6 @@ async function admin(request: Request, env: Env, parts: string[], ray: string) {
       env.DB.prepare("DELETE FROM submissions WHERE case_id = ?").bind(id),
       env.DB.prepare("DELETE FROM reroutes WHERE case_id = ?").bind(id),
       env.DB.prepare("DELETE FROM cases WHERE id = ?").bind(id),
-      env.DB.prepare("DELETE FROM sessions WHERE case_id = ? AND NOT EXISTS (SELECT 1 FROM cases WHERE profile_id = ?)").bind(row.profile_id, row.profile_id),
-      env.DB.prepare("DELETE FROM profiles WHERE id = ? AND NOT EXISTS (SELECT 1 FROM cases WHERE profile_id = ?)").bind(row.profile_id, row.profile_id),
       audit(env, id, "admin", "purge", null, ray),
     ]);
     return json({ ok: true });
@@ -527,13 +557,13 @@ export default {
       if (!parts.length && page) return html(LANDING, request);
       if (parts[0] === "probes" && (parts.length === 1 || parts.length === 3) && page) return html(APP, request);
       if (parts[0] === "admin" && parts.length === 1 && page) return html(ADMIN, request);
-      if (!schemaReady) { await migrate(env); schemaReady = true; }
+      if (!schemaReady) { if (!(await schemaCurrent(env))) await migrate(env); schemaReady = true; }
       if (parts[0] === "api" && parts[1] === "admin") return await adminSite(request, env, parts.slice(2), ray);
       if (parts[0] === "admin") return await admin(request, env, parts.slice(1), ray);
       if (parts[0] !== "api") return notFound();
       if (parts[1] === "probes" && parts.length === 2 && page) return json({ profiles: await directory(env) });
       if (parts[1] === "pages" && parts[2] && parts[3]) {
-        const row = await env.DB.prepare("SELECT c.* FROM cases c JOIN profiles p ON p.id = c.profile_id WHERE p.slug = ? AND c.slug = ? AND c.status != 'draft'").bind(parts[2], parts[3]).first<CaseRow>();
+        const row = await env.DB.prepare("SELECT c.*, p.name AS p_name, p.slug AS p_slug, p.password_hash AS p_hash, p.password_salt AS p_salt, p.pw_version AS p_version FROM cases c JOIN profiles p ON p.id = c.profile_id WHERE p.slug = ? AND c.slug = ? AND c.status != 'draft'").bind(parts[2], parts[3]).first<CaseRow>();
         if (!row) return json({ error: "not_found" }, 404);
         return await pageApi(request, env, row, parts.slice(4).join("/"), ray);
       }

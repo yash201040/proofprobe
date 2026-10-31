@@ -25,7 +25,7 @@ details>summary{cursor:pointer;list-style:none}details>summary::-webkit-details-
 .fold{background:var(--surface);border:1px solid var(--line)}.fold>summary{display:flex;flex-wrap:wrap;gap:2px 10px;align-items:baseline;padding:14px 16px;font:700 20px/1.2 var(--display)}.fold>summary small{font:400 15.5px var(--body);color:var(--muted)}.fold>.blocks{padding:0 16px 16px}
 summary::before{content:"▸";color:var(--accent);margin-right:8px;display:inline-block;transition:transform .15s}details[open]>summary::before{transform:rotate(90deg)}
 @media (prefers-reduced-motion:reduce){summary::before{transition:none}}
-.sec>summary{display:block}.sec .sc{font:500 13px var(--mono);color:var(--muted);margin-left:8px}
+.sec>summary{display:flex;align-items:flex-start}.sec>summary h3{flex:1;min-width:0}.sec>summary::before{margin-top:2px}.sec .sc{font:500 13px var(--mono);color:var(--muted);margin-left:8px}
 .bar{position:sticky;top:0;z-index:4;background:var(--bg);padding-block:10px;display:flex;flex-wrap:wrap;gap:10px;align-items:center;border-bottom:1px solid var(--line)}
 .count{font:500 13px var(--mono);color:var(--muted);margin-right:auto}
 button{font:600 15px var(--body);padding:7px 13px;border-radius:5px;border:1px solid var(--accent);background:var(--accent);color:var(--surface);cursor:pointer}
@@ -38,7 +38,6 @@ textarea{grid-column:2;width:100%;min-height:76px;margin-top:7px;padding:8px 10p
 .saverow{grid-column:2;display:flex;flex-wrap:wrap;gap:6px 10px;align-items:center;margin-top:7px}.saverow button{padding:4px 12px;font-size:14.5px}
 .state{font-size:14.5px;color:var(--muted)}.state.ok{color:var(--go)}.state.warn{color:var(--wait)}.state.err{color:var(--stop)}
 .alert{background:var(--stop-soft);padding:14px 16px}.log{list-style:none;padding:0;margin:10px 0 0;font-size:15.5px;color:var(--muted)}.log:empty{display:none}
-.tabs{display:flex;gap:18px;padding-block:14px;border-bottom:1px solid var(--line)}.tabs a{font-weight:600;font-size:15px;color:var(--muted);text-decoration:none}.tabs a.on{color:var(--accent)}
 .cost{font:500 14px var(--mono);color:var(--muted);margin-top:10px}
 .notice{padding-block:22px 40px;border-top:1px solid var(--line);font-size:15px;color:var(--muted)}.qa b{display:block;font-weight:600}.qa p{white-space:pre-wrap;color:var(--muted);margin-top:3px}.qa p.has{color:var(--ink)}
 #viewList{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,520px),1fr));gap:18px 36px}
@@ -49,7 +48,7 @@ textarea{grid-column:2;width:100%;min-height:76px;margin-top:7px;padding:8px 10p
 .topbar{position:relative;display:flex;justify-content:space-between;align-items:center;padding-block:14px;border-bottom:1px solid var(--line)}.brandlink{font:700 18px var(--display);color:var(--ink);text-decoration:none}
 .eyebrow a{color:inherit;text-decoration:none}
 .access{display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin-top:14px;font-size:15.5px;color:var(--muted)}button.ghost{background:transparent;color:var(--accent)}
-.profiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,420px),1fr));gap:16px}.profile{background:var(--surface);border:1px solid var(--line);padding:18px}.profile h2{font-size:24px}.pagelink{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:4px 12px;padding:12px 0;border-top:1px solid var(--line);margin-top:12px;text-decoration:none;color:var(--ink)}.pagelink:hover b{color:var(--accent)}.pagelink small{color:var(--muted);font-size:14.5px}
+.profiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,420px),1fr));gap:16px}.profile{background:var(--surface);border:1px solid var(--line);padding:18px}.profile h2{font-size:24px}.pagelink{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:4px 12px;padding:12px 0;border-top:1px solid var(--line);margin-top:12px;text-decoration:none;color:var(--ink)}.pagelink:hover b{color:var(--accent)}.pagelink small{color:var(--muted);font-size:14.5px}
 .reroute{background:var(--info-soft);padding:14px 16px}.reroute label{font-weight:600;display:block}.reroute small{display:block;font:400 15.5px var(--body);color:var(--muted);margin-top:2px}.reroute textarea{min-height:64px}.reroute .saverow{margin-top:8px}#rerouteInfo{margin-top:14px}
 dialog{width:min(420px,calc(100vw - 32px));padding:22px;border:1px solid var(--line);border-radius:10px;background:var(--surface);color:var(--ink)}dialog::backdrop{background:rgba(0,0,0,.5)}dialog h3{margin-bottom:12px}dialog label{display:block;font-weight:600;margin-bottom:6px}dialog input{width:100%;padding:9px 10px;font:400 16px var(--body);color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:4px}.dialogrow{display:flex;justify-content:flex-end;gap:8px;margin-top:12px}#unlockErr{margin-top:8px;min-height:20px}
 #loadbar{position:fixed;inset:0 0 auto;height:3px;z-index:30;overflow:hidden;background:color-mix(in srgb,var(--accent) 16%,transparent);transition:opacity .25s ease}
@@ -59,6 +58,30 @@ dialog{width:min(420px,calc(100vw - 32px));padding:22px;border:1px solid var(--l
 .skel{display:grid;gap:12px;padding-block:8px 26px}.skel i{display:block;height:64px;border-radius:6px;background:linear-gradient(100deg,var(--line) 30%,var(--surface) 50%,var(--line) 70%);background-size:220% 100%;opacity:.55;animation:shimmer 1.05s linear infinite}.skel i:first-child{height:120px}
 @keyframes shimmer{from{background-position:120% 0}to{background-position:-120% 0}}
 @media (prefers-reduced-motion:reduce){#loadbar::before{animation:none;width:100%}.skel i{animation:none}}
+.pagelink .chip{white-space:nowrap}.pagelink small{grid-column:1/-1}
+.chip{border-radius:12px}
+#viewList .qa{min-width:0;overflow-wrap:anywhere}
+@media (max-width:640px){
+  .pagelink{grid-template-columns:minmax(0,1fr)}.pagelink .chip{justify-self:start}
+  .wrap{padding-inline:max(14px,env(safe-area-inset-left,0px)) max(14px,env(safe-area-inset-right,0px))}
+  header{padding-block:26px 18px}
+  .q{grid-template-columns:30px minmax(0,1fr)}
+  .sec{padding:14px}.fold>summary{padding:13px 14px;font-size:18px}.fold>.blocks{padding:0 12px 14px}
+  th,td{padding:8px 10px}table{font-size:15px}
+  .bar{gap:8px}.bar button{min-height:40px}
+  button{min-height:42px}
+  .saverow button{min-height:36px}
+}
+@media (max-width:640px){
+  table.cards thead{display:none}
+  table.cards,table.cards tbody,table.cards tr{display:block;width:100%}
+  table.cards tr{padding:11px 12px;border-bottom:1px solid var(--line)}table.cards tr:last-child{border-bottom:0}
+  table.cards tbody tr:nth-child(even) td{background:none}table.cards tbody tr:nth-child(even){background:var(--zebra)}
+  table.cards td{display:grid;grid-template-columns:42% minmax(0,1fr);gap:10px;align-items:center;padding:4px 0;border:0;min-width:0}
+  table.cards td::before{content:attr(data-label);color:var(--muted);font-size:14px}
+  table.cards td:first-child{display:block;font-size:17px;font-weight:600;padding-bottom:6px}table.cards td:first-child::before{content:none}
+  table.cards .chip{justify-self:start;white-space:normal}
+}
 </style></head><body><div id="loadbar" role="progressbar" aria-label="Loading"></div><div class="wrap">
 <div class="topbar"><a class="brandlink" href="/">ProofProbe</a></div>
 <header><div class="eyebrow" id="eyebrow"></div><h1 id="title"></h1>
@@ -86,7 +109,7 @@ dialog{width:min(420px,calc(100vw - 32px));padding:22px;border:1px solid var(--l
     <p id="submitStatus" role="status" style="margin-top:10px"></p><ul id="log" class="log"></ul></div>
 </div></section>
 <dialog id="unlockBox" aria-labelledby="unlockTitle"><h3 id="unlockTitle">Edit this page</h3><label for="password">Enter your profile password</label><input id="password" type="password" autocomplete="current-password"><p class="state err" id="unlockErr" role="alert"></p><div class="dialogrow"><button type="button" class="ghost" id="unlockCancel">Cancel</button><button type="button" id="unlockGo">Continue</button></div></dialog>
-<footer class="notice">Privacy: anyone with this site's address can read every page, including research, documents and submitted answers. Saved answers stay out of view until submitted. Only someone with a profile's password can edit its pages.</footer>
+<footer class="notice" id="notice">Privacy: anyone with this site's address can read every page, including research, documents and submitted answers. Saved answers stay out of view until submitted. Only someone with a profile's password can edit its pages.</footer>
 </div>
 <script>
 const seg=location.pathname.split("/").filter(Boolean),onPage=seg.length===3;
@@ -112,7 +135,7 @@ function renderBlocks(host,list){
     else if(b.t==="callout")host.appendChild(el("p",b.text,"callout"));
     else if(b.t==="ul"||b.t==="ol"){const l=el(b.t);(b.items||[]).forEach(i=>l.appendChild(el("li",i)));host.appendChild(l)}
     else if(b.t==="links"){const l=el("ul");(b.links||[]).forEach(k=>{const u=safeUrl(k.url);const li=el("li");if(u){const a=el("a",k.label||u);a.href=u;a.target="_blank";a.rel="noopener noreferrer";li.appendChild(a)}else li.textContent=k.label||"";if(k.note)li.appendChild(document.createTextNode(" "+k.note));l.appendChild(li)});host.appendChild(l)}
-    else if(b.t==="table"){const box=el("div",null,"tablebox"),t=el("table"),th=el("tr");(b.head||[]).forEach(c=>th.appendChild(el("th",c)));const hd=el("thead");hd.appendChild(th);t.appendChild(hd);const bd=el("tbody");(b.rows||[]).forEach(r=>{const tr=el("tr");r.forEach(c=>{const td=el("td");fillCell(td,c);tr.appendChild(td)});bd.appendChild(tr)});t.appendChild(bd);box.appendChild(t);host.appendChild(box)}
+    else if(b.t==="table"){const box=el("div",null,"tablebox"),t=el("table",null,(b.head||[]).length>2?"cards":null),th=el("tr");(b.head||[]).forEach(c=>th.appendChild(el("th",c)));const hd=el("thead");hd.appendChild(th);t.appendChild(hd);const bd=el("tbody");(b.rows||[]).forEach(r=>{const tr=el("tr");r.forEach((c,i)=>{const td=el("td");td.dataset.label=(b.head||[])[i]||"";fillCell(td,c);tr.appendChild(td)});bd.appendChild(tr)});t.appendChild(bd);box.appendChild(t);host.appendChild(box)}
   }catch(e){}});
 }
 function renderForm(sections){
@@ -249,7 +272,7 @@ async function showDirectory(){
     p.pages.forEach(g=>{const a=el("a",null,"pagelink");a.href="/probes/"+encodeURIComponent(p.slug)+"/"+encodeURIComponent(g.slug);a.appendChild(el("b",g.title));a.appendChild(el("span",g.rerouting?"Changing direction":STAGE[g.status]||g.status,"chip "+(g.rerouting?"warn":TONE[g.status]||"info")));a.appendChild(el("small","Research cost "+money(g.costUsd)));c.appendChild(a)});
     host.appendChild(c);
   });
-  $("dirEmpty").hidden=d.profiles.length>0;$("dirBox").hidden=false;
+  $("dirEmpty").hidden=d.profiles.length>0;$("dirBox").hidden=false;$("notice").hidden=true;
 }
 async function route(){
   try{if(onPage)await showPage();else await showDirectory()}

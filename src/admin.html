@@ -33,6 +33,17 @@ footer{margin-top:24px;color:var(--muted);font-size:15px}
 .skel{display:grid;gap:12px;padding-block:8px 26px}.skel i{display:block;height:64px;border-radius:6px;background:linear-gradient(100deg,var(--line) 30%,var(--surface) 50%,var(--line) 70%);background-size:220% 100%;opacity:.55;animation:shimmer 1.05s linear infinite}.skel i:first-child{height:120px}
 @keyframes shimmer{from{background-position:120% 0}to{background-position:-120% 0}}
 @media (prefers-reduced-motion:reduce){#loadbar::before{animation:none;width:100%}.skel i{animation:none}}
+@media (max-width:640px){
+  table.cards thead{display:none}
+  table.cards,table.cards tbody,table.cards tr{display:block;width:100%}
+  table.cards tr{padding:11px 12px;border-bottom:1px solid var(--line)}table.cards tr:last-child{border-bottom:0}
+  table.cards tbody tr:nth-child(even) td{background:none}table.cards tbody tr:nth-child(even){background:var(--zebra)}
+  table.cards td{display:grid;grid-template-columns:42% minmax(0,1fr);gap:10px;align-items:center;padding:4px 0;border:0;min-width:0}
+  table.cards td::before{content:attr(data-label);color:var(--muted);font-size:14px}
+  table.cards td:first-child{display:block;font-size:17px;font-weight:600;padding-bottom:6px}table.cards td:first-child::before{content:none}
+  table.cards .chip{justify-self:start;white-space:normal}
+}
+@media (max-width:640px){table.cards td.act{display:block}table.cards .row input{min-width:0}}
 </style></head><body><div id="loadbar" role="progressbar" aria-label="Loading"></div><div class="wrap">
 <div class="top"><a class="brand" href="/">ProofProbe</a><div class="row"><a href="/probes">Probes</a><button type="button" class="ghost" id="logout" hidden>Log out</button></div></div>
 
@@ -46,10 +57,10 @@ footer{margin-top:24px;color:var(--muted);font-size:15px}
   <h1>Admin</h1>
   <div class="tiles" id="tiles"></div>
   <h2>Profiles</h2>
-  <div class="tablebox" style="margin-block:10px 8px"><table><thead><tr><th>Profile</th><th>Pages</th><th>Password</th><th>Change password</th></tr></thead><tbody id="profiles"></tbody></table></div>
+  <div class="tablebox" style="margin-block:10px 8px"><table class="cards"><thead><tr><th>Profile</th><th>Pages</th><th>Password</th><th>Change password</th></tr></thead><tbody id="profiles"></tbody></table></div>
   <div class="row"><input id="newProfile" placeholder="New profile name" aria-label="New profile name" style="max-width:280px"><button type="button" class="ghost" id="addProfile">Add profile</button><span class="muted" id="pwMsg"></span></div>
   <h2 style="margin-top:24px">Pages</h2>
-  <div class="tablebox" style="margin-top:10px"><table><thead><tr><th>Profile</th><th>Page</th><th>Stage</th><th>Saved</th><th>Submissions</th><th>Cost</th><th>Last change</th><th></th></tr></thead><tbody id="rows"></tbody></table></div>
+  <div class="tablebox" style="margin-top:10px"><table class="cards"><thead><tr><th>Profile</th><th>Page</th><th>Stage</th><th>Saved</th><th>Submissions</th><th>Cost</th><th>Last change</th><th></th></tr></thead><tbody id="rows"></tbody></table></div>
   <section class="panel" id="detail" hidden></section>
 </main>
 <footer id="foot" hidden>Everything here is private to this login. Password views and answer edits are recorded in the activity log.</footer>
@@ -117,9 +128,10 @@ async function loadApp(){
     const stage=el("td");stage.appendChild(el("span",s,"chip "+tone));
     const a=el("a",p.title);a.href="/probes/"+p.profile_slug+"/"+p.slug;const title=el("td");title.appendChild(a);
     const act=el("td");act.appendChild(open);
-    tr.append(el("td",p.profile),title,stage,el("td",p.saved+" of "+p.total,"num"),el("td",String(p.submissions),"num"),el("td",money(p.cost_usd),"num"),el("td",fmt(p.updated_at)),act);
+    act.className="act";tr.append(el("td",p.profile),title,stage,el("td",p.saved+" of "+p.total,"num"),el("td",String(p.submissions),"num"),el("td",money(p.cost_usd),"num"),el("td",fmt(p.updated_at)),act);
     body.appendChild(tr);
   });
+  document.querySelectorAll("table.cards").forEach(labelCards);
 }
 async function loadDetail(id){
   const d=await api("/pages/"+id),box=$("detail");box.textContent="";box.hidden=false;
@@ -153,6 +165,7 @@ async function loadDetail(id){
   act.appendChild(table(["When","Who","What","Detail"],d.audit.map(a=>[fmt(a.at),a.actor,a.action,a.detail||""])));box.appendChild(act);
   box.scrollIntoView({behavior:matchMedia("(prefers-reduced-motion:reduce)").matches?"auto":"smooth"});
 }
-function table(head,rows){const b=el("div",null,"tablebox");b.style.marginTop="10px";const t=el("table"),h=el("thead"),tr=el("tr");head.forEach(x=>tr.appendChild(el("th",x)));h.appendChild(tr);const bd=el("tbody");rows.forEach(r=>{const w=el("tr");r.forEach(c=>w.appendChild(el("td",c)));bd.appendChild(w)});t.append(h,bd);b.appendChild(t);return b}
+function table(head,rows){const b=el("div",null,"tablebox");b.style.marginTop="10px";const t=el("table",null,"cards"),h=el("thead"),tr=el("tr");head.forEach(x=>tr.appendChild(el("th",x)));h.appendChild(tr);const bd=el("tbody");rows.forEach(r=>{const w=el("tr");r.forEach(c=>w.appendChild(el("td",c)));bd.appendChild(w)});t.append(h,bd);b.appendChild(t);labelCards(t);return b}
+function labelCards(t){const heads=[...t.querySelectorAll("th")].map(x=>x.textContent);t.querySelectorAll("tbody tr").forEach(r=>[...r.children].forEach((td,i)=>{td.dataset.label=heads[i]||""}))}
 start().catch(()=>{view(["unset"]);$("unset").querySelector("p").textContent="Couldn't reach the server. Please refresh."}).finally(loaded);
 </script></body></html>

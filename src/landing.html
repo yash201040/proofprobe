@@ -38,7 +38,6 @@ body.day .step{color:#A85E00}
 @keyframes ripple{to{transform:scale(32);opacity:0}}
 .ico{width:18px;height:18px;flex:none}
 .adminlink{position:absolute;right:max(20px,env(safe-area-inset-right,0px));bottom:calc(env(safe-area-inset-bottom,0px) + 18px);display:inline-flex;align-items:center;gap:6px;padding:6px 8px;border-radius:8px;font-size:14px;color:var(--muted);text-decoration:none;opacity:.55;transition:opacity .2s ease,transform .2s ease}.adminlink .ico{width:14px;height:14px}.adminlink:hover{opacity:1;transform:translateY(-1px)}.adminlink:active{transform:scale(.96)}
-body.day .cta{background:#0C1C24;color:#F2F7F6}
 .cue{position:absolute;left:50%;bottom:26px;width:1px;height:46px;background:linear-gradient(var(--pulse),transparent);animation:cue 2s ease-in-out infinite}
 .hero{position:relative}
 @keyframes cue{50%{transform:translateY(10px);opacity:.4}}
@@ -52,7 +51,7 @@ body.day .ticks i.on{background:#A85E00}
 @media (prefers-reduced-motion:reduce){.reveal{opacity:1;transform:none;transition:none}.word>span{transform:none;transition:none}.cue{animation:none}.cta,.cta .arrow,.cta .ico{transition:none}}
 </style></head><body>
 <canvas id="c" aria-hidden="true"></canvas>
-<div class="top"><a class="brand" href="/">ProofProbe</a></div>
+<div class="top"><span class="brand">ProofProbe</span></div>
 <div class="ruler" aria-hidden="true"><span class="ticks" id="ticks"><i></i><i></i><i></i><i></i><i></i></span><span id="rulerLabel">Goal</span></div>
 <main>
   <section class="panel hero"><h1 class="reveal">Any goal.<br>One proven path.</h1><div class="cue"></div></section>
