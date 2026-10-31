@@ -569,6 +569,20 @@ async function adminSite(request: Request, env: Env, parts: string[], ray: strin
   if (what === "profiles" && id) {
     const profile = await profileOf(env, id);
     if (!profile) return json({ error: "not_found" }, 404);
+    if (sub === "name" && request.method === "POST") {
+      const b = await request.json().catch(() => null) as { name?: unknown } | null;
+      const name = typeof b?.name === "string" ? tidyName(b.name) : "";
+      if (name.length < 2 || name.length > 80) return json({ error: "bad_name" }, 400);
+      const { match } = await findProfile(env, name);
+      if (match && match.id !== id) return json({ error: "name_taken" }, 409);
+      // The slug stays, so links that were already shared keep working.
+      await env.DB.batch([
+        env.DB.prepare("UPDATE profiles SET name = ? WHERE id = ?").bind(name, id),
+        env.DB.prepare("UPDATE requests SET name = ? WHERE profile_id = ?").bind(name, id),
+        audit(env, null, "admin", "profile_renamed", "profile=" + id, ray),
+      ]);
+      return json({ name });
+    }
     if (sub === "status" && request.method === "POST") {
       const b = await request.json().catch(() => null) as { status?: unknown } | null;
       if (b?.status !== "active" && b?.status !== "rejected") return json({ error: "bad_status" }, 400);

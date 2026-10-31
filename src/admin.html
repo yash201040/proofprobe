@@ -53,6 +53,8 @@ td,li,p,h1,h2,summary,.qa{overflow-wrap:anywhere}
 .link,td.act button,td .pwset{white-space:nowrap}
 @media (min-width:861px){#rows td:nth-child(2){min-width:190px}#rows td:nth-child(5),#rows td:nth-child(3){white-space:nowrap}.pwi{min-width:150px}}
 @media (pointer:coarse){summary{min-height:44px}.fold>summary{align-items:center}.sec>summary{align-items:center}details.fold>summary{display:flex;align-items:center}button{min-height:42px}.infobtn{min-height:20px}.saverow button{min-height:40px}}
+@media (max-width:860px){td .row{flex-wrap:wrap}td .row .pwi{flex:1 1 100%;width:100%}}
+.namecell{display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px}.renamei{min-width:0;flex:1 1 150px}
 </style></head><body><div id="loadbar" role="progressbar" aria-label="Loading"></div><div class="wrap">
 <div class="top"><a class="brand" href="/">ProofProbe</a><div class="row"><a href="/probes">Probes</a><button type="button" class="ghost" id="logout" hidden>Log out</button></div></div>
 
@@ -124,16 +126,30 @@ async function reveal(id,host){
   try{const r=await api("/profiles/"+id+"/password");host.appendChild(el("span",r.password||"Set a new one","pw"))}
   catch(e){host.textContent="Couldn't load"}
 }
+function nameCell(cell,p){
+  cell.textContent="";const shown=el("div",null,"namecell"),label=el("span",p.name),edit=el("button","Rename","link rename");edit.type="button";shown.append(label);
+  if(p.status==="rejected")shown.append(el("span","Rejected","chip bad"));shown.append(edit);cell.appendChild(shown);
+  edit.addEventListener("click",()=>{
+    cell.textContent="";const box=el("div",null,"row"),inp=el("input"),save=el("button","Save"),no=el("button","Cancel","ghost");
+    inp.type="text";inp.value=p.name;inp.maxLength=80;inp.className="renamei";inp.setAttribute("aria-label","New name for "+p.name);save.type="button";save.className="renamesave";no.type="button";
+    const done=async()=>{const name=inp.value.trim();if(!name||name===p.name)return nameCell(cell,p);save.disabled=true;
+      try{const r=await api("/profiles/"+p.id+"/name",{method:"POST",body:JSON.stringify({name})});await loadApp();$("pwMsg").textContent="Renamed to "+r.name+". They sign in with the new name now, and existing links still work."}
+      catch(e){save.disabled=false;$("pwMsg").textContent=e.status===409?"That name is taken.":e.status===400?"Use 2 to 80 characters.":"Couldn't rename."}};
+    save.addEventListener("click",done);no.addEventListener("click",()=>nameCell(cell,p));
+    inp.addEventListener("keydown",e=>{if(e.key==="Enter"){e.preventDefault();done()}else if(e.key==="Escape")nameCell(cell,p)});
+    box.append(inp,save,no);cell.appendChild(box);inp.focus();inp.select();
+  });
+}
 function profileRows(list,pages){
   const body=$("profiles");body.textContent="";
   list.forEach(p=>{
     const tr=el("tr"),pw=el("td"),set=el("td"),box=el("div",null,"row"),inp=el("input"),go=el("button","Set");
     if(p.has_password){const b=el("button","Show","link show");b.type="button";b.addEventListener("click",()=>reveal(p.id,pw));pw.appendChild(b)}else pw.appendChild(el("span","Not set","chip bad"));
     inp.type="text";inp.autocomplete="off";inp.placeholder="4 or more characters";inp.setAttribute("aria-label","New password for "+p.name);inp.className="pwi";go.type="button";go.className="pwset ghost";
-    go.addEventListener("click",async()=>{try{await api("/profiles/"+p.id+"/password",{method:"POST",body:JSON.stringify({password:inp.value})});await loadApp();$("pwMsg").textContent="Saved for "+p.name+". Devices using the old password are locked out."}catch(e){$("pwMsg").textContent=e.status===400?"Use 4 or more characters.":"Couldn't save."}});
+    go.addEventListener("click",async()=>{try{await api("/profiles/"+p.id+"/password",{method:"POST",body:JSON.stringify({password:inp.value})});await loadApp();$("pwMsg").textContent="Saved for "+p.name+". Devices using the old password are signed out."}catch(e){$("pwMsg").textContent=e.status===400?"Use 4 or more characters.":"Couldn't save."}});
     box.append(inp,go);set.appendChild(box);
     if(!p.pages){const del=el("button","Delete profile","link");del.type="button";del.className="link del";del.addEventListener("click",async()=>{if(del.dataset.armed){await api("/profiles/"+p.id,{method:"DELETE"}).catch(()=>{});loadApp()}else{del.dataset.armed="1";del.textContent="Press again to delete"}});box.appendChild(del)}
-    const nm=el("td",p.name);if(p.status==="rejected")nm.append(" ",el("span","Rejected","chip bad"));tr.append(nm,el("td",String(p.pages),"num"),pw,set);body.appendChild(tr);
+    const nm=el("td");nameCell(nm,p);tr.append(nm,el("td",String(p.pages),"num"),pw,set);body.appendChild(tr);
   });
 }
 $("addProfile").addEventListener("click",async()=>{const n=$("newProfile");try{await api("/profiles",{method:"POST",body:JSON.stringify({name:n.value})});n.value="";loadApp()}catch(e){$("pwMsg").textContent="Enter a name for the profile."}});
