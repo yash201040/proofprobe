@@ -1,11 +1,12 @@
 {
   "name": "proofprobe",
+  "account_id": "69a5b01b5f3056049e3a445ce5544eba",
   "main": "src/index.ts",
   "compatibility_date": "2026-10-01",
   "workers_dev": true,
   "observability": { "enabled": true },
   "rules": [{ "type": "Text", "globs": ["**/*.html"], "fallthrough": true }],
-  "d1_databases": [{ "binding": "DB", "database_name": "proofprobe" }],
+  "d1_databases": [{ "binding": "DB", "database_name": "proofprobe", "database_id": "3e0d0fb8-2a18-4f74-aa16-b93d963e8908" }],
   "keep_vars": true,
   "vars": { "APP_VERSION": "0.1.0" }
 }
