@@ -1,0 +1,150 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>ProofProbe</title>
+<meta name="description" content="Any goal. One proven path.">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,800&family=Instrument+Sans:wght@400;500;600&display=swap">
+<style>
+/* Concept: a field of uncertainty that scroll resolves into one bright path, and the night sky turns to daylight as it does. */
+:root{--night:#071019;--day:#EEF2EA;--ink:#F2F7F6;--muted:#9FB6BC;--pulse:#FFB454;--line:rgba(255,255,255,.16);
+--display:"Bricolage Grotesque","Segoe UI",system-ui,sans-serif;--body:"Instrument Sans","Segoe UI",system-ui,sans-serif;color-scheme:dark}
+body.day{--ink:#0C1C24;--muted:#4B5F66;--line:rgba(12,28,36,.18);color-scheme:light}
+*{box-sizing:border-box}html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--night);color:var(--ink);font:400 18px/1.5 var(--body);transition:color .5s ease;overflow-x:hidden}
+canvas{position:fixed;inset:0;width:100%;height:100%;display:block;pointer-events:none}
+a{color:inherit}
+:focus-visible{outline:2px solid var(--pulse);outline-offset:3px}
+.top{position:fixed;inset:0 0 auto;z-index:5;display:flex;align-items:center;justify-content:space-between;padding:calc(env(safe-area-inset-top,0px) + 16px) max(20px,env(safe-area-inset-right,0px)) 16px max(20px,env(safe-area-inset-left,0px))}
+.brand{font:800 19px var(--display);letter-spacing:-.02em;text-decoration:none}
+.burger{width:44px;height:44px;border:1px solid var(--line);border-radius:50%;background:transparent;color:inherit;cursor:pointer;display:grid;place-items:center;backdrop-filter:blur(8px)}
+.burger span,.burger span::before{display:block;width:16px;height:1.5px;background:currentColor;transition:transform .25s ease}
+.burger span{position:relative;transform:translateY(3px)}.burger span::before{content:"";position:absolute;top:-6px}
+.burger[aria-expanded=true] span{transform:rotate(45deg)}.burger[aria-expanded=true] span::before{transform:translateY(6px) rotate(-90deg)}
+.menu{position:fixed;top:calc(env(safe-area-inset-top,0px) + 70px);right:max(20px,env(safe-area-inset-right,0px));z-index:5;min-width:190px;padding:8px;border:1px solid var(--line);border-radius:16px;background:rgba(8,18,26,.82);backdrop-filter:blur(16px);color:#F2F7F6}
+.menu a{display:block;padding:11px 14px;border-radius:10px;text-decoration:none;font-weight:600}.menu a:hover{background:rgba(255,255,255,.1)}
+main{position:relative;z-index:1}
+.panel{min-height:100svh;display:flex;flex-direction:column;justify-content:center;padding:96px max(24px,env(safe-area-inset-right,0px)) 96px max(24px,env(safe-area-inset-left,0px));max-width:1320px;margin:0 auto}
+.panel.right{align-items:flex-end;text-align:right}.panel.center{align-items:center;text-align:center}
+h1,h2{font-family:var(--display);font-weight:800;letter-spacing:-.035em;margin:0;text-wrap:balance}
+h1{font-size:clamp(58px,13vw,172px);line-height:.92}
+h2{font-size:clamp(46px,9vw,118px);line-height:.96}
+p{margin:18px 0 0;font-size:clamp(19px,2vw,25px);color:var(--muted);max-width:30ch;transition:color .5s ease}
+.step{font:600 14px var(--body);letter-spacing:.12em;text-transform:uppercase;color:var(--pulse);margin-bottom:14px}
+body.day .step{color:#A85E00}
+.tags{display:flex;flex-wrap:wrap;gap:10px;margin-top:26px;max-width:560px}
+.panel.right .tags{justify-content:flex-end}
+.tag{padding:9px 17px;border:1px solid var(--line);border-radius:999px;font-weight:500;font-size:16px;backdrop-filter:blur(6px)}
+.cta{display:inline-flex;align-items:center;gap:10px;margin-top:34px;padding:16px 28px;border-radius:999px;background:var(--pulse);color:#1B1203;font-weight:600;text-decoration:none;transition:transform .2s ease}
+.cta:hover{transform:translateY(-2px)}
+body.day .cta{background:#0C1C24;color:#F2F7F6}
+.cue{position:absolute;left:50%;bottom:26px;width:1px;height:46px;background:linear-gradient(var(--pulse),transparent);animation:cue 2s ease-in-out infinite}
+.hero{position:relative}
+@keyframes cue{50%{transform:translateY(10px);opacity:.4}}
+.ruler{position:fixed;z-index:4;left:max(20px,env(safe-area-inset-left,0px));bottom:calc(env(safe-area-inset-bottom,0px) + 22px);display:flex;align-items:center;gap:12px;font-size:13px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);transition:color .5s ease}
+.ticks{display:flex;gap:5px}.ticks i{display:block;width:22px;height:3px;border-radius:2px;background:var(--line);transition:background .3s ease}.ticks i.on{background:var(--pulse)}
+body.day .ticks i.on{background:#A85E00}
+.word{display:inline-block;overflow:hidden;vertical-align:bottom;padding-bottom:.08em;margin-bottom:-.08em}.word>span{display:inline-block;transform:translateY(105%);transition:transform .9s cubic-bezier(.2,.75,.15,1)}.in .word>span{transform:none}
+@media (max-width:640px){.cue{display:none}}
+.reveal{opacity:0;transform:translateY(26px);transition:opacity .8s ease,transform .8s cubic-bezier(.2,.7,.2,1)}
+.reveal.in{opacity:1;transform:none}
+@media (prefers-reduced-motion:reduce){.reveal{opacity:1;transform:none;transition:none}.word>span{transform:none;transition:none}.cue{animation:none}.cta{transition:none}}
+</style></head><body>
+<canvas id="c" aria-hidden="true"></canvas>
+<div class="top"><a class="brand" href="/">ProofProbe</a>
+  <button class="burger" id="burger" aria-label="Menu" aria-expanded="false" aria-controls="menu"><span></span></button></div>
+<nav class="menu" id="menu" hidden><a href="/probes">Probes</a><a href="https://github.com/yash201040/proofprobe" rel="noopener">GitHub</a></nav>
+<div class="ruler" aria-hidden="true"><span class="ticks" id="ticks"><i></i><i></i><i></i><i></i><i></i></span><span id="rulerLabel">Goal</span></div>
+<main>
+  <section class="panel hero"><h1 class="reveal">Any goal.<br>One proven path.</h1><div class="cue"></div></section>
+  <section class="panel"><div class="reveal"><div class="step">Start anywhere</div><h2>Bring what<br>you have.</h2>
+    <div class="tags"><span class="tag">CV</span><span class="tag">LinkedIn</span><span class="tag">Job post</span><span class="tag">Startup idea</span><span class="tag">An open question</span></div></div></section>
+  <section class="panel right"><div class="reveal"><div class="step">Step one</div><h2>Probe wide.</h2><p>Live market data, checked at the source.</p></div></section>
+  <section class="panel"><div class="reveal"><div class="step">Your turn</div><h2>Answer what<br>only you know.</h2></div></section>
+  <section class="panel right"><div class="reveal"><div class="step">Step two</div><h2>Probe deep.</h2><p>Every option tested against your answers.</p></div></section>
+  <section class="panel center"><div class="reveal"><h2>One path.<br>Backed by proof.</h2><a class="cta" href="/probes">See the probes <span aria-hidden="true">→</span></a></div></section>
+</main>
+<script>
+const canvas=document.getElementById("c"),ctx=canvas.getContext("2d");
+const still=matchMedia("(prefers-reduced-motion:reduce)").matches;
+let W=0,H=0,dpr=1,P=[];
+const STATES=6,NIGHT=[7,16,25],DAY=[238,242,234];
+const ease=t=>t*t*(3-2*t),mix=(a,b,t)=>a+(b-a)*t;
+function rand(i,s){const x=Math.sin(i*127.1+s*311.7)*43758.5453;return x-Math.floor(x)}
+function layout(){
+  dpr=Math.min(devicePixelRatio||1,1.6);W=innerWidth;H=innerHeight;
+  canvas.width=W*dpr;canvas.height=H*dpr;ctx.setTransform(dpr,0,0,dpr,0,0);
+  const n=Math.round(Math.min(1500,Math.max(500,W*H/800))),cx=W/2,cy=H/2,m=Math.min(W,H),cols=Math.max(9,Math.round(W/70)),rows=7;
+  P=Array.from({length:n},(_,i)=>{
+    const a=rand(i,1)*Math.PI*2,r=Math.sqrt(rand(i,2)),u=i/n;
+    const scatter=[rand(i,3)*W,rand(i,4)*H];
+    const groups=[[.68,.3],[.84,.52],[.62,.72],[.42,.5],[.8,.8]],g=groups[i%5],gr=rand(i,5)*m*.12;
+    const cluster=[W*g[0]+Math.cos(a)*gr,H*g[1]+Math.sin(a)*gr];
+    const ring=Math.floor(rand(i,6)*5)+1,ringR=ring*m*.1;
+    const sonar=[W*.34+Math.cos(a)*ringR,cy+Math.sin(a)*ringR];
+    const c=i%cols,ro=Math.floor(i/cols)%rows,gw=Math.min(W*.5,560);
+    const grid=[W*.46+c/cols*gw,H*.22+ro*H*.095];
+    const fa=rand(i,7)*.55-.27,fd=Math.pow(rand(i,8),.6)*W*.82;
+    const funnel=[W*.72-fd*Math.cos(fa),cy+fd*Math.sin(fa)];
+    const x=u*W*1.1-W*.05,jit=(rand(i,9)-.5)*2.5;
+    const path=[x,cy+Math.sin(u*Math.PI*2.1)*m*.14*(1-u*.2)+jit];
+    return {s:[scatter,cluster,sonar,grid,funnel,path],d:rand(i,10)*.28,z:1+rand(i,11)*1.7,w:rand(i,12)*6.28};
+  });
+}
+let target=0,now=0,raf=0,px=-999,py=-999,pxs=-999,pys=-999;
+const LABELS=["Goal","Inputs","Probe wide","Your answers","Probe deep","One path"],ticks=[...document.querySelectorAll("#ticks i")],rulerLabel=document.getElementById("rulerLabel");
+let lastLabel=-1;
+addEventListener("pointermove",e=>{if(e.pointerType==="mouse"){px=e.clientX;py=e.clientY}},{passive:true});
+document.addEventListener("pointerleave",()=>{px=py=-999});
+function read(){const max=document.documentElement.scrollHeight-innerHeight;target=max>0?scrollY/max:0}
+function draw(p,time){
+  const pos=p*(STATES-1),day=ease(Math.min(1,Math.max(0,(pos-3.9)/1)));
+  const bg=NIGHT.map((v,i)=>Math.round(mix(v,DAY[i],day)));
+  document.body.style.background=canvas.style.background=`rgb(${bg})`;
+  document.body.classList.toggle("day",day>.55);
+  ctx.clearRect(0,0,W,H);
+  const lit=mix(0,1,day),rgb=[Math.round(mix(120,12,lit)),Math.round(mix(214,70,lit)),Math.round(mix(218,84,lit))];
+  ctx.fillStyle=`rgba(${rgb},${mix(.78,.9,lit)})`;
+  const sweep=time*.0009;
+  pxs+=(px-pxs)*.12;pys+=(py-pys)*.12;
+  const push=still?0:1,reach=130;
+  const label=Math.min(5,Math.round(pos));
+  if(label!==lastLabel){lastLabel=label;rulerLabel.textContent=LABELS[label];ticks.forEach((t,i)=>t.classList.toggle("on",i<label))}
+  for(const q of P){
+    const local=Math.min(STATES-1,Math.max(0,pos+q.d-.14));
+    const i=Math.min(STATES-2,Math.floor(local)),t=ease(local-i),a=q.s[i],b=q.s[i+1];
+    const wob=(1-Math.min(1,pos/4.4))*5;
+    let x=mix(a[0],b[0],t)+Math.cos(time*.0006+q.w)*wob,y=mix(a[1],b[1],t)+Math.sin(time*.0007+q.w)*wob;
+    if(push){const dx=x-pxs,dy=y-pys,d2=dx*dx+dy*dy;if(d2<reach*reach&&d2>1){const d=Math.sqrt(d2),f=(1-d/reach);x+=dx/d*f*f*46;y+=dy/d*f*f*46}}
+    ctx.fillRect(x,y,q.z,q.z);
+  }
+  if(pos>1.4&&pos<3){ // the probe sweeping the field
+    const o=Math.min(1,pos-1.4)*Math.min(1,3-pos),cx=W*.34,cy=H/2,R=Math.min(W,H)*.52;
+    ctx.save();ctx.strokeStyle=`rgba(255,180,84,${.75*o})`;ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(cx,cy);ctx.lineTo(cx+Math.cos(sweep)*R,cy+Math.sin(sweep)*R);ctx.stroke();
+    ctx.fillStyle=`rgba(255,180,84,${o})`;ctx.beginPath();ctx.arc(cx,cy,4,0,7);ctx.fill();ctx.restore();
+  }
+  if(pos>4.2){ // the proven path lights up from left to right
+    const o=Math.min(1,(pos-4.2)/.7),m=Math.min(W,H);
+    ctx.save();ctx.strokeStyle=`rgba(216,120,10,${o})`;ctx.lineWidth=3;ctx.lineCap="round";ctx.beginPath();
+    for(let u=0;u<=o;u+=.01){const x=u*W*1.1-W*.05,y=H/2+Math.sin(u*Math.PI*2.1)*m*.14*(1-u*.2);u?ctx.lineTo(x,y):ctx.moveTo(x,y)}
+    ctx.stroke();ctx.restore();
+  }
+}
+function loop(t){
+  raf=0;read();now+=(target-now)*.085;draw(now,t);
+  if(!document.hidden)raf=requestAnimationFrame(loop);
+}
+function start(){if(still){read();now=target;draw(now,0)}else if(!raf)raf=requestAnimationFrame(loop)}
+addEventListener("resize",()=>{layout();start()});
+addEventListener("scroll",()=>{if(still)start()},{passive:true});
+document.addEventListener("visibilitychange",start);
+document.querySelectorAll("h2").forEach(h=>{
+  const lines=h.innerHTML.split(/<br\s*\/?>/i);h.setAttribute("aria-label",h.textContent);h.textContent="";let n=0;
+  lines.forEach((line,li)=>{
+    line.trim().split(/\s+/).forEach((w,i)=>{const o=document.createElement("span"),s=document.createElement("span");o.className="word";o.setAttribute("aria-hidden","true");s.textContent=w;s.style.transitionDelay=(n++*.07)+"s";o.appendChild(s);if(i)h.append(" ");h.appendChild(o)});
+    if(li<lines.length-1)h.appendChild(document.createElement("br"));
+  });
+});
+const io=new IntersectionObserver(es=>es.forEach(e=>{if(e.isIntersecting)e.target.classList.add("in")}),{threshold:.25});
+document.querySelectorAll(".reveal").forEach(e=>io.observe(e));
+const burger=document.getElementById("burger"),menu=document.getElementById("menu");
+burger.addEventListener("click",()=>{const open=menu.hidden;menu.hidden=!open;burger.setAttribute("aria-expanded",String(open))});
+layout();start();
+</script></body></html>

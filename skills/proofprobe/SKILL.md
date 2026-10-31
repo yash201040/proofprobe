@@ -33,17 +33,17 @@ Any one starting input is enough. Profiles are optional. If there is no usable i
 Use this when Step 1 already happened in another chat or folder. Don't repeat the research.
 
 1. Read the existing notes, findings and questions.
-2. Create the case with `proofprobe new`, using the person, team or product name.
+2. Create the page with `proofprobe new`, using the person, team or product as the profile.
 3. Convert the existing questions to `questions.json` without changing their meaning, and fill gaps the flow requires: gate questions first, a `why` on each, and a final `catchAll` question.
 4. Summarise the findings so far into `intro.json`.
 5. Record what the research already cost with `proofprobe cost`, using the spend reported in that chat.
-6. Publish with `--status open`, give the user the link, and tell them which older page or file it replaces. If answers already exist elsewhere, tell the user, because they don't move across on their own.
+6. Publish with `--status open`, run `proofprobe password <id>`, give the user the link and password, and tell them which older page or file it replaces. If answers already exist elsewhere, tell the user, because they don't move across on their own.
 
 Then carry on with Step 2 as normal.
 
 ## Step 1: broad probing
 
-1. Create the case: `proofprobe new --name "<first name, team or product>" --title "<goal>"`. Save the inputs to `inputs.md` in the case folder.
+1. Create the page: `proofprobe new --profile "<person, team or product>" --title "<goal>"`. Use the same profile name to add another page for someone. Save the inputs to `inputs.md` in the case folder.
 2. Read what was given. For a person, use `treg.linkedin.user.profile` and `treg.linkedin.user.posts`. Read documents locally.
 3. Split the research into 2–4 independent tracks. Tell the user the plan and a treg budget, usually $1–2 in total, then run the tracks. Use parallel subagents when the tracks are large, each with its own cap, and pass them the /treg rules.
 4. Follow the /treg rules: load the treg skill, open pages rather than trusting snippets, confirm decisive or numeric claims with an independent source, report conflicts, and ask before a call over $1 or a total over $5.
@@ -56,7 +56,7 @@ Then carry on with Step 2 as normal.
    - The last question must be an open "anything we missed?", marked `"catchAll": true`. Publishing refuses without it.
 8. Write `intro.json` with what the research found so far, so they see why the questions matter.
 9. Record the spend first, so the page never shows an old total: `proofprobe cost <id> <usd> "Step 1 research"`. Use the sum of `charged_micro`, because other sessions share the treg balance. A negative amount corrects a mistake.
-10. Publish: `proofprobe publish <id> --questions .proofprobe/cases/<id>/questions.json --intro .proofprobe/cases/<id>/intro.json --status open`. Give the user the link.
+10. Publish: `proofprobe publish <id> --questions .proofprobe/cases/<id>/questions.json --intro .proofprobe/cases/<id>/intro.json --status open`, then run `proofprobe password <id>`. Give the user the link and password to pass on.
 
 `questions.json`:
 ```json
@@ -99,9 +99,10 @@ These rules apply to every `intro.json` and `plan.json`. Check the page against 
 
 ## Rules
 
+- Never name Claude, treg or any research tool on a page. Describe the research by what it found, and avoid even general terms like "AI tools" or "web scraping" unless the page needs them. A person's own use of those tools can still be asked about. This applies to the website only, not to this repo.
 - Never send a CV or private document to treg or any outside service. Search with public facts only.
-- Pages are for a closed friend group, and a notice on every page says so. Anyone with a personal link can read every page, including submitted answers, read only. Only that link's owner can change their own answers. Give each person or team their own link.
-- If a link leaks, `proofprobe rotate <id>` replaces it without losing data.
+- Pages are public and read-only for anyone with the site address, including research, questions and submitted answers, and a notice on every page says so. Write them with that in mind.
+- Editing needs that page's own password. `proofprobe password <id> [--set <password>]` creates or changes it, and locks any device using the old one. `proofprobe passwords` lists every page with its link and password. There is no lockout for wrong guesses.
 - Never advise hiding work from an employer, misrepresenting experience, or inflating a pitch.
 - Goals may be hypothetical, but research them seriously.
 - End with tools used, total cost, verified versus inferred, and gaps.

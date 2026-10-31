@@ -16,15 +16,16 @@ async function api(method, path, body) {
   if (!r.ok) throw new Error(`${method} ${path}: ${r.status} ${text.slice(0, 200)}`);
   return JSON.parse(text);
 }
+const WORDS = "amber birch cedar delta ember fable glade harbor indigo juniper kestrel lumen meadow nectar orbit pebble quartz river summit tundra umber velvet willow zephyr".split(" ");
+const newPassword = () => { const b = randomBytes(5); return `${WORDS[b[0] % 24]}-${WORDS[b[1] % 24]}-${WORDS[b[2] % 24]}-${(b.readUInt16BE(3) % 9000) + 1000}`; };
 const flag = (a, name) => { const i = a.indexOf("--" + name); return i >= 0 ? a[i + 1] : undefined; };
 const [cmd, ...a] = process.argv.slice(2);
 const out = (x) => console.log(JSON.stringify(x, null, 2));
 switch (cmd) {
   case "init": {
-    const c = existsSync(CFG) ? cfg() : { adminToken: randomBytes(32).toString("base64url"), baseUrl: "http://localhost:8799", links: {} };
+    const c = existsSync(CFG) ? cfg() : { adminToken: randomBytes(32).toString("base64url"), baseUrl: "http://localhost:8799", passwords: {} };
     if (flag(a, "url")) {
       const next = flag(a, "url").replace(/\/$/, "");
-      for (const id of Object.keys(c.links)) c.links[id] = c.links[id].replace(c.baseUrl, next);
       c.baseUrl = next;
     }
     saveCfg(c);
@@ -33,10 +34,10 @@ switch (cmd) {
     break;
   }
   case "new": {
-    const r = await api("POST", "/cases", { title: flag(a, "title"), firstName: flag(a, "name") });
-    const c = cfg(); c.links[r.id] = c.baseUrl + "/c/" + r.token; saveCfg(c);
-    mkdirSync(join(ROOT, ".proofprobe/cases", r.id), { recursive: true });
-    out({ id: r.id, link: c.links[r.id], folder: join(ROOT, ".proofprobe/cases", r.id) });
+    const profile = flag(a, "profile") ?? flag(a, "name");
+    const r = await api("POST", "/cases", { title: flag(a, "title"), profile });
+    mkdirSync(join(dirname(CFG), "cases", r.id), { recursive: true });
+    out({ id: r.id, link: cfg().baseUrl + r.path, folder: join(dirname(CFG), "cases", r.id) });
     break;
   }
   case "publish": {
@@ -54,18 +55,25 @@ switch (cmd) {
     if (flag(a, "plan")) body.plan = readJson(flag(a, "plan"));
     if (flag(a, "status")) body.status = flag(a, "status");
     out(await api("PATCH", "/cases/" + a[0], body));
-    console.log("link: " + cfg().links[a[0]]);
+    console.log("link: " + cfg().baseUrl + (await api("GET", "/cases/" + a[0])).path);
     break;
   }
   case "cost": out(await api("POST", `/cases/${a[0]}/costs`, { usd: Number(a[1]), label: a.slice(2).join(" ") || "research" })); break;
-  case "rotate": {
-    const r = await api("POST", `/cases/${a[0]}/rotate`);
-    const c = cfg(); c.links[a[0]] = c.baseUrl + "/c/" + r.token; saveCfg(c);
-    console.log("new link: " + c.links[a[0]] + "\nThe old link has stopped working.");
+  case "password": {
+    const pw = flag(a, "set") ?? newPassword();
+    await api("POST", `/cases/${a[0]}/password`, { password: pw });
+    const c = cfg(); c.passwords = { ...c.passwords, [a[0]]: pw }; saveCfg(c);
+    console.log(`password: ${pw}\nAny earlier password has stopped working, and devices using it are locked.`);
+    break;
+  }
+  case "passwords": {
+    const { cases } = await api("GET", "/cases");
+    const c = cfg();
+    out(cases.map((x) => ({ id: x.id, profile: x.profile, title: x.title, link: `${c.baseUrl}/probes/${x.profile_slug}/${x.slug}`, password: c.passwords?.[x.id] ?? (x.has_password ? "set elsewhere" : "not set") })));
     break;
   }
   case "list": out(await api("GET", "/cases")); break;
-  case "link": console.log(cfg().links[a[0]] ?? "no local link for this case"); break;
+  case "link": console.log(cfg().baseUrl + (await api("GET", "/cases/" + a[0])).path); break;
   case "status": {
     const r = await api("GET", "/cases/" + a[0]);
     const total = r.sections.flatMap((s) => s.questions).length;
@@ -80,5 +88,5 @@ switch (cmd) {
     break;
   }
   case "purge": out(await api("DELETE", "/cases/" + a[0])); break;
-  default: console.log("proofprobe init [--url U] | new --name N --title T | cost ID USD [label] | rotate ID | publish ID [--intro F] [--questions F] [--plan F] [--status S] [--allow-drop] | list | link ID | status ID | fetch ID [--seq N] [--out F] | purge ID");
+  default: console.log("proofprobe init [--url U] | new --profile NAME --title T | cost ID USD [label] | password ID [--set P] | passwords | publish ID [--intro F] [--questions F] [--plan F] [--status S] [--allow-drop] | list | link ID | status ID | fetch ID [--seq N] [--out F] | purge ID");
 }

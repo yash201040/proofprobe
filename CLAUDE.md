@@ -25,7 +25,8 @@ Run it with no command to see the options. The Cloudflare and admin details are 
 ## How it's built
 
 - `src/index.ts`: Cloudflare Worker for pages, saving, submissions and the admin API
-- `src/page.html`: the single page people use
+- `src/landing.html`: the home page
+- `src/page.html`: the Probes directory and research pages
 - `src/schema.ts`: D1 tables, applied on first request
 - `bin/proofprobe.mjs`: admin helper
 - `skills/proofprobe/SKILL.md`: the research procedure
@@ -34,9 +35,11 @@ Run it with no command to see the options. The Cloudflare and admin details are 
 ## Rules for changes
 
 - Free tier only. No login or accounts for now.
-- Each person or team has one private link. Only that link can change its answers. The group can read every page and submitted answers, and a page notice says so.
+- Site map: home page at `/`, directory at `/probes`, and each page at `/probes/<profile>/<page>`. One profile can hold several pages.
+- Anyone can read every page and its submitted answers. Editing needs that page's password, and a page notice says so. Wrong guesses never lock anyone out.
 - Submissions are append-only, and a database trigger enforces that.
+- The website never mentions Claude, treg or how the research is done. Source code and docs can.
 - Page content renders as text only. Never inject stored content as HTML.
-- Never commit anything from `.proofprobe/`, and never log answers or links.
+- Never commit anything from `.proofprobe/`, and never log answers or passwords.
 - Before committing, run `npm run typecheck`, start `npm run dev`, then run `npm run test:e2e`. The test stays on localhost.
 - Deploy with `npx wrangler deploy`. The admin hash is stored as a Cloudflare secret, so a deploy doesn't change it.

@@ -1,12 +1,14 @@
 # ProofProbe
 
+Live: https://proofprobe.forested-wolfberry.workers.dev
+
 Two-step research that turns any starting point into a clear, data-backed path: a job or interview to prepare for, a search for side income, a startup idea, or another goal.
 
 1. **Broad probing:** research the goal, then publish exhaustive personalised questions.
 2. **In-depth research:** when asked, read the latest submission and publish the path on the same page, as one recommendation or up to three alternatives.
 
 - **`/proofprobe` skill** (`skills/proofprobe/SKILL.md`): runs in Claude Code. Opus does the thinking and treg does the live research, so the server needs no AI key.
-- **Worker** (`src/`): hosts each case at a private link. No sign-in. People save and submit answers, and the plan appears on the same page.
+- **Worker** (`src/`): hosts the home page and the Probes directory, organised as profiles with one or more pages. Anyone can view a page, and its password unlocks editing.
 - **`bin/proofprobe.mjs`**: admin helper to create, publish, check and fetch cases.
 
 ## For agents and other chats
@@ -28,7 +30,7 @@ Local test: put `ADMIN_TOKEN_SHA256=<hash>` in `.dev.vars`, run `npm run dev`, t
 
 ## Data rules
 
-- Sharing: send each person their own link. There is no login, password or email. A closed friend group can read every page and submitted answers, and a notice says so. Only a person's own link can change their answers.
+- Anyone can read every page, including submitted answers, and a notice says so. Each page has its own password for editing. Unlocking one page never unlocks another.
 - Submitting stores a log and starts nothing. Research continues only when `/proofprobe` is run.
 - The cost shown on a page is treg data spend logged with `gap cost`. Claude usage is not included.
 - Submissions are append-only. A database trigger blocks updates, and each log stores a SHA-256 so corruption is detectable.
@@ -42,7 +44,7 @@ This is a small free-tier app: one Cloudflare Worker and a D1 database, with no 
 
 ## Open source and access
 
-The code is public, but the running service is not. Cases, answers and links live in the owner's Cloudflare account, and nothing in this repo gives access to them. The admin token and case links stay in `.proofprobe/`, which is never committed. The Worker holds only a hash of the token, as a Cloudflare secret.
+The code is public, but the running service is not. Cases, answers and links live in the owner's Cloudflare account, and nothing in this repo gives access to them. The admin token and page passwords stay in `.proofprobe/`, which is never committed. The Worker holds only a hash of the token, as a Cloudflare secret.
 
 To run your own copy, replace `account_id` and `database_id` in `wrangler.jsonc` with your own.
 

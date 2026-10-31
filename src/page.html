@@ -46,21 +46,29 @@ textarea{grid-column:2;width:100%;min-height:76px;margin-top:7px;padding:8px 10p
 .bars{display:grid;gap:7px}.bars h3{font-size:17px}.barrow{display:grid;grid-template-columns:minmax(0,260px) minmax(0,1fr) 72px;gap:12px;align-items:center;min-height:28px}.track{height:10px;background:var(--zebra);border-radius:0 4px 4px 0;overflow:hidden}.fill{display:block;height:100%;background:var(--accent);border-radius:0 4px 4px 0}.barval{font-variant-numeric:tabular-nums;font-weight:600;text-align:right}
 .meter{display:grid;grid-template-columns:minmax(40px,84px) auto;gap:8px;align-items:center;font-variant-numeric:tabular-nums;font-weight:600}
 @media (max-width:640px){.bars{gap:12px}.barrow{grid-template-columns:minmax(0,1fr) 64px;gap:3px 12px}.barrow .track{grid-column:1/-1;grid-row:2}}
-.you{color:var(--muted);font-size:14px;margin-left:6px}
+.topbar{position:relative;display:flex;justify-content:space-between;align-items:center;padding-block:14px;border-bottom:1px solid var(--line)}.brandlink{font:700 18px var(--display);color:var(--ink);text-decoration:none}
+.burger{width:42px;height:42px;padding:0;border-radius:50%;background:transparent;color:var(--ink);border:1px solid var(--line);font-size:17px}.menu{position:absolute;top:60px;right:0;z-index:6;min-width:170px;padding:7px;background:var(--surface);border:1px solid var(--line);border-radius:12px}.menu a{display:block;padding:9px 12px;border-radius:8px;color:var(--ink);text-decoration:none;font-weight:600}.menu a:hover{background:var(--accent-soft)}
+.eyebrow a{color:inherit;text-decoration:none}
+.access{display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin-top:14px;font-size:15.5px;color:var(--muted)}button.ghost{background:transparent;color:var(--accent)}
+.unlock{margin-top:12px;max-width:440px}.unlock label{font-weight:600;display:block;margin-bottom:6px}.unlockrow{display:flex;gap:8px}.unlockrow input{flex:1;min-width:0;padding:8px 10px;font:400 16px var(--body);color:var(--ink);background:var(--surface);border:1px solid var(--line);border-radius:4px}
+.profiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,420px),1fr));gap:16px}.profile{background:var(--surface);border:1px solid var(--line);padding:18px}.profile h2{font-size:24px}.pagelink{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:4px 12px;padding:12px 0;border-top:1px solid var(--line);margin-top:12px;text-decoration:none;color:var(--ink)}.pagelink:hover b{color:var(--accent)}.pagelink small{color:var(--muted);font-size:14.5px}
 </style></head><body><div class="wrap">
-<nav class="tabs" aria-label="Pages"><a href="#mine" id="tabMine">This page</a><a href="#group" id="tabGroup">Group</a></nav>
-<header><div class="eyebrow" id="eyebrow">Loading</div><h1 id="title">ProofProbe</h1>
+<div class="topbar"><a class="brandlink" href="/">ProofProbe</a>
+  <button class="burger" id="burger" type="button" aria-label="Menu" aria-expanded="false" aria-controls="menu">☰</button>
+  <nav class="menu" id="menu" hidden><a href="/">Home</a><a href="/probes">Probes</a><a href="https://github.com/yash201040/proofprobe" rel="noopener">GitHub</a></nav></div>
+<header><div class="eyebrow" id="eyebrow"><a href="/probes">Probes</a></div><h1 id="title">Probes</h1>
   <p class="cost" id="cost" hidden></p>
+  <div class="access" id="access" hidden><span id="accessText"></span><button type="button" id="unlockBtn">Unlock to edit</button><button type="button" id="lockBtn" class="ghost" hidden>Lock</button></div>
+  <div class="unlock" id="unlockBox" hidden><label for="password">Password for this page</label><div class="unlockrow"><input id="password" type="password" autocomplete="current-password"><button type="button" id="unlockGo">Unlock</button></div><p class="state err" id="unlockErr" role="alert"></p></div>
 </header>
 <div id="fatal" class="alert" hidden><p id="fatalText"></p><p style="margin-top:9px"><button type="button" id="retry">Try again</button></p></div>
-<section id="groupBox" hidden><div class="stack"><p>Everyone has their own page. Open one to see the goal, the research and the answers. Other people's pages are read only.</p><div class="tablebox"><table><thead><tr><th>Name</th><th>Goal</th><th>Stage</th><th>Research cost</th></tr></thead><tbody id="people"></tbody></table></div></div></section>
+<section id="dirBox" hidden><div id="profiles" class="profiles"></div><p id="dirEmpty" hidden>No probes published yet.</p></section>
 <section id="viewQs" hidden><div class="stack"><h2>Questions and answers</h2><p id="viewNote"></p><div id="viewList" class="stack"></div></div></section>
 <section id="planBox" hidden><div class="stack"><h2>Recommended path</h2><div id="plan" class="blocks"></div></div></section>
 <section id="introBox" hidden><div id="intro" class="blocks"></div></section>
 <section id="qBox" hidden><div class="stack">
   <h2 id="qTitle">Questions</h2>
-  <p><strong>How this works:</strong> the Save all changes button lights up whenever you type, and stays on screen as you scroll. Press it to store your answers online. You can then stop, refresh or come back later on any device using this same link. When you're done, press Submit answers at the end. You can edit, save and submit again, and every submission is kept.</p>
-  <p>This link is your personal one, so please don't forward it. Anyone who has it can change your answers.</p>
+  <p><strong>How this works:</strong> Save all changes lights up when you type. Press it to store your answers, then come back any time on any device with your password. When you're done, press Submit answers at the end. You can edit and submit again, and every submission is kept.</p>
   <div class="bar"><span class="count" id="count" role="status"></span><button type="button" id="saveAll" disabled>Save all changes</button></div>
   <form id="form" class="stack" autocomplete="off"></form>
   <div class="sec"><h3>Finished?<small>This sends your saved answers. You can come back, change anything and submit again.</small></h3>
@@ -68,11 +76,12 @@ textarea{grid-column:2;width:100%;min-height:76px;margin-top:7px;padding:8px 10p
     <p id="submitHint" class="state warn" style="margin-top:8px"></p>
     <p id="submitStatus" role="status" style="margin-top:10px"></p><ul id="log" class="log"></ul></div>
 </div></section>
-<footer class="notice">Privacy: everything here, including your submitted answers and any documents you share, can be seen and downloaded by the few people in this friend group. Saved answers stay out of their view until you submit. Only you can change your own answers.</footer>
+<footer class="notice">Privacy: anyone with this site's address can read every page, including research, documents and submitted answers. Saved answers stay out of view until submitted. Only someone with a page's password can edit it.</footer>
 </div>
 <script>
-const API=location.pathname.replace(/\/+$/,"")+"/api";
-const DRAFT_KEY="proofprobe-drafts-v2-"+location.pathname.slice(-10);
+const seg=location.pathname.split("/").filter(Boolean),onPage=seg.length===3;
+const API=onPage?"/api/pages/"+seg[1]+"/"+seg[2]:"";
+const DRAFT_KEY="proofprobe-drafts-v3-"+seg.slice(1).join("-");
 const $=id=>document.getElementById(id);
 const fmt=iso=>new Date(iso).toLocaleString([],{dateStyle:"medium",timeStyle:"short"});
 let drafts={};try{drafts=JSON.parse(localStorage.getItem(DRAFT_KEY)||"{}")}catch(e){drafts={}}
@@ -152,7 +161,7 @@ async function saveAll(){
   }catch(e){
     const stale=e.status===409||e.status===404;
     const tooLong=e.status===413&&e.body&&e.body.id&&blocks[e.body.id];
-    saveError=e.status===403?"This form is closed, so nothing was saved.":stale?"Something changed elsewhere. Refresh this page. Your text is kept on this device.":tooLong?"Q"+tooLong.n+" is too long to save. Please shorten it.":"Not saved. Check your connection and try again. Your text is kept on this device.";
+    saveError=e.status===401?"Editing is locked. Refresh and unlock this page.":e.status===403?"This form is closed, so nothing was saved.":stale?"Something changed elsewhere. Refresh this page. Your text is kept on this device.":tooLong?"Q"+tooLong.n+" is too long to save. Please shorten it.":"Not saved. Check your connection and try again. Your text is kept on this device.";
   }
   busy=false;bar();
 }
@@ -170,31 +179,25 @@ $("submit").addEventListener("click",async()=>{
     const change=r.seq>1?(nums.length?" Changed since last time: "+nums.join(", ")+".":" Nothing changed since last time."):"";
     st.textContent="Submission "+r.seq+" received with "+r.answered+" of "+r.total+" answers."+change+" You can close this page.";
     busy=false;bar();
-    const d=await fetch(API+"/case").then(x=>x.json()).catch(()=>null);if(d)renderLog(d.submissions);
-  }catch(e){st.textContent=e.status===403?"This form is closed, so nothing was submitted.":"Your submission wasn't confirmed. Check your connection and press Submit answers again."}
+    const d=await fetch(API).then(x=>x.json()).catch(()=>null);if(d&&d.submissions)renderLog(d.submissions);
+  }catch(e){st.textContent=e.status===401?"Editing is locked. Refresh and unlock this page.":e.status===403?"This form is closed, so nothing was submitted.":"Your submission wasn't confirmed. Check your connection and press Submit answers again."}
   busy=false;bar();
 });
 $("form").addEventListener("submit",e=>e.preventDefault());
-let loadedMine=false;
+let loaded=false;
 const money=n=>"$"+Number(n).toFixed(n>0&&n<1?3:2);
 const STAGE={draft:"Being prepared",open:"Answering questions",submitted:"Answers in",plan_ready:"Path ready",closed:"Closed"};
-function hideAll(){["groupBox","viewQs","planBox","introBox","qBox","fatal"].forEach(i=>$(i).hidden=true)}
-function heading(d){
-  document.title=d.title;$("title").textContent=d.title;$("eyebrow").textContent=d.firstName;
-  $("cost").textContent="Research cost so far: "+money(d.costUsd)+" in data tools";$("cost").hidden=false;
-}
-function tabs(on){$("tabMine").className=on==="mine"?"on":"";$("tabGroup").className=on==="group"?"on":""}
+const TONE={open:"warn",submitted:"info",plan_ready:"good",closed:"bad"};
 function fail(m){$("fatalText").textContent=m;$("fatal").hidden=false}
-function showMine(d){
-  hideAll();tabs("mine");heading(d);
-  if(d.plan.length){renderBlocks($("plan"),d.plan);$("planBox").hidden=false}
-  if(d.intro.length){renderBlocks($("intro"),d.intro);$("introBox").hidden=false}
-  if(d.sections.length)$("qBox").hidden=false;
+function showRead(d){
+  $("viewNote").textContent=d.seq?"Submission "+d.seq+", "+fmt(d.submittedAt)+". Read only.":"No answers submitted yet.";
+  const l=$("viewList");l.textContent="";
+  d.items.forEach((q,i)=>{const w=el("div",null,"qa");w.appendChild(el("b",(i+1)+". "+q.question));const has=!!q.answer.trim();if(d.seq)w.appendChild(el("p",has?q.answer:"Not answered",has?"has":""));l.appendChild(w)});
+  $("viewQs").hidden=!d.items.length;$("qBox").hidden=true;
 }
-async function loadMine(){
-  const r=await fetch(API+"/case");if(!r.ok)throw new Error("http");
-  const d=await r.json();closed=d.status==="closed";$("tabMine").textContent=d.firstName+"'s page";
-  if(!loadedMine&&d.sections.length){
+function showEdit(d){
+  closed=d.status==="closed";
+  if(!loaded&&d.sections.length){
     renderForm(d.sections);
     ids.forEach(id=>{
       const b=blocks[id],a=d.answers[id];b.saved=a?a.text:"";b.savedAt=a?a.updatedAt:null;
@@ -207,41 +210,53 @@ async function loadMine(){
     const last=d.submissions[d.submissions.length-1];
     if(last)$("submitStatus").textContent="Last submitted "+fmt(last.submittedAt)+".";
     if(closed)$("submitStatus").textContent="This form is closed.";
-    loadedMine=true;
+    loaded=true;
   }
-  return d;
+  $("qBox").hidden=!d.sections.length;$("viewQs").hidden=true;
 }
-async function showGroup(){
-  hideAll();tabs("group");$("cost").hidden=true;$("eyebrow").textContent="Group";$("title").textContent="Everyone's pages";document.title="Group";
-  const r=await fetch(API+"/group");if(!r.ok)throw new Error("http");
-  const d=await r.json(),body=$("people");body.textContent="";
-  d.people.forEach(p=>{
-    const tr=el("tr"),who=el("td"),a=el("a",p.firstName);a.href=p.mine?"#mine":"#view-"+p.id;who.appendChild(a);if(p.mine)who.appendChild(el("span","this link","you"));
-    tr.append(who,el("td",p.title),el("td",STAGE[p.status]||p.status),el("td",money(p.costUsd)));body.appendChild(tr);
-  });
-  $("groupBox").hidden=false;
-}
-async function showOther(id){
-  hideAll();tabs("group");
-  const r=await fetch(API+"/view/"+encodeURIComponent(id));
-  if(!r.ok)throw new Error("http");
-  const d=await r.json();heading(d);$("eyebrow").textContent=d.firstName+"'s page · read only";
+async function showPage(){
+  $("fatal").hidden=true;
+  const r=await fetch(API);if(!r.ok)throw r;
+  const d=await r.json();
+  document.title=d.title;$("title").textContent=d.title;
+  const eb=$("eyebrow");eb.textContent="";const a=el("a","Probes");a.href="/probes";eb.append(a," / "+d.name);
+  $("cost").textContent="Research cost so far: "+money(d.costUsd);$("cost").hidden=false;
   if(d.plan.length){renderBlocks($("plan"),d.plan);$("planBox").hidden=false}
   if(d.intro.length){renderBlocks($("intro"),d.intro);$("introBox").hidden=false}
-  $("viewNote").textContent=d.seq?"Submission "+d.seq+", "+fmt(d.submittedAt)+". Read only.":"No answers submitted yet.";
-  const l=$("viewList");l.textContent="";
-  d.items.forEach((q,i)=>{const w=el("div",null,"qa");w.appendChild(el("b",(i+1)+". "+q.question));const has=!!q.answer.trim();if(d.seq)w.appendChild(el("p",has?q.answer:"Not answered",has?"has":""));l.appendChild(w)});
-  $("viewQs").hidden=!d.items.length;
+  $("access").hidden=false;$("unlockBox").hidden=true;$("unlockBtn").hidden=d.editable||!d.hasPassword;$("lockBtn").hidden=!d.editable;
+  $("accessText").textContent=d.editable?"Editing is unlocked on this device.":d.hasPassword?"View only.":"View only. Editing isn't set up yet.";
+  if(d.editable)showEdit(d);else showRead(d);
+}
+async function showDirectory(){
+  $("fatal").hidden=true;
+  const r=await fetch("/api/probes");if(!r.ok)throw r;
+  const d=await r.json(),host=$("profiles");host.textContent="";
+  d.profiles.forEach(p=>{
+    const c=el("article",null,"profile");c.appendChild(el("h2",p.name));
+    p.pages.forEach(g=>{const a=el("a",null,"pagelink");a.href="/probes/"+encodeURIComponent(p.slug)+"/"+encodeURIComponent(g.slug);a.appendChild(el("b",g.title));a.appendChild(el("span",STAGE[g.status]||g.status,"chip "+(TONE[g.status]||"info")));a.appendChild(el("small","Research cost "+money(g.costUsd)));c.appendChild(a)});
+    host.appendChild(c);
+  });
+  $("dirEmpty").hidden=d.profiles.length>0;$("dirBox").hidden=false;
 }
 async function route(){
-  const h=location.hash.slice(1);
-  try{
-    if(h==="group")await showGroup();
-    else if(h.startsWith("view-"))await showOther(h.slice(5));
-    else showMine(await loadMine());
-  }catch(e){fail("We couldn't load this page. Check your connection and try again.")}
+  try{if(onPage)await showPage();else await showDirectory()}
+  catch(e){fail(e&&e.status===404?"This page doesn't exist.":"We couldn't load this page. Check your connection and try again.")}
 }
-window.addEventListener("hashchange",route);
+$("unlockBtn").addEventListener("click",()=>{$("unlockBox").hidden=false;$("password").focus()});
+async function tryUnlock(){
+  const err=$("unlockErr");err.textContent="";
+  try{
+    await call("/unlock",{method:"POST",body:JSON.stringify({password:$("password").value})});
+    $("password").value="";await route();
+  }catch(e){
+    if(e.status===401)err.textContent="That password isn't right.";
+    else err.textContent="Couldn't unlock. Check your connection and try again.";
+  }
+}
+$("unlockGo").addEventListener("click",tryUnlock);
+$("password").addEventListener("keydown",e=>{if(e.key==="Enter"){e.preventDefault();tryUnlock()}});
+$("lockBtn").addEventListener("click",async()=>{try{await call("/lock",{method:"POST",body:"{}"})}catch(e){}location.reload()});
+$("burger").addEventListener("click",()=>{const m=$("menu"),open=m.hidden;m.hidden=!open;$("burger").setAttribute("aria-expanded",String(open))});
 $("retry").addEventListener("click",route);
-loadMine().catch(()=>{}).then(route);
+route();
 </script></body></html>
