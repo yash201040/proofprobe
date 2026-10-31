@@ -56,6 +56,10 @@ footer{margin-top:24px;color:var(--muted);font-size:15px}
 <main id="app" hidden>
   <h1>Admin</h1>
   <div class="tiles" id="tiles"></div>
+  <h2>Pending research</h2>
+  <p class="muted" style="margin-top:4px">For tracking only. Nothing starts from this page. Copy a prompt into Claude Code when you want to continue one.</p>
+  <div class="tablebox" id="pendingBox" style="margin-block:10px 24px"><table class="cards"><thead><tr><th>Profile</th><th>Page</th><th>Waiting for</th><th>Since</th><th>Prompt</th></tr></thead><tbody id="pending"></tbody></table></div>
+  <p class="muted" id="noPending" hidden style="margin-block:10px 24px">Nothing is pending.</p>
   <h2>Profiles</h2>
   <div class="tablebox" style="margin-block:10px 8px"><table class="cards"><thead><tr><th>Profile</th><th>Pages</th><th>Password</th><th>Change password</th></tr></thead><tbody id="profiles"></tbody></table></div>
   <div class="row"><input id="newProfile" placeholder="New profile name" aria-label="New profile name" style="max-width:280px"><button type="button" class="ghost" id="addProfile">Add profile</button><span class="muted" id="pwMsg"></span></div>
@@ -111,13 +115,23 @@ function profileRows(list,pages){
     if(p.has_password){const b=el("button","Show","link show");b.type="button";b.addEventListener("click",()=>reveal(p.id,pw));pw.appendChild(b)}else pw.appendChild(el("span","Not set","chip bad"));
     inp.type="text";inp.autocomplete="off";inp.placeholder="4 or more characters";inp.setAttribute("aria-label","New password for "+p.name);inp.className="pwi";go.type="button";go.className="pwset ghost";
     go.addEventListener("click",async()=>{try{await api("/profiles/"+p.id+"/password",{method:"POST",body:JSON.stringify({password:inp.value})});await loadApp();$("pwMsg").textContent="Saved for "+p.name+". Devices using the old password are locked out."}catch(e){$("pwMsg").textContent=e.status===400?"Use 4 or more characters.":"Couldn't save."}});
-    box.append(inp,go);set.appendChild(box);tr.append(el("td",p.name),el("td",String(p.pages),"num"),pw,set);body.appendChild(tr);
+    box.append(inp,go);set.appendChild(box);
+    if(!p.pages){const del=el("button","Delete profile","link");del.type="button";del.className="link del";del.addEventListener("click",async()=>{if(del.dataset.armed){await api("/profiles/"+p.id,{method:"DELETE"}).catch(()=>{});loadApp()}else{del.dataset.armed="1";del.textContent="Press again to delete"}});box.appendChild(del)}
+    tr.append(el("td",p.name),el("td",String(p.pages),"num"),pw,set);body.appendChild(tr);
   });
 }
 $("addProfile").addEventListener("click",async()=>{const n=$("newProfile");try{await api("/profiles",{method:"POST",body:JSON.stringify({name:n.value})});n.value="";loadApp()}catch(e){$("pwMsg").textContent="Enter a name for the profile."}});
 async function loadApp(){
   const d=await api("/overview");view(["app","foot","logout"]);
   profileRows(d.profiles);
+  const pb=$("pending");pb.textContent="";
+  d.pending.forEach(w=>{
+    const tr=el("tr"),type=el("td"),link=el("a",w.title),page=el("td"),act=el("td"),copy=el("button","Copy prompt");
+    type.appendChild(el("span",w.kind==="reroute"?"New direction":"In-depth research",w.kind==="reroute"?"chip warn":"chip info"));link.href=w.path;page.appendChild(link);
+    copy.type="button";copy.className="ghost";copy.addEventListener("click",async()=>{try{await navigator.clipboard.writeText(w.prompt);copy.textContent="Copied"}catch(e){copy.textContent=w.prompt}});
+    act.className="act";act.appendChild(copy);tr.append(el("td",w.profile),page,type,el("td",fmt(w.since)),act);pb.appendChild(tr);
+  });
+  $("pendingBox").hidden=!d.pending.length;$("noPending").hidden=d.pending.length>0;
   const pages=d.pages,sub=pages.reduce((a,p)=>a+p.submissions,0),cost=pages.reduce((a,p)=>a+p.cost_usd,0);
   const t=$("tiles");t.textContent="";
   [[d.profiles.length,"Profiles"],[pages.length,"Pages"],[sub,"Submissions"],[money(cost),"Research cost"]].forEach(([v,l])=>{const c=el("div",null,"tile");c.append(el("b",String(v)),el("span",l));t.appendChild(c)});
@@ -161,8 +175,11 @@ async function loadDetail(id){
 
   const costs=el("details",null,"fold");costs.appendChild(el("summary","Work done and cost ("+money(d.costUsd)+")"));
   costs.appendChild(table(["Work","Cost","When"],d.costs.map(c=>[c.label,money(c.usd),fmt(c.at)])));box.appendChild(costs);
+  const del=el("button","Delete this page");del.type="button";del.className="ghost";del.id="deletePage";
+  const delHost=el("div",null,"row");delHost.appendChild(del);
+  del.addEventListener("click",async()=>{if(del.dataset.armed){await api("/pages/"+id,{method:"DELETE"});$("detail").hidden=true;loadApp()}else{del.dataset.armed="1";del.textContent="Press again to delete permanently"}});
   const act=el("details",null,"fold");act.appendChild(el("summary","Activity log"));
-  act.appendChild(table(["When","Who","What","Detail"],d.audit.map(a=>[fmt(a.at),a.actor,a.action,a.detail||""])));box.appendChild(act);
+  act.appendChild(table(["When","Who","What","Detail"],d.audit.map(a=>[fmt(a.at),a.actor,a.action,a.detail||""])));box.appendChild(act);box.appendChild(delHost);
   box.scrollIntoView({behavior:matchMedia("(prefers-reduced-motion:reduce)").matches?"auto":"smooth"});
 }
 function table(head,rows){const b=el("div",null,"tablebox");b.style.marginTop="10px";const t=el("table",null,"cards"),h=el("thead"),tr=el("tr");head.forEach(x=>tr.appendChild(el("th",x)));h.appendChild(tr);const bd=el("tbody");rows.forEach(r=>{const w=el("tr");r.forEach(c=>w.appendChild(el("td",c)));bd.appendChild(w)});t.append(h,bd);b.appendChild(t);labelCards(t);return b}

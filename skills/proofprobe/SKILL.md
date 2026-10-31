@@ -1,6 +1,6 @@
 ---
 name: proofprobe
-description: Use when the user wants a researched path from where someone is to a goal, starting from any input, such as a LinkedIn profile, CV, job description, scheduled interview, part-time income question, or a startup idea, product document or prototype. Also use to check a ProofProbe case for answers, continue a case, publish its final path, or host questions and pages for research already done in another chat.
+description: Use when the user wants a researched path from where someone is to a goal, starting from any input, such as a LinkedIn profile, CV, job description, scheduled interview, part-time income question, or a startup idea, product document or prototype. Also use to check a ProofProbe case for answers, continue a case, publish its final path, host questions and pages for research already done in another chat, or list and complete pending research.
 ---
 
 # ProofProbe
@@ -18,6 +18,14 @@ Helper, shown below as `proofprobe`, works from any folder:
 `node ~/HOME/Coding/Projects/personal/proofprobe/bin/proofprobe.mjs <command>`
 
 Keep working files in `~/HOME/Coding/Projects/personal/proofprobe/.proofprobe/cases/<id>/`, which git ignores, and pass full paths to the helper. Paths below are shown relative to the project. If a project already has its own research folder, keep the research there and put only the JSON files in the case folder.
+
+## Pending research
+
+Nothing on the website can start research. Submissions and new directions only join the pending list, and you act when the user asks here.
+
+- "/proofprobe pending": run `proofprobe pending` and show what's waiting.
+- "/proofprobe continue <profile or page>": run `proofprobe pending`, and complete only the one the user named. If the name matches several, ask which in one line. `kind: "reroute"` goes to "Changing direction", and `kind: "answers"` goes to Step 2.
+- Never pick up other pending items on your own, even when they're listed.
 
 ## Always start here
 

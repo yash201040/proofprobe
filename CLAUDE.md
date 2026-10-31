@@ -41,6 +41,7 @@ Run it with no command to see the options. The Cloudflare and admin details are 
 - The Admin page at `/admin` opens with a master password. It shows passwords, answers, logs and costs. Profile passwords are hashed for checking and AES-GCM encrypted with the `PASSWORD_KEY` secret for display. Master password guesses pause after 6 tries, but profile passwords never do.
 - Anyone can read every page and its submitted answers. Editing needs the profile's password, which unlocks all of that profile's pages and no others. A page notice covers this. Wrong guesses never lock anyone out.
 - Submissions are append-only, and a database trigger enforces that.
+- The website never triggers research. The Worker makes no outbound calls. Pending work is a list on the Admin page, and it runs only when the owner asks in Claude Code with `/proofprobe continue <profile or page>`.
 - The website never mentions Claude, treg or how the research is done. Source code and docs can.
 - Page content renders as text only. Never inject stored content as HTML.
 - Never commit anything from `.proofprobe/`, and never log answers or passwords.

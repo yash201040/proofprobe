@@ -9,11 +9,11 @@ const MAX_ANSWER = 30_000;
 const MAX_DOC = 300_000;
 const MAX_REROUTE = 5_000;
 const SESSION_DAYS = 30;
-const ADMIN_HOURS = 12;
+const ADMIN_DAYS = 90;
 const ADMIN_MAX_FAILS = 6;
 const ADMIN_LOCK_MINUTES = 15;
 const ADMIN_SESSION = "__admin";
-const SCHEMA_VERSION = "2";
+const SCHEMA_VERSION = "3";
 const STATUSES = ["draft", "open", "submitted", "plan_ready", "closed"];
 const TONES = ["good", "warn", "bad", "info"];
 
@@ -55,7 +55,7 @@ interface Section { title: string; note?: string; first?: boolean; questions: Qu
 interface CaseRow {
   id: string; title: string; first_name: string; status: string; intro_json: string; questions_json: string; plan_json: string;
   created_at: string; updated_at: string; profile_id: string | null; slug: string | null;
-  questions_at: string | null; p_name: string; p_slug: string; p_hash: string | null; p_salt: string | null; p_version: number;
+  questions_at: string | null; plan_at: string | null; p_name: string; p_slug: string; p_hash: string | null; p_salt: string | null; p_version: number;
 }
 interface ProfileRow { id: string; slug: string; name: string; password_hash: string | null; password_salt: string | null; password_enc: string | null; password_iv: string | null; pw_version: number }
 
@@ -90,7 +90,7 @@ async function schemaCurrent(env: Env) {
 async function migrate(env: Env) {
   await env.DB.batch(SCHEMA.map((q) => env.DB.prepare(q)));
   const cols = new Set((await env.DB.prepare("SELECT name FROM pragma_table_info('cases')").all()).results.map((r: any) => r.name as string));
-  if (!cols.has("questions_at")) await env.DB.prepare("ALTER TABLE cases ADD COLUMN questions_at TEXT").run();
+  for (const name of ["questions_at", "plan_at"]) if (!cols.has(name)) await env.DB.prepare(`ALTER TABLE cases ADD COLUMN ${name} TEXT`).run();
   for (const old of ["password_hash", "password_salt", "password_enc", "password_iv", "pw_version"])
     if (cols.has(old)) await env.DB.prepare(`ALTER TABLE cases DROP COLUMN ${old}`).run();
   await setSettings(env, { schema_version: SCHEMA_VERSION });
@@ -126,6 +126,30 @@ function validBlock(b: any): boolean {
 const validBlocks = (v: unknown) => Array.isArray(v) && v.every(validBlock);
 
 const isCurrent = (submittedAt: string, questionsAt: string | null) => !questionsAt || submittedAt >= questionsAt;
+// What's waiting for the owner. This is only a list: nothing here can start research.
+async function pendingWork(env: Env) {
+  const r = await env.DB.prepare(`SELECT c.id, c.title, c.status, c.questions_at, c.plan_at, p.name AS profile, p.slug AS profile_slug, c.slug,
+    (SELECT message FROM reroutes x WHERE x.case_id = c.id AND x.handled_at IS NULL ORDER BY x.id DESC LIMIT 1) AS reroute,
+    (SELECT at FROM reroutes x WHERE x.case_id = c.id AND x.handled_at IS NULL ORDER BY x.id DESC LIMIT 1) AS reroute_at,
+    (SELECT MAX(submitted_at) FROM submissions s WHERE s.case_id = c.id) AS last_submitted
+    FROM cases c JOIN profiles p ON p.id = c.profile_id WHERE c.status NOT IN ('draft', 'closed') ORDER BY c.created_at`).all<any>();
+  return r.results.flatMap((c) => {
+    const base = { id: c.id, profile: c.profile, title: c.title, path: `/probes/${c.profile_slug}/${c.slug}`, prompt: `/proofprobe continue ${c.profile}: ${c.title}` };
+    if (c.reroute) return [{ ...base, kind: "reroute", since: c.reroute_at, detail: c.reroute }];
+    const ready = c.last_submitted && isCurrent(c.last_submitted, c.questions_at) && (!c.plan_at || c.last_submitted > c.plan_at);
+    return ready ? [{ ...base, kind: "answers", since: c.last_submitted, detail: null }] : [];
+  });
+}
+async function deleteCase(env: Env, id: string, ray: string) {
+  await env.DB.batch([
+    env.DB.prepare("DELETE FROM answers WHERE case_id = ?").bind(id),
+    env.DB.prepare("DELETE FROM cost_entries WHERE case_id = ?").bind(id),
+    env.DB.prepare("DELETE FROM submissions WHERE case_id = ?").bind(id),
+    env.DB.prepare("DELETE FROM reroutes WHERE case_id = ?").bind(id),
+    env.DB.prepare("DELETE FROM cases WHERE id = ?").bind(id),
+    audit(env, null, "admin", "page_deleted", id, ray),
+  ]);
+}
 const openReroute = (env: Env, caseId: string) =>
   env.DB.prepare("SELECT message, at FROM reroutes WHERE case_id = ? AND handled_at IS NULL ORDER BY id DESC LIMIT 1").bind(caseId).first<{ message: string; at: string }>();
 async function costUsd(env: Env, caseId: string) {
@@ -356,10 +380,10 @@ async function adminSite(request: Request, env: Env, parts: string[], ray: strin
     const token = randomToken();
     await setSettings(env, { admin_fails: "0", admin_locked_until: "" });
     await env.DB.batch([
-      env.DB.prepare("INSERT INTO sessions(token_hash, case_id, pw_version, expires_at) VALUES (?,?,?,?)").bind(await sha256(token), ADMIN_SESSION, 0, new Date(now.getTime() + ADMIN_HOURS * 3_600_000).toISOString()),
+      env.DB.prepare("INSERT INTO sessions(token_hash, case_id, pw_version, expires_at) VALUES (?,?,?,?)").bind(await sha256(token), ADMIN_SESSION, 0, new Date(now.getTime() + ADMIN_DAYS * 86_400_000).toISOString()),
       audit(env, null, "admin", "login", null, ray),
     ]);
-    return json({ ok: true }, 200, { "Set-Cookie": `pp_admin=${token}; Path=/; Max-Age=${ADMIN_HOURS * 3600}; HttpOnly; Secure; SameSite=Strict` });
+    return json({ ok: true }, 200, { "Set-Cookie": `pp_admin=${token}; Path=/; Max-Age=${ADMIN_DAYS * 86_400}; HttpOnly; Secure; SameSite=Strict` });
   }
   if (!(await adminLoggedIn(request, env))) return json({ error: "login_required" }, 401);
   if (what === "logout" && request.method === "POST") {
@@ -374,7 +398,7 @@ async function adminSite(request: Request, env: Env, parts: string[], ray: strin
       EXISTS (SELECT 1 FROM reroutes r WHERE r.case_id = c.id AND r.handled_at IS NULL) AS rerouting,
       (SELECT COALESCE(SUM(e.usd_micro), 0) / 1000000.0 FROM cost_entries e WHERE e.case_id = c.id) AS cost_usd
       FROM cases c JOIN profiles p ON p.id = c.profile_id ORDER BY c.created_at`).all<any>();
-    return json({ profiles: profiles.results, pages: r.results.map(({ questions_json, ...x }) => ({ ...x, total: flatten(parse<Section[]>(questions_json, [])).length })) });
+    return json({ pending: await pendingWork(env), profiles: profiles.results, pages: r.results.map(({ questions_json, ...x }) => ({ ...x, total: flatten(parse<Section[]>(questions_json, [])).length })) });
   }
   if (what === "profiles" && !id && request.method === "POST") {
     const b = await request.json().catch(() => null) as { name?: unknown } | null;
@@ -396,12 +420,23 @@ async function adminSite(request: Request, env: Env, parts: string[], ray: strin
       await setProfilePassword(env, id, b.password, "admin", ray);
       return json({ ok: true });
     }
+    if (!sub && request.method === "DELETE") {
+      const used = await env.DB.prepare("SELECT 1 FROM cases WHERE profile_id = ? LIMIT 1").bind(id).first();
+      if (used) return json({ error: "has_pages" }, 409);
+      await env.DB.batch([
+        env.DB.prepare("DELETE FROM sessions WHERE case_id = ?").bind(id),
+        env.DB.prepare("DELETE FROM profiles WHERE id = ?").bind(id),
+        audit(env, null, "admin", "profile_deleted", id, ray),
+      ]);
+      return json({ ok: true });
+    }
     return notFound();
   }
   if (what !== "pages" || !id) return notFound();
   const row = await env.DB.prepare("SELECT * FROM cases WHERE id = ?").bind(id).first<CaseRow>();
   if (!row) return json({ error: "not_found" }, 404);
 
+  if (!sub && request.method === "DELETE") { await deleteCase(env, id, ray); return json({ ok: true }); }
   if (sub === "answers" && request.method === "PUT") {
     const b = await request.json().catch(() => null) as { answers?: Record<string, unknown> } | null;
     const known = new Set(flatten(parse<Section[]>(row.questions_json, [])).map((q) => q.id));
@@ -438,6 +473,7 @@ async function admin(request: Request, env: Env, parts: string[], ray: string) {
     await setSettings(env, { setup_hash: await sha256(code), setup_expires: new Date(Date.now() + 30 * 60_000).toISOString() });
     return json({ code });
   }
+  if (root === "pending" && request.method === "GET") return json({ pending: await pendingWork(env) });
   if (root === "profiles" && request.method === "GET") {
     const r = await env.DB.prepare("SELECT p.name, p.slug, p.password_hash IS NOT NULL AS has_password, (SELECT COUNT(*) FROM cases c WHERE c.profile_id = p.id) AS pages FROM profiles p ORDER BY p.created_at").all();
     return json({ profiles: r.results });
@@ -492,9 +528,10 @@ async function admin(request: Request, env: Env, parts: string[], ray: string) {
     const oldIds = new Set(flatten(parse<Section[]>(row.questions_json, [])).map((q) => q.id));
     const addsQuestions = b.questions !== undefined && flatten(b.questions as Section[]).some((q) => !oldIds.has(q.id));
     const questionsAt = addsQuestions ? now : row.questions_at;
+    const planAt = b.plan !== undefined && (b.plan as unknown[]).length ? now : rerouted ? null : row.plan_at;
     if (intro.length + questions.length + plan.length > MAX_DOC) return json({ error: "too_large" }, 413);
     await env.DB.batch([
-      env.DB.prepare("UPDATE cases SET intro_json = ?, questions_json = ?, plan_json = ?, status = ?, questions_at = ?, updated_at = ? WHERE id = ?").bind(intro, questions, plan, status, questionsAt, now, id),
+      env.DB.prepare("UPDATE cases SET intro_json = ?, questions_json = ?, plan_json = ?, status = ?, questions_at = ?, plan_at = ?, updated_at = ? WHERE id = ?").bind(intro, questions, plan, status, questionsAt, planAt, now, id),
       // New questions answer an open change of direction.
       ...(b.questions !== undefined ? [env.DB.prepare("UPDATE reroutes SET handled_at = ? WHERE case_id = ? AND handled_at IS NULL").bind(now, id)] : []),
       audit(env, id, "admin", "update", Object.keys(b).join(","), ray),
@@ -525,17 +562,7 @@ async function admin(request: Request, env: Env, parts: string[], ray: string) {
     await setProfilePassword(env, row.profile_id!, b.password, "cli", ray);
     return json({ ok: true });
   }
-  if (!sub && request.method === "DELETE") {
-    await env.DB.batch([
-      env.DB.prepare("DELETE FROM answers WHERE case_id = ?").bind(id),
-      env.DB.prepare("DELETE FROM cost_entries WHERE case_id = ?").bind(id),
-      env.DB.prepare("DELETE FROM submissions WHERE case_id = ?").bind(id),
-      env.DB.prepare("DELETE FROM reroutes WHERE case_id = ?").bind(id),
-      env.DB.prepare("DELETE FROM cases WHERE id = ?").bind(id),
-      audit(env, id, "admin", "purge", null, ray),
-    ]);
-    return json({ ok: true });
-  }
+  if (!sub && request.method === "DELETE") { await deleteCase(env, id, ray); return json({ ok: true }); }
   if (sub === "submissions" && request.method === "GET") {
     if (!which) return json({ submissions: await summaries(env, id) });
     const r = which === "latest"
