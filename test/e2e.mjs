@@ -76,6 +76,17 @@ ok(pub.seq === 2 && pub.items[1].answer === "second answer" && !JSON.stringify(p
 const stale = await page.evaluate(async (api) => (await fetch(api + "/answers", { method: "PUT", body: JSON.stringify({ answers: { a1: "old" }, bases: { a1: "2000-01-01" } }) })).status, first.api.replace(base, ""));
 ok(stale === 409, "a stale save is refused");
 
+const noRe = await fetch(first.api + "/reroute", { method: "POST", body: JSON.stringify({ message: "x" }) });
+ok(noRe.status === 401 && (await dis("#rerouteSend")), "changing direction needs the password and a message");
+await page.type("#rerouteText", "Focus on product roles instead");
+await page.click("#rerouteSend");
+await page.waitForFunction(() => /Received/.test(document.querySelector("#rerouteState").textContent));
+const rerouted = await (await fetch(first.api)).json();
+ok(rerouted.reroute?.message === "Focus on product roles instead" && JSON.parse(pp("status", first.id)).reroute, "a new direction is stored and starts nothing");
+const dir = await (await fetch(base + "/api/probes")).json();
+ok(dir.profiles.flatMap((p) => p.pages).some((g) => g.rerouting), "the directory shows the change of direction");
+pp("publish", first.id, "--questions", qf);
+ok((await (await fetch(first.api)).json()).reroute === null, "publishing new questions closes the request");
 writeFileSync(qf + ".intro", JSON.stringify([{ t: "section", title: "Compare", blocks: [{ t: "table", head: ["Route", "Fit"], rows: [["A", { text: "High", tone: "good" }], ["B", { text: "7/10", score: 7 }]] }, { t: "bars", title: "Fit", max: 10, items: [{ label: "A", value: 8 }] }] }]));
 pp("publish", first.id, "--intro", qf + ".intro");
 await page.reload({ waitUntil: "networkidle0" }); await page.waitForSelector("#intro .fold");

@@ -7,5 +7,6 @@ export const SCHEMA: string[] = [
   "CREATE TABLE IF NOT EXISTS audit_log (\n  id INTEGER PRIMARY KEY AUTOINCREMENT,\n  case_id TEXT,\n  actor TEXT NOT NULL,\n  action TEXT NOT NULL,\n  detail TEXT,\n  ray_id TEXT,\n  at TEXT NOT NULL\n);"
   ,"CREATE TABLE IF NOT EXISTS cost_entries (\n  id INTEGER PRIMARY KEY AUTOINCREMENT,\n  case_id TEXT NOT NULL REFERENCES cases(id),\n  usd_micro INTEGER NOT NULL,\n  label TEXT NOT NULL,\n  at TEXT NOT NULL\n);",
   "CREATE TABLE IF NOT EXISTS profiles (\n  id TEXT PRIMARY KEY,\n  slug TEXT NOT NULL UNIQUE,\n  name TEXT NOT NULL,\n  created_at TEXT NOT NULL\n);",
-  "CREATE TABLE IF NOT EXISTS sessions (\n  token_hash TEXT PRIMARY KEY,\n  case_id TEXT NOT NULL,\n  pw_version INTEGER NOT NULL,\n  expires_at TEXT NOT NULL\n);"
+  "CREATE TABLE IF NOT EXISTS sessions (\n  token_hash TEXT PRIMARY KEY,\n  case_id TEXT NOT NULL,\n  pw_version INTEGER NOT NULL,\n  expires_at TEXT NOT NULL\n);",
+  "CREATE TABLE IF NOT EXISTS reroutes (\n  id INTEGER PRIMARY KEY AUTOINCREMENT,\n  case_id TEXT NOT NULL,\n  message TEXT NOT NULL,\n  at TEXT NOT NULL,\n  handled_at TEXT\n);"
 ];

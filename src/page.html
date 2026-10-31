@@ -52,12 +52,14 @@ textarea{grid-column:2;width:100%;min-height:76px;margin-top:7px;padding:8px 10p
 .access{display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin-top:14px;font-size:15.5px;color:var(--muted)}button.ghost{background:transparent;color:var(--accent)}
 .unlock{margin-top:12px;max-width:440px}.unlock label{font-weight:600;display:block;margin-bottom:6px}.unlockrow{display:flex;gap:8px}.unlockrow input{flex:1;min-width:0;padding:8px 10px;font:400 16px var(--body);color:var(--ink);background:var(--surface);border:1px solid var(--line);border-radius:4px}
 .profiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,420px),1fr));gap:16px}.profile{background:var(--surface);border:1px solid var(--line);padding:18px}.profile h2{font-size:24px}.pagelink{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:4px 12px;padding:12px 0;border-top:1px solid var(--line);margin-top:12px;text-decoration:none;color:var(--ink)}.pagelink:hover b{color:var(--accent)}.pagelink small{color:var(--muted);font-size:14.5px}
+.reroute{background:var(--info-soft);padding:14px 16px}.reroute label{font-weight:600;display:block}.reroute small{display:block;font:400 15.5px var(--body);color:var(--muted);margin-top:2px}.reroute textarea{min-height:64px}.reroute .saverow{margin-top:8px}#rerouteInfo{margin-top:14px}
 </style></head><body><div class="wrap">
 <div class="topbar"><a class="brandlink" href="/">ProofProbe</a>
   <button class="burger" id="burger" type="button" aria-label="Menu" aria-expanded="false" aria-controls="menu">☰</button>
   <nav class="menu" id="menu" hidden><a href="/">Home</a><a href="/probes">Probes</a><a href="https://github.com/yash201040/proofprobe" rel="noopener">GitHub</a></nav></div>
 <header><div class="eyebrow" id="eyebrow"><a href="/probes">Probes</a></div><h1 id="title">Probes</h1>
   <p class="cost" id="cost" hidden></p>
+  <p class="callout" id="rerouteInfo" hidden></p>
   <div class="access" id="access" hidden><span id="accessText"></span><button type="button" id="unlockBtn">Unlock to edit</button><button type="button" id="lockBtn" class="ghost" hidden>Lock</button></div>
   <div class="unlock" id="unlockBox" hidden><label for="password">Password for this page</label><div class="unlockrow"><input id="password" type="password" autocomplete="current-password"><button type="button" id="unlockGo">Unlock</button></div><p class="state err" id="unlockErr" role="alert"></p></div>
 </header>
@@ -68,6 +70,9 @@ textarea{grid-column:2;width:100%;min-height:76px;margin-top:7px;padding:8px 10p
 <section id="introBox" hidden><div id="intro" class="blocks"></div></section>
 <section id="qBox" hidden><div class="stack">
   <h2 id="qTitle">Questions</h2>
+  <div class="reroute"><label for="rerouteText">Not the right direction? <small>Optional. Tell us what you want instead, and you can skip the questions below. We'll redo the research around it.</small></label>
+    <textarea id="rerouteText" maxlength="5000" placeholder="Example: Focus on a move into product management, not part-time work."></textarea>
+    <div class="saverow"><button type="button" id="rerouteSend" disabled>Send new direction</button><span class="state" id="rerouteState" role="status"></span></div></div>
   <p><strong>How this works:</strong> Save all changes lights up when you type. Press it to store your answers, then come back any time on any device with your password. When you're done, press Submit answers at the end. You can edit and submit again, and every submission is kept.</p>
   <div class="bar"><span class="count" id="count" role="status"></span><button type="button" id="saveAll" disabled>Save all changes</button></div>
   <form id="form" class="stack" autocomplete="off"></form>
@@ -212,6 +217,7 @@ function showEdit(d){
     if(closed)$("submitStatus").textContent="This form is closed.";
     loaded=true;
   }
+  if(d.reroute&&!$("rerouteText").value){$("rerouteText").value=d.reroute.message;$("rerouteState").textContent="Received "+fmt(d.reroute.at)+". This page will update when the new research is ready."}
   $("qBox").hidden=!d.sections.length;$("viewQs").hidden=true;
 }
 async function showPage(){
@@ -223,6 +229,7 @@ async function showPage(){
   $("cost").textContent="Research cost so far: "+money(d.costUsd);$("cost").hidden=false;
   if(d.plan.length){renderBlocks($("plan"),d.plan);$("planBox").hidden=false}
   if(d.intro.length){renderBlocks($("intro"),d.intro);$("introBox").hidden=false}
+  const ri=$("rerouteInfo");ri.textContent=d.reroute?"New direction requested: "+d.reroute.message:"";ri.hidden=!d.reroute;
   $("access").hidden=false;$("unlockBox").hidden=true;$("unlockBtn").hidden=d.editable||!d.hasPassword;$("lockBtn").hidden=!d.editable;
   $("accessText").textContent=d.editable?"Editing is unlocked on this device.":d.hasPassword?"View only.":"View only. Editing isn't set up yet.";
   if(d.editable)showEdit(d);else showRead(d);
@@ -233,7 +240,7 @@ async function showDirectory(){
   const d=await r.json(),host=$("profiles");host.textContent="";
   d.profiles.forEach(p=>{
     const c=el("article",null,"profile");c.appendChild(el("h2",p.name));
-    p.pages.forEach(g=>{const a=el("a",null,"pagelink");a.href="/probes/"+encodeURIComponent(p.slug)+"/"+encodeURIComponent(g.slug);a.appendChild(el("b",g.title));a.appendChild(el("span",STAGE[g.status]||g.status,"chip "+(TONE[g.status]||"info")));a.appendChild(el("small","Research cost "+money(g.costUsd)));c.appendChild(a)});
+    p.pages.forEach(g=>{const a=el("a",null,"pagelink");a.href="/probes/"+encodeURIComponent(p.slug)+"/"+encodeURIComponent(g.slug);a.appendChild(el("b",g.title));a.appendChild(el("span",g.rerouting?"Changing direction":STAGE[g.status]||g.status,"chip "+(g.rerouting?"warn":TONE[g.status]||"info")));a.appendChild(el("small","Research cost "+money(g.costUsd)));c.appendChild(a)});
     host.appendChild(c);
   });
   $("dirEmpty").hidden=d.profiles.length>0;$("dirBox").hidden=false;
@@ -242,6 +249,15 @@ async function route(){
   try{if(onPage)await showPage();else await showDirectory()}
   catch(e){fail(e&&e.status===404?"This page doesn't exist.":"We couldn't load this page. Check your connection and try again.")}
 }
+$("rerouteText").addEventListener("input",e=>{$("rerouteSend").disabled=!e.target.value.trim();$("rerouteState").textContent=""});
+$("rerouteSend").addEventListener("click",async()=>{
+  const b=$("rerouteSend"),st=$("rerouteState");b.disabled=true;st.textContent="Sending...";
+  try{
+    const r=await call("/reroute",{method:"POST",body:JSON.stringify({message:$("rerouteText").value})});
+    st.textContent="Received "+fmt(r.at)+". You can skip the questions. This page will update when the new research is ready.";
+    const ri=$("rerouteInfo");ri.textContent="New direction requested: "+r.message;ri.hidden=false;
+  }catch(e){b.disabled=false;st.textContent=e.status===401?"Editing is locked. Refresh and unlock this page.":"That wasn't sent. Check your connection and try again."}
+});
 $("unlockBtn").addEventListener("click",()=>{$("unlockBox").hidden=false;$("password").focus()});
 async function tryUnlock(){
   const err=$("unlockErr");err.textContent="";

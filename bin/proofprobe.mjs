@@ -77,7 +77,7 @@ switch (cmd) {
   case "status": {
     const r = await api("GET", "/cases/" + a[0]);
     const total = r.sections.flatMap((s) => s.questions).length;
-    out({ id: r.id, title: r.title, status: r.status, questions: total, savedAnswers: Object.values(r.answers).filter((x) => x.text.trim()).length, submissions: r.submissions });
+    out({ id: r.id, title: r.title, status: r.status, reroute: r.reroute, questions: total, savedAnswers: Object.values(r.answers).filter((x) => x.text.trim()).length, submissions: r.submissions });
     break;
   }
   case "fetch": {

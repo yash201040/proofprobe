@@ -6,7 +6,7 @@ ProofProbe turns any starting point into a clear, data-backed path through two-s
 
 1. **Step 1, broad probing.** Spend treg credits on real analysis, split into a few research tracks. Each track ends with the facts that would change its conclusions.
 2. **Questions.** Turn those facts into exhaustive, personalised questions, gate questions first, and end with an open "anything we missed?". Publish them with the findings so far to that person or team's own page.
-3. **They answer in their own time.** Submitting only stores a log. It never starts a job.
+3. **They answer in their own time.** Submitting only stores a log. It never starts a job. They can instead send a new direction and skip the questions, which restarts Step 1 when the owner asks.
 4. **Step 2, in-depth research.** Run this only when the owner asks. Read the latest submission and finish the research. Follow-up questions are rare, one round at most.
 5. **The path.** Publish one deterministic recommendation, or up to three alternatives with what decides between them, at the top of the same page. It must be data-backed and motivating, and say exactly what to do next.
 

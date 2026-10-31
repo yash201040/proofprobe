@@ -6,6 +6,7 @@ export interface Env { DB: D1Database; APP_VERSION: string; ADMIN_TOKEN_SHA256: 
 
 const MAX_ANSWER = 30_000;
 const MAX_DOC = 300_000;
+const MAX_REROUTE = 5_000;
 const SESSION_DAYS = 30;
 const STATUSES = ["draft", "open", "submitted", "plan_ready", "closed"];
 const TONES = ["good", "warn", "bad", "info"];
@@ -111,6 +112,8 @@ function validBlock(b: any): boolean {
 }
 const validBlocks = (v: unknown) => Array.isArray(v) && v.every(validBlock);
 
+const openReroute = (env: Env, caseId: string) =>
+  env.DB.prepare("SELECT message, at FROM reroutes WHERE case_id = ? AND handled_at IS NULL ORDER BY id DESC LIMIT 1").bind(caseId).first<{ message: string; at: string }>();
 async function costUsd(env: Env, caseId: string) {
   const r = await env.DB.prepare("SELECT COALESCE(SUM(usd_micro), 0) AS micro FROM cost_entries WHERE case_id = ?").bind(caseId).first<{ micro: number }>();
   return (r?.micro ?? 0) / 1_000_000;
@@ -193,11 +196,12 @@ async function submit(env: Env, row: CaseRow, key: string, ray: string) {
 async function directory(env: Env) {
   const profiles = await env.DB.prepare("SELECT id, slug, name FROM profiles ORDER BY created_at").all<any>();
   const pages = await env.DB.prepare(`SELECT c.profile_id, c.slug, c.title, c.status,
-    (SELECT COALESCE(SUM(e.usd_micro), 0) FROM cost_entries e WHERE e.case_id = c.id) AS micro
+    (SELECT COALESCE(SUM(e.usd_micro), 0) FROM cost_entries e WHERE e.case_id = c.id) AS micro,
+    EXISTS (SELECT 1 FROM reroutes r WHERE r.case_id = c.id AND r.handled_at IS NULL) AS rerouting
     FROM cases c WHERE c.status != 'draft' ORDER BY c.created_at`).all<any>();
   return profiles.results.map((p) => ({
     slug: p.slug, name: p.name,
-    pages: pages.results.filter((c) => c.profile_id === p.id).map((c) => ({ slug: c.slug, title: c.title, status: c.status, costUsd: c.micro / 1_000_000 })),
+    pages: pages.results.filter((c) => c.profile_id === p.id).map((c) => ({ slug: c.slug, title: c.title, status: c.status, costUsd: c.micro / 1_000_000, rerouting: !!c.rerouting })),
   })).filter((p) => p.pages.length);
 }
 
@@ -209,7 +213,7 @@ async function pageApi(request: Request, env: Env, row: CaseRow, rest: string, r
     return json({
       title: row.title, name: profile?.name ?? row.first_name, profileSlug: profile?.slug, status: row.status,
       intro: parse(row.intro_json, []), plan: parse(row.plan_json, []), costUsd: await costUsd(env, row.id),
-      hasPassword: !!row.password_hash, editable, seq: last?.seq ?? null, submittedAt: last?.submitted_at ?? null,
+      hasPassword: !!row.password_hash, editable, reroute: await openReroute(env, row.id), seq: last?.seq ?? null, submittedAt: last?.submitted_at ?? null,
       items: last ? parse(last.payload, []) : flatten(parse<Section[]>(row.questions_json, [])).map((q) => ({ ...q, answer: "" })),
       ...(editable ? { sections: parse(row.questions_json, []), answers: await currentAnswers(env, row.id), submissions: await summaries(env, row.id) } : {}),
     });
@@ -220,10 +224,24 @@ async function pageApi(request: Request, env: Env, row: CaseRow, rest: string, r
     if (token) await env.DB.prepare("DELETE FROM sessions WHERE token_hash = ?").bind(await sha256(token)).run();
     return json({ ok: true }, 200, { "Set-Cookie": `${cookieName(row.id)}=; Path=/; Max-Age=0; HttpOnly; Secure; SameSite=Strict` });
   }
-  if (!(rest === "answers" && request.method === "PUT") && !(rest === "submit" && request.method === "POST")) return notFound();
+  if (!(rest === "answers" && request.method === "PUT") && !((rest === "submit" || rest === "reroute") && request.method === "POST")) return notFound();
   if (!editable) return json({ error: "locked" }, 401);
   if (row.status === "closed") return json({ error: "closed" }, 403);
 
+  if (rest === "reroute") {
+    // This only records the request. Research restarts when the owner runs it.
+    const body = await request.json().catch(() => null) as { message?: unknown } | null;
+    const message = typeof body?.message === "string" ? body.message.trim() : "";
+    if (!message) return json({ error: "empty" }, 400);
+    if (message.length > MAX_REROUTE) return json({ error: "too_long", max: MAX_REROUTE }, 413);
+    const at = new Date().toISOString();
+    await env.DB.batch([
+      env.DB.prepare("UPDATE reroutes SET handled_at = ? WHERE case_id = ? AND handled_at IS NULL").bind(at, row.id),
+      env.DB.prepare("INSERT INTO reroutes(case_id, message, at) VALUES (?,?,?)").bind(row.id, message, at),
+      audit(env, row.id, "editor", "reroute", null, ray),
+    ]);
+    return json({ message, at });
+  }
   if (rest === "submit") {
     const body = await request.json().catch(() => null) as { key?: unknown } | null;
     if (typeof body?.key !== "string" || !/^[\w-]{8,64}$/.test(body.key)) return json({ error: "bad_request" }, 400);
@@ -261,6 +279,7 @@ async function admin(request: Request, env: Env, parts: string[], ray: string) {
     const r = await env.DB.prepare(`SELECT c.id, c.title, c.status, c.updated_at, p.name AS profile, p.slug AS profile_slug, c.slug,
       c.password_hash IS NOT NULL AS has_password,
       (SELECT COUNT(*) FROM submissions s WHERE s.case_id = c.id) AS submissions,
+      EXISTS (SELECT 1 FROM reroutes r WHERE r.case_id = c.id AND r.handled_at IS NULL) AS rerouting,
       (SELECT COALESCE(SUM(e.usd_micro), 0) / 1000000.0 FROM cost_entries e WHERE e.case_id = c.id) AS cost_usd
       FROM cases c LEFT JOIN profiles p ON p.id = c.profile_id ORDER BY c.created_at`).all();
     return json({ cases: r.results });
@@ -283,7 +302,7 @@ async function admin(request: Request, env: Env, parts: string[], ray: string) {
 
   if (!sub && request.method === "GET") {
     const p = await env.DB.prepare("SELECT slug, name FROM profiles WHERE id = ?").bind(row.profile_id).first<any>();
-    return json({ id: row.id, title: row.title, profile: p?.name, path: `/probes/${p?.slug}/${row.slug}`, status: row.status, hasPassword: !!row.password_hash, costUsd: await costUsd(env, id), sections: parse(row.questions_json, []), answers: await currentAnswers(env, id), submissions: await summaries(env, id) });
+    return json({ id: row.id, title: row.title, profile: p?.name, path: `/probes/${p?.slug}/${row.slug}`, status: row.status, hasPassword: !!row.password_hash, costUsd: await costUsd(env, id), reroute: await openReroute(env, id), sections: parse(row.questions_json, []), answers: await currentAnswers(env, id), submissions: await summaries(env, id) });
   }
   if (!sub && request.method === "PATCH") {
     const b = await request.json().catch(() => null) as { intro?: unknown; questions?: unknown; plan?: unknown; status?: string } | null;
@@ -298,6 +317,8 @@ async function admin(request: Request, env: Env, parts: string[], ray: string) {
     if (intro.length + questions.length + plan.length > MAX_DOC) return json({ error: "too_large" }, 413);
     await env.DB.batch([
       env.DB.prepare("UPDATE cases SET intro_json = ?, questions_json = ?, plan_json = ?, status = ?, updated_at = ? WHERE id = ?").bind(intro, questions, plan, b.status ?? row.status, now, id),
+      // New questions answer an open change of direction.
+      ...(b.questions !== undefined ? [env.DB.prepare("UPDATE reroutes SET handled_at = ? WHERE case_id = ? AND handled_at IS NULL").bind(now, id)] : []),
       audit(env, id, "admin", "update", Object.keys(b).join(","), ray),
     ]);
     return json({ ok: true });
@@ -325,6 +346,7 @@ async function admin(request: Request, env: Env, parts: string[], ray: string) {
       env.DB.prepare("DELETE FROM cost_entries WHERE case_id = ?").bind(id),
       env.DB.prepare("DELETE FROM submissions WHERE case_id = ?").bind(id),
       env.DB.prepare("DELETE FROM sessions WHERE case_id = ?").bind(id),
+      env.DB.prepare("DELETE FROM reroutes WHERE case_id = ?").bind(id),
       env.DB.prepare("DELETE FROM cases WHERE id = ?").bind(id),
       env.DB.prepare("DELETE FROM profiles WHERE id = ? AND NOT EXISTS (SELECT 1 FROM cases WHERE profile_id = ?)").bind(row.profile_id, row.profile_id),
       audit(env, id, "admin", "purge", null, ray),
