@@ -16,7 +16,7 @@ p{margin:0}a{color:var(--accent)}
 header{padding-block:40px 24px}.eyebrow{font:500 12.5px var(--mono);letter-spacing:.06em;text-transform:uppercase;color:var(--accent)}
 section{padding-block:28px;border-top:1px solid var(--line)}
 .stack{display:grid;gap:14px}
-.blocks{display:grid;gap:12px}.blocks ul,.blocks ol{margin:0;padding-left:22px}.blocks li{margin-top:5px}
+.blocks{display:grid;gap:12px}.blocks ul,.blocks ol{margin:0;padding-left:22px}.blocks li{margin-bottom:5px}
 .callout{background:var(--accent-soft);padding:14px 16px}.tablebox{overflow-x:auto;border:1px solid var(--line);background:var(--surface)}
 table{border-collapse:collapse;width:100%;font-size:15.5px}th,td{text-align:left;padding:9px 12px;border-bottom:1px solid var(--line);vertical-align:top}
 th{font:500 12px var(--mono);text-transform:uppercase;color:var(--muted)}tr:last-child td{border-bottom:0}
@@ -115,7 +115,7 @@ function bar(){
   const answered=ids.filter(i=>blocks[i].saved.trim()).length,un=ids.filter(dirty).length;
   $("count").textContent=saveError||(answered+" of "+ids.length+" saved"+(un?" · "+un+" unsaved":""));
   $("count").style.color=saveError?"var(--stop)":"";
-  const s=$("saveAll");s.disabled=!un||busy||closed;s.textContent=busy&&un?"Saving...":un?"Save all changes":"All changes saved";
+  const s=$("saveAll");s.disabled=!un||busy||closed;s.textContent=busy&&un?"Saving...":un||!answered?"Save all changes":"All changes saved";
   $("submit").disabled=busy||closed||un>0;
   $("submitHint").textContent=un?"Press Save all changes first. Submit unlocks once everything is saved.":"";
 }
