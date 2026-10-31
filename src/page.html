@@ -211,7 +211,7 @@ function infoBtn(text){
 }
 // The icon stays attached to the last word, so it flows with the text and is never squeezed.
 function withInfo(text,info){
-  const f=document.createDocumentFragment(),cut=text.trimEnd().lastIndexOf(" ")+1,nb=el("span",text.slice(cut),"nb");
+  const f=el("span"),cut=text.trimEnd().lastIndexOf(" ")+1,nb=el("span",text.slice(cut),"nb");
   if(cut)f.append(text.slice(0,cut));nb.appendChild(infoBtn(info));f.appendChild(nb);return f;
 }
 function fillCell(td,c){

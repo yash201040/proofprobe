@@ -173,6 +173,12 @@ ok((await round(320)) && (await round(390)) && (await round(760)) && (await roun
 await page.$eval("#intro .infobtn", (e) => e.scrollIntoView({ block: "center" })); await new Promise((r) => setTimeout(r, 200));
 await page.hover("#intro .infobtn"); await page.waitForFunction(() => !document.querySelector("#tip").hidden);
 ok(true, "hovering an info icon shows the detail");
+writeFileSync(qf + ".wrap", JSON.stringify([{ t: "section", title: "Wrap", open: true, blocks: [{ t: "table", head: ["Name", "Pay", "Time"], rows: [["A", { text: "A long value that wraps across lines", info: "Why" }, "Days"]] }] }]));
+pp("publish", first.id, "--step", "3", "--intro", qf + ".wrap");
+await page.setViewport({ width: 390, height: 800 }); await page.reload({ waitUntil: "networkidle0" }); await page.waitForSelector("#intro td");
+ok(await page.$eval("#intro td:nth-child(2)", (e) => e.children.length === 1), "text and its info icon stay together in a phone card");
+await page.setViewport({ width: 1280, height: 800 }); pp("publish", first.id, "--step", "3", "--intro", qf + ".intro"); await page.reload({ waitUntil: "networkidle0" }); await page.waitForSelector("#intro .infobtn");
+await page.$eval("#intro .infobtn", (e) => e.scrollIntoView({ block: "center" })); await new Promise((r) => setTimeout(r, 200)); await page.hover("#intro .infobtn"); await page.waitForFunction(() => !document.querySelector("#tip").hidden);
 await new Promise((r) => setTimeout(r, 250));
 const tipTop = () => page.$eval("#tip", (e) => e.getBoundingClientRect().top);
 const beforeClick = await tipTop(); await page.click("#intro .infobtn"); await new Promise((r) => setTimeout(r, 250));
