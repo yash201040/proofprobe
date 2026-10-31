@@ -142,6 +142,9 @@ th{overflow-wrap:normal}
 .lockpill{display:inline-flex;align-items:center;gap:7px;min-height:48px;padding:10px 16px;border-radius:999px;border:1px solid var(--line);background:var(--surface);color:var(--ink);font:600 16px var(--body);box-shadow:0 6px 18px rgba(0,0,0,.22);transition:transform .25s cubic-bezier(.2,1.4,.4,1)}.lockpill svg{width:18px;height:18px}.lockpill.open{color:var(--go)}.lockpill:active{transform:scale(.96)}
 @media (hover:hover){.lockpill:hover{transform:translateY(-2px)}}
 @media (max-width:420px){.lockpill span{display:none}.lockpill{padding:10px 13px}}
+#profiles,#dirEmpty{transition:filter .18s ease}
+#dirBox:has(.filterpanel:not([hidden])) #profiles,#dirBox:has(.filterpanel:not([hidden])) #dirEmpty{filter:blur(4px);pointer-events:none;user-select:none}
+@media (prefers-reduced-motion:reduce){#profiles,#dirEmpty{transition:none}}
 </style></head><body><div id="loadbar" role="progressbar" aria-label="Loading"></div><div class="wrap">
 <div class="topbar"><a class="brandlink" href="/">ProofProbe</a></div>
 <header><div class="eyebrow" id="eyebrow"></div><h1 id="title"></h1>

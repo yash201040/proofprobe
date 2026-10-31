@@ -73,6 +73,15 @@ const otherSlug = (await (await fetch(base + "/api/probes")).json()).profiles.fi
 await box("profile", otherSlug); ok((await titles()).join() === "Other goal", "status and profile combine with AND");
 await box("status", "open"); ok((await titles()).length === 0 && (await txt("#dirEmpty")).includes("match"), "no match shows a clear message");
 await page.click("#filterClear"); ok((await titles()).length === 3 && (await txt("#filterBtn")) === "Filter", "clearing filters shows everything");
+const blurred = () => page.$eval("#profiles", (e) => getComputedStyle(e).filter.includes("blur"));
+ok((await blurred()) && !(await page.$eval("#filterPanel", (e) => getComputedStyle(e).filter.includes("blur"))), "the cards blur behind an open filter panel");
+const cardPoint = await page.$eval(".pagelink", (e) => { const r = e.getBoundingClientRect(); return [r.right - 20, r.top + r.height / 2]; });
+const cardUrl = page.url(); await page.mouse.click(...cardPoint); await new Promise((r) => setTimeout(r, 150));
+ok(page.url() === cardUrl && !(await page.$eval("#filterPanel", (e) => !e.hidden)), "clicking a blurred card only closes the panel");
+await page.waitForFunction(() => !getComputedStyle(document.querySelector("#profiles")).filter.includes("blur")); ok(true, "the blur clears when the panel closes");
+await page.click("#sortBtn"); await page.waitForSelector("#sortPanel:not([hidden])"); ok(await blurred(), "the cards blur behind an open sort panel");
+await page.keyboard.press("Escape"); await page.waitForFunction(() => !getComputedStyle(document.querySelector("#profiles")).filter.includes("blur")); ok(true, "Escape clears the blur");
+await page.click("#filterBtn"); await page.waitForSelector("#filterPanel:not([hidden])");
 await page.mouse.click(5, 5); ok(!(await page.$eval("#filterPanel", (e) => !e.hidden)), "clicking away closes the filter panel");
 pp("publish", second.id, "--status", "open");
 await page.goto(base + "/probes", { waitUntil: "networkidle0" }); await page.waitForSelector(".profile.single .who");
