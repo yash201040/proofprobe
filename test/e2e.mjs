@@ -53,7 +53,17 @@ await page.click("#sortDir"); ok((await titles()).at(-1) === "Second goal", "the
 await page.select("#sortBy", "created"); await page.click("#sortDir"); ok((await titles())[0] === "First goal", "the date sort can be reversed");
 pp("publish", second.id, "--status", "plan_ready"); await page.reload({ waitUntil: "networkidle0" }); await page.waitForSelector(".pagelink");
 await page.select("#sortBy", "updated"); ok((await titles())[0] === "Second goal", "sorting by last updated works");
-await page.select("#statusBy", "plan_ready"); ok((await titles()).length === 1 && (await txt("#dirCount")) === "1 probe", "the status filter works");
+ok((await txt("#filterBtn")) === "Filter" && (await page.$("#statusBy")) === null && (await titles()).length === 3, "filters start empty and show everything");
+await page.click("#filterBtn"); await page.waitForSelector("#filterPanel:not([hidden])");
+ok((await page.$$("#filterPanel input:checked")).length === 0 && (await page.$$('#filterStatus input')).length === 5, "status options are unchecked checkboxes");
+const box = (group, value) => page.click(`#filterPanel input[data-group="${group}"][value="${value}"]`);
+await box("status", "plan_ready"); ok((await titles()).length === 1 && (await txt("#dirCount")) === "1 probe" && (await txt("#filterBtn")) === "Filter (1)", "one status filters the list");
+await box("status", "open"); ok((await titles()).length === 3, "two statuses combine with OR");
+const otherSlug = (await (await fetch(base + "/api/probes")).json()).profiles.find((p) => p.name === "Other Person").slug;
+await box("profile", otherSlug); ok((await titles()).join() === "Other goal", "status and profile combine with AND");
+await box("status", "open"); ok((await titles()).length === 0 && (await txt("#dirEmpty")).includes("match"), "no match shows a clear message");
+await page.click("#filterClear"); ok((await titles()).length === 3 && (await txt("#filterBtn")) === "Filter", "clearing filters shows everything");
+await page.mouse.click(5, 5); ok(!(await page.$eval("#filterPanel", (e) => !e.hidden)), "clicking away closes the filter panel");
 pp("publish", second.id, "--status", "open");
 await page.goto(base + "/probes", { waitUntil: "networkidle0" }); await page.waitForSelector(".profile.single .who");
 await Promise.all([page.waitForNavigation({ waitUntil: "networkidle0" }), page.click(".profile.single .who")]);

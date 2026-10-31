@@ -103,6 +103,11 @@ dialog{width:min(420px,calc(100vw - 32px));padding:22px;border:1px solid var(--l
 .pagelink.row{position:relative;overflow:hidden;margin-inline:-10px;padding-inline:10px;border-radius:6px;transition:background .18s ease}.pagelink.row:hover{background:var(--accent-soft)}.pagelink.row:hover::before{opacity:1;animation:cardflash .7s ease-out}.pagelink.row:active{transform:scale(.995)}
 @keyframes cardflash{to{left:115%}}
 @media (prefers-reduced-motion:reduce){.profile,.pagelink.row{transition:none}.profile.single:hover,.profile.single:active{transform:none}.profile.single:hover::before,.pagelink.row:hover::before{animation:none;opacity:0}}
+.filterwrap{position:relative}#filterBtn{min-height:42px;min-width:104px}#filterBtn.on{background:var(--accent);color:var(--surface)}
+.filterpanel{position:absolute;z-index:8;top:calc(100% + 8px);left:0;display:grid;gap:14px;width:min(320px,calc(100vw - 28px));max-height:min(70vh,520px);overflow:auto;padding:16px;background:var(--surface);border:1px solid var(--line);border-radius:10px;box-shadow:0 14px 34px rgba(0,0,0,.28)}
+.filterpanel fieldset{border:0;margin:0;padding:0;display:grid;gap:2px;min-width:0}.filterpanel legend{padding:0 0 6px;font:500 12px var(--mono);letter-spacing:.05em;text-transform:uppercase;color:var(--muted)}
+.dirtools .filterpanel label{display:flex;align-items:center;gap:10px;min-height:38px;padding:4px 6px;border-radius:6px;font-size:16px;font-weight:500;color:var(--ink);cursor:pointer}.filterpanel label:hover{background:var(--accent-soft)}.filterpanel input{width:18px;height:18px;flex:none;accent-color:var(--accent)}
+@media (max-width:640px){.filterwrap{flex:1 1 120px}#filterBtn{width:100%}.filterpanel{position:fixed;left:14px;right:14px;top:auto;bottom:calc(env(safe-area-inset-bottom,0px) + 14px);width:auto;max-height:70vh}}
 </style></head><body><div id="loadbar" role="progressbar" aria-label="Loading"></div><div class="wrap">
 <div class="topbar"><a class="brandlink" href="/">ProofProbe</a></div>
 <header><div class="eyebrow" id="eyebrow"></div><h1 id="title"></h1>
@@ -113,7 +118,7 @@ dialog{width:min(420px,calc(100vw - 32px));padding:22px;border:1px solid var(--l
 <div class="skel" id="skel" aria-hidden="true"><i></i><i></i><i></i></div>
 <div id="tip" role="tooltip" hidden></div>
 <div id="fatal" class="alert" hidden><p id="fatalText"></p><p style="margin-top:9px"><button type="button" id="retry">Try again</button></p></div>
-<section id="dirBox" hidden><div class="dirtools"><label for="sortBy">Sort by<select id="sortBy"><option value="created">Date created</option><option value="updated">Last updated</option><option value="profile">Profile</option><option value="cost">Cost</option></select></label><button type="button" id="sortDir" class="ghost" aria-label="Change sort direction"></button><label for="statusBy">Status<select id="statusBy"><option value="">All</option></select></label><span class="dircount" id="dirCount" role="status"></span></div><div id="profiles" class="profiles"></div><p id="dirEmpty" hidden></p></section>
+<section id="dirBox" hidden><div class="dirtools"><label for="sortBy">Sort by<select id="sortBy"><option value="created">Date created</option><option value="updated">Last updated</option><option value="profile">Profile</option><option value="cost">Cost</option></select></label><button type="button" id="sortDir" class="ghost" aria-label="Change sort direction"></button><div class="filterwrap"><button type="button" id="filterBtn" class="ghost" aria-expanded="false" aria-controls="filterPanel">Filter</button><div class="filterpanel" id="filterPanel" hidden><fieldset id="filterStatus"><legend>Status</legend></fieldset><fieldset id="filterProfile"><legend>Profile</legend></fieldset><button type="button" class="ghost" id="filterClear">Clear filters</button></div></div><span class="dircount" id="dirCount" role="status"></span></div><div id="profiles" class="profiles"></div><p id="dirEmpty" hidden></p></section>
 <section id="planBox" hidden><div class="stack"><h2>Recommended path</h2><div id="plan" class="blocks"></div></div></section>
 <section id="introBox" hidden><div id="intro" class="blocks"></div></section>
 <section id="viewQs" hidden><div class="stack"><h2>Questions and answers</h2><p id="viewNote"></p><div id="viewList" class="stack"></div></div></section>
@@ -322,15 +327,29 @@ function pageLink(p,g){
   a.appendChild(el("small","Created "+day(g.createdAt)+" · Updated "+day(g.updatedAt)+" · Research cost "+money(g.costUsd)));return a;
 }
 const SORTS={created:["Newest first","Oldest first","desc"],updated:["Latest first","Earliest first","desc"],profile:["A to Z","Z to A","asc"],cost:["Highest first","Lowest first","desc"]};
-let sortDir="desc";
+let sortDir="desc";const picked={status:new Set(),profile:new Set()};
+const STATUS_FILTERS=["open","submitted","rerouting","plan_ready","closed"];
+function filterBox(group,value,label){
+  const l=el("label"),c=el("input");c.type="checkbox";c.dataset.group=group;c.value=value;c.checked=picked[group].has(value);
+  c.addEventListener("change",()=>{if(c.checked)picked[group].add(value);else picked[group].delete(value);renderDirectory()});
+  l.append(c,document.createTextNode(label));return l;
+}
+function buildFilters(){
+  const s=$("filterStatus"),p=$("filterProfile");[...s.querySelectorAll("label"),...p.querySelectorAll("label")].forEach(x=>x.remove());
+  STATUS_FILTERS.forEach(k=>s.appendChild(filterBox("status",k,STAGE_NAME(k))));
+  directory.slice().sort((x,y)=>x.name.localeCompare(y.name,undefined,{sensitivity:"base"})).forEach(x=>p.appendChild(filterBox("profile",x.slug,x.name)));
+}
+function closeFilter(){$("filterPanel").hidden=true;$("filterBtn").setAttribute("aria-expanded","false")}
 function renderDirectory(){
-  const sort=$("sortBy").value,want=$("statusBy").value,host=$("profiles"),flip=sortDir==="asc"?1:-1;host.textContent="";
+  const sort=$("sortBy").value,host=$("profiles"),flip=sortDir==="asc"?1:-1;host.textContent="";
+  const count=picked.status.size+picked.profile.size,fb=$("filterBtn");fb.textContent=count?"Filter ("+count+")":"Filter";fb.classList.toggle("on",count>0);$("filterClear").hidden=!count;
   $("sortDir").textContent=(sortDir===SORTS[sort][2]?SORTS[sort][0]:SORTS[sort][1])+(sortDir==="asc"?" ↑":" ↓");
-  const keep=g=>!want||stageOf(g)===want;
-  const rows=directory.flatMap(p=>p.pages.filter(keep).map(g=>({p,g})));
+  // OR inside a filter type, AND between filter types. Nothing checked means everything shows.
+  const keep=(p,g)=>(!picked.status.size||picked.status.has(stageOf(g)))&&(!picked.profile.size||picked.profile.has(p.slug));
+  const rows=directory.flatMap(p=>p.pages.filter(g=>keep(p,g)).map(g=>({p,g})));
   if(sort==="profile"){
     directory.slice().sort((x,y)=>flip*x.name.localeCompare(y.name,undefined,{sensitivity:"base"})).forEach(p=>{
-      const pages=p.pages.filter(keep);if(!pages.length)return;
+      const pages=p.pages.filter(g=>keep(p,g));if(!pages.length)return;
       const c=el("article",null,"profile"+(pages.length===1?" single":""));c.appendChild(el("h2",p.name));
       pages.slice().sort((x,y)=>y.createdAt.localeCompare(x.createdAt)).forEach(g=>{const a=pageLink(p,g);if(pages.length>1)a.classList.add("row");c.appendChild(a)});host.appendChild(c);
     });
@@ -339,19 +358,20 @@ function renderDirectory(){
     rows.sort((x,y)=>flip*cmp(x,y)).forEach(({p,g})=>{const c=el("article",null,"profile single");c.append(el("div",p.name,"who"),pageLink(p,g));host.appendChild(c)});
   }
   $("dirCount").textContent=rows.length+(rows.length===1?" probe":" probes");
-  const e=$("dirEmpty");e.textContent=directory.length?"No probes have this status.":"No probes published yet.";e.hidden=rows.length>0;
+  const e=$("dirEmpty");e.textContent=directory.length?"No probes match these filters.":"No probes published yet.";e.hidden=rows.length>0;
 }
 async function showDirectory(){
   $("fatal").hidden=true;$("title").textContent="Probes";document.title="Probes";
   const r=await fetch("/api/probes");if(!r.ok)throw r;
   directory=(await r.json()).profiles;
-  const kinds=[...new Set(directory.flatMap(p=>p.pages.map(stageOf)))],sel=$("statusBy");
-  [...sel.options].slice(1).forEach(o=>o.remove());
-  kinds.forEach(k=>{const o=el("option",STAGE_NAME(k));o.value=k;sel.appendChild(o)});
+  buildFilters();
   renderDirectory();$("dirBox").hidden=false;$("notice").hidden=true;
 }
 $("sortBy").addEventListener("change",()=>{sortDir=SORTS[$("sortBy").value][2];renderDirectory()});
-$("sortDir").addEventListener("click",()=>{sortDir=sortDir==="asc"?"desc":"asc";renderDirectory()});$("statusBy").addEventListener("change",renderDirectory);
+$("sortDir").addEventListener("click",()=>{sortDir=sortDir==="asc"?"desc":"asc";renderDirectory()});$("filterBtn").addEventListener("click",e=>{e.stopPropagation();const open=$("filterPanel").hidden;$("filterPanel").hidden=!open;$("filterBtn").setAttribute("aria-expanded",String(open))});
+$("filterPanel").addEventListener("click",e=>e.stopPropagation());
+$("filterClear").addEventListener("click",()=>{picked.status.clear();picked.profile.clear();buildFilters();renderDirectory()});
+document.addEventListener("click",closeFilter);document.addEventListener("keydown",e=>{if(e.key==="Escape")closeFilter()});
 async function route(){
   try{if(onPage)await showPage();else await showDirectory()}
   catch(e){fail(e&&e.status===404?"This page doesn't exist.":"We couldn't load this page. Check your connection and try again.")}
