@@ -29,7 +29,7 @@ switch (cmd) {
     break;
   }
   case "new": {
-    const r = await api("POST", "/cases", { title: flag(a, "title"), firstName: flag(a, "name"), groupVisible: !a.includes("--hidden") });
+    const r = await api("POST", "/cases", { title: flag(a, "title"), firstName: flag(a, "name") });
     const c = cfg(); c.links[r.id] = c.baseUrl + "/c/" + r.token; saveCfg(c);
     mkdirSync(join(ROOT, ".gap/cases", r.id), { recursive: true });
     out({ id: r.id, link: c.links[r.id], folder: join(ROOT, ".gap/cases", r.id) });
@@ -62,5 +62,5 @@ switch (cmd) {
     break;
   }
   case "purge": out(await api("DELETE", "/cases/" + a[0])); break;
-  default: console.log("gap init [--url U] | new --name N --title T [--hidden] | cost ID USD [label] | publish ID [--intro F] [--questions F] [--plan F] [--status S] | list | link ID | status ID | fetch ID [--seq N] [--out F] | purge ID");
+  default: console.log("gap init [--url U] | new --name N --title T | cost ID USD [label] | publish ID [--intro F] [--questions F] [--plan F] [--status S] | list | link ID | status ID | fetch ID [--seq N] [--out F] | purge ID");
 }

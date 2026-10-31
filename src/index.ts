@@ -38,7 +38,7 @@ function log(env: Env, ray: string, level: string, msg: string, extra: Record<st
 
 interface Question { id: string; text: string; why?: string }
 interface Section { title: string; note?: string; first?: boolean; questions: Question[] }
-interface CaseRow { id: string; title: string; first_name: string; status: string; group_visible: number; intro_json: string; questions_json: string; plan_json: string; created_at: string; updated_at: string }
+interface CaseRow { id: string; title: string; first_name: string; status: string; intro_json: string; questions_json: string; plan_json: string; created_at: string; updated_at: string }
 
 function flatten(sections: Section[]) {
   return sections.flatMap((s) => s.questions.map((q) => ({ id: q.id, section: s.title, question: q.text })));
@@ -114,31 +114,24 @@ async function respondent(request: Request, env: Env, row: CaseRow, rest: string
       title: row.title, firstName: row.first_name, status: row.status,
       intro: parse(row.intro_json, []), sections: parse(row.questions_json, []), plan: parse(row.plan_json, []),
       answers: await currentAnswers(env, row.id), submissions: await summaries(env, row.id),
-      costUsd: await costUsd(env, row.id), groupVisible: !!row.group_visible,
+      costUsd: await costUsd(env, row.id),
     });
   }
   if (rest === "api/group" && request.method === "GET") {
-    const r = await env.DB.prepare(`SELECT c.id, c.first_name, c.title, c.status, c.group_visible,
+    const r = await env.DB.prepare(`SELECT c.id, c.first_name, c.title, c.status,
       (SELECT COALESCE(SUM(e.usd_micro), 0) FROM cost_entries e WHERE e.case_id = c.id) AS micro
       FROM cases c WHERE c.status != 'draft' OR c.id = ? ORDER BY c.created_at`).bind(row.id).all();
-    return json({ people: r.results.map((x: any) => ({ id: x.id, firstName: x.first_name, title: x.title, status: x.status, visible: !!x.group_visible, costUsd: x.micro / 1_000_000, mine: x.id === row.id })) });
+    return json({ people: r.results.map((x: any) => ({ id: x.id, firstName: x.first_name, title: x.title, status: x.status, costUsd: x.micro / 1_000_000, mine: x.id === row.id })) });
   }
   const view = rest.match(/^api\/view\/([\w-]{1,40})$/);
   if (view && request.method === "GET") {
     const other = await env.DB.prepare("SELECT * FROM cases WHERE id = ?").bind(view[1]).first<CaseRow>();
     if (!other) return json({ error: "not_found" }, 404);
-    if (!other.group_visible && other.id !== row.id) return json({ error: "hidden", firstName: other.first_name }, 403);
-    // Answers are deliberately absent: other people can read the research, questions and plan only.
-    return json({ title: other.title, firstName: other.first_name, status: other.status, intro: parse(other.intro_json, []), sections: parse(other.questions_json, []), plan: parse(other.plan_json, []), costUsd: await costUsd(env, other.id) });
-  }
-  if (rest === "api/visibility" && request.method === "PUT") {
-    const body = await request.json().catch(() => null) as { visible?: unknown } | null;
-    if (typeof body?.visible !== "boolean") return json({ error: "bad_request" }, 400);
-    await env.DB.batch([
-      env.DB.prepare("UPDATE cases SET group_visible = ?, updated_at = ? WHERE id = ?").bind(body.visible ? 1 : 0, new Date().toISOString(), row.id),
-      audit(env, row.id, "respondent", "visibility", String(body.visible), ray),
-    ]);
-    return json({ visible: body.visible });
+    // Read only, and only submitted answers: drafts stay private until that person submits.
+    const last = await env.DB.prepare("SELECT seq, submitted_at, payload FROM submissions WHERE case_id = ? ORDER BY seq DESC LIMIT 1").bind(other.id).first<any>();
+    return json({ title: other.title, firstName: other.first_name, status: other.status, intro: parse(other.intro_json, []), plan: parse(other.plan_json, []), costUsd: await costUsd(env, other.id),
+      submittedAt: last?.submitted_at ?? null, seq: last?.seq ?? null,
+      items: last ? parse(last.payload, []) : flatten(parse<Section[]>(other.questions_json, [])).map((q) => ({ ...q, answer: "" })) });
   }
   if (rest === "api/answers" && request.method === "PUT") {
     if (row.status === "closed") return json({ error: "closed" }, 403);
@@ -175,16 +168,16 @@ async function admin(request: Request, env: Env, parts: string[], ray: string) {
   const now = new Date().toISOString();
 
   if (!id && request.method === "GET") {
-    const r = await env.DB.prepare("SELECT c.id, c.title, c.first_name, c.status, c.group_visible, c.updated_at, (SELECT COUNT(*) FROM submissions s WHERE s.case_id = c.id) AS submissions, (SELECT COALESCE(SUM(e.usd_micro), 0) / 1000000.0 FROM cost_entries e WHERE e.case_id = c.id) AS cost_usd FROM cases c ORDER BY c.created_at").all();
+    const r = await env.DB.prepare("SELECT c.id, c.title, c.first_name, c.status, c.updated_at, (SELECT COUNT(*) FROM submissions s WHERE s.case_id = c.id) AS submissions, (SELECT COALESCE(SUM(e.usd_micro), 0) / 1000000.0 FROM cost_entries e WHERE e.case_id = c.id) AS cost_usd FROM cases c ORDER BY c.created_at").all();
     return json({ cases: r.results });
   }
   if (!id && request.method === "POST") {
-    const b = await request.json().catch(() => null) as { title?: string; firstName?: string; groupVisible?: boolean } | null;
+    const b = await request.json().catch(() => null) as { title?: string; firstName?: string } | null;
     if (!b?.title || !b.firstName) return json({ error: "title and firstName required" }, 400);
     const caseId = crypto.randomUUID().slice(0, 8);
     const token = randomToken();
     await env.DB.batch([
-      env.DB.prepare("INSERT INTO cases(id, token_hash, title, first_name, group_visible, created_at, updated_at) VALUES (?,?,?,?,?,?,?)").bind(caseId, await sha256(token), b.title, b.firstName, b.groupVisible === false ? 0 : 1, now, now),
+      env.DB.prepare("INSERT INTO cases(id, token_hash, title, first_name, created_at, updated_at) VALUES (?,?,?,?,?,?)").bind(caseId, await sha256(token), b.title, b.firstName, now, now),
       audit(env, caseId, "admin", "create", null, ray),
     ]);
     return json({ id: caseId, token }, 201);
@@ -194,7 +187,7 @@ async function admin(request: Request, env: Env, parts: string[], ray: string) {
   if (!row) return json({ error: "not_found" }, 404);
 
   if (!sub && request.method === "GET") {
-    return json({ id: row.id, title: row.title, firstName: row.first_name, status: row.status, groupVisible: !!row.group_visible, costUsd: await costUsd(env, id), sections: parse(row.questions_json, []), answers: await currentAnswers(env, id), submissions: await summaries(env, id) });
+    return json({ id: row.id, title: row.title, firstName: row.first_name, status: row.status, costUsd: await costUsd(env, id), sections: parse(row.questions_json, []), answers: await currentAnswers(env, id), submissions: await summaries(env, id) });
   }
   if (!sub && request.method === "PATCH") {
     const b = await request.json().catch(() => null) as { intro?: unknown; questions?: unknown; plan?: unknown; status?: string } | null;

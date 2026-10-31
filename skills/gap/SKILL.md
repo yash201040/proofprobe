@@ -5,7 +5,7 @@ description: Use when the user wants to bridge someone's skills to a goal, such 
 
 # Knowledge Gap
 
-Turn a person's profile plus a goal into researched questions, then a plan with the least resistance to that goal. Never jump to a course before the answers are in.
+Two-step research. Step 1 is broad probing that ends in personalised questions. Step 2 is in-depth research on their answers that surfaces the trajectories worth their time. Never jump to a course before the answers are in. Submitting never starts anything: run stage 2 only when the user asks.
 
 Project: `/Users/guts/HOME/Coding/Projects/personal/knowledge-gap`. Run the helper from there: `node bin/gap.mjs <command>`. Keep working files in `.gap/cases/<id>/`.
 
@@ -46,9 +46,8 @@ Blocks for `intro.json` and `plan.json` are an array of: `{"t":"h2"|"h3"|"p"|"ca
 
 ## Rules
 
-- Keep CV contents local. Never send a CV to treg or any outside service, and put only what is needed on the page.
-- Use first names only on pages. Links are private but not sign-in protected.
-- Everyone with a case link can browse the other pages in the group unless that person hides theirs. They see intro, questions, plan and cost, never answers. Write intro and plan with that audience in mind.
-- If a page would expose something sensitive, such as side work at a current employer, create it with `gap new --hidden` and tell the user. The person can turn sharing on from their own page.
+- Never send a CV to treg or any outside service.
+- Pages are for a closed friend group, and a notice on every page says so. Anyone with a personal link can read every page, including submitted answers, read only. Only that link's owner can change their own answers. Give each person their own link.
+- Goals may be hypothetical, but research them seriously.
 - Never advise hiding work from an employer, or misrepresenting experience to an interviewer.
 - End with tools used, total cost, verified versus inferred, and gaps.

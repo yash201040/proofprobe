@@ -19,11 +19,12 @@ Local run: put `ADMIN_TOKEN_SHA256=<hash>` in `.dev.vars`, run `npm run dev`, th
 
 ## Data rules
 
-- Every person has a separate page. Anyone with a case link can browse the others read-only, and each person can hide their page. Answers are never returned to anyone else.
+- Sharing: send each person their own link. There is no login, password or email. A closed friend group can read every page and submitted answers, and a notice says so. Only a person's own link can change their answers.
+- Submitting stores a log and starts nothing. Research continues only when `/gap` is run.
 - The cost shown on a page is treg data spend logged with `gap cost`. Claude usage is not included.
 - Submissions are append-only. A database trigger blocks updates, and each log stores a SHA-256 so corruption is detectable.
 - Page content is rendered as text only, so stored content cannot inject markup.
-- CVs and research notes stay in `.gap/` on this machine, which git ignores. Only questions, intro and plan go to the server.
+- CVs and research notes stay in `.gap/` on this machine, which git ignores. Only questions, intro, plan and costs go to the server.
 - Answer text and tokens are never logged.
 
 ## Platform guide deviations

@@ -33,23 +33,22 @@ textarea{grid-column:2;width:100%;min-height:76px;margin-top:7px;padding:8px 10p
 .state{font-size:14.5px;color:var(--muted)}.state.ok{color:var(--go)}.state.warn{color:var(--wait)}.state.err{color:var(--stop)}
 .alert{background:var(--stop-soft);padding:14px 16px}.log{list-style:none;padding:0;margin:10px 0 0;font-size:15.5px;color:var(--muted)}.log:empty{display:none}
 .tabs{display:flex;gap:18px;padding-block:14px;border-bottom:1px solid var(--line)}.tabs a{font-weight:600;font-size:15px;color:var(--muted);text-decoration:none}.tabs a.on{color:var(--accent)}
-.cost{font:500 14px var(--mono);color:var(--muted);margin-top:10px}.share{display:flex;gap:8px;align-items:flex-start;margin-top:12px;font-size:15.5px;max-width:68ch}.share input{margin-top:5px}
-#viewList{margin:0;padding-left:24px;max-width:68ch}#viewList li{margin-top:7px}
+.cost{font:500 14px var(--mono);color:var(--muted);margin-top:10px}
+.notice{padding-block:22px 40px;border-top:1px solid var(--line);font-size:15px;color:var(--muted);max-width:68ch}.qa b{display:block;font-weight:600}.qa p{white-space:pre-wrap;color:var(--muted);margin-top:3px}.qa p.has{color:var(--ink)}
 </style></head><body><div class="wrap">
 <nav class="tabs" aria-label="Pages"><a href="#mine" id="tabMine">My page</a><a href="#group" id="tabGroup">Group</a></nav>
 <header><div class="eyebrow" id="eyebrow">Loading</div><h1 id="title">Knowledge Gap</h1>
   <p class="cost" id="cost" hidden></p>
-  <label class="share" id="shareBox" hidden><input type="checkbox" id="share"> <span>Let others in the group view this page. They see the research, questions, plan and cost, never your answers.</span></label>
 </header>
 <div id="fatal" class="alert" hidden><p id="fatalText"></p><p style="margin-top:9px"><button type="button" id="retry">Try again</button></p></div>
-<section id="groupBox" hidden><div class="stack"><p>Everyone's page is separate. Open one to see how they're using this. Answers are never shown here.</p><div class="tablebox"><table><thead><tr><th>Person</th><th>Goal</th><th>Stage</th><th>Research cost</th></tr></thead><tbody id="people"></tbody></table></div></div></section>
-<section id="viewQs" hidden><div class="stack"><h2>Questions asked</h2><p>Answers are private to this person.</p><ol id="viewList"></ol></div></section>
+<section id="groupBox" hidden><div class="stack"><p>Everyone has their own page. Open one to see how they're using this. Other people's pages are read only.</p><div class="tablebox"><table><thead><tr><th>Person</th><th>Goal</th><th>Stage</th><th>Research cost</th></tr></thead><tbody id="people"></tbody></table></div></div></section>
+<section id="viewQs" hidden><div class="stack"><h2>Questions and answers</h2><p id="viewNote"></p><div id="viewList" class="stack"></div></div></section>
 <section id="planBox" hidden><div class="stack"><h2>Your plan</h2><div id="plan" class="blocks"></div></div></section>
 <section id="introBox" hidden><div id="intro" class="blocks"></div></section>
 <section id="qBox" hidden><div class="stack">
   <h2 id="qTitle">Questions</h2>
   <p><strong>How this works:</strong> the Save all changes button lights up whenever you type, and stays on screen as you scroll. Press it to store your answers online. You can then stop, refresh or come back later on any device using this same link. When you're done, press Submit answers at the end. You can edit, save and submit again, and every submission is kept.</p>
-  <p>Your answers are read by the friend who sent you this link, with Claude's help. Other people in the group never see them. Keep this link private, because anyone who has it can read and change your answers.</p>
+  <p>This link is your personal one, so please don't forward it. Anyone who has it can change your answers.</p>
   <div class="bar"><span class="count" id="count" role="status"></span><button type="button" id="saveAll" disabled>Save all changes</button></div>
   <form id="form" class="stack" autocomplete="off"></form>
   <div class="sec"><h3>Finished?<small>This sends your saved answers. You can come back, change anything and submit again.</small></h3>
@@ -57,6 +56,7 @@ textarea{grid-column:2;width:100%;min-height:76px;margin-top:7px;padding:8px 10p
     <p id="submitHint" class="state warn" style="margin-top:8px"></p>
     <p id="submitStatus" role="status" style="margin-top:10px"></p><ul id="log" class="log"></ul></div>
 </div></section>
+<footer class="notice">Privacy: everything here, including your submitted answers and any documents you share, can be seen and downloaded by the few people in this friend group. Saved answers stay out of their view until you submit. Only you can change your own answers.</footer>
 </div>
 <script>
 const API=location.pathname.replace(/\/+$/,"")+"/api";
@@ -146,6 +146,7 @@ $("submit").addEventListener("click",async()=>{
     const nums=r.changed.map(i=>"Q"+(blocks[i]?blocks[i].n:i));
     const change=r.seq>1?(nums.length?" Changed since last time: "+nums.join(", ")+".":" Nothing changed since last time."):"";
     st.textContent="Submission "+r.seq+" received with "+r.answered+" of "+r.total+" answers."+change+" You can close this page.";
+    busy=false;bar();
     const d=await fetch(API+"/case").then(x=>x.json()).catch(()=>null);if(d)renderLog(d.submissions);
   }catch(e){st.textContent="Your submission wasn't confirmed. Check your connection and press Submit answers again."}
   busy=false;bar();
@@ -162,7 +163,7 @@ function heading(d){
 function tabs(on){$("tabMine").className=on==="mine"?"on":"";$("tabGroup").className=on==="group"?"on":""}
 function fail(m){$("fatalText").textContent=m;$("fatal").hidden=false}
 function showMine(d){
-  hideAll();tabs("mine");heading(d);$("shareBox").hidden=false;$("share").checked=d.groupVisible;
+  hideAll();tabs("mine");heading(d);
   if(d.plan.length){renderBlocks($("plan"),d.plan);$("planBox").hidden=false}
   if(d.intro.length){renderBlocks($("intro"),d.intro);$("introBox").hidden=false}
   if(d.sections.length)$("qBox").hidden=false;
@@ -186,26 +187,26 @@ async function loadMine(){
   return d;
 }
 async function showGroup(){
-  hideAll();tabs("group");$("shareBox").hidden=true;$("cost").hidden=true;$("eyebrow").textContent="Group";$("title").textContent="Everyone's pages";document.title="Group";
+  hideAll();tabs("group");$("cost").hidden=true;$("eyebrow").textContent="Group";$("title").textContent="Everyone's pages";document.title="Group";
   const r=await fetch(API+"/group");if(!r.ok)throw new Error("http");
   const d=await r.json(),body=$("people");body.textContent="";
   d.people.forEach(p=>{
-    const tr=el("tr"),who=el("td");
-    if(p.visible||p.mine){const a=el("a",p.firstName+(p.mine?" (you)":""));a.href=p.mine?"#mine":"#view-"+p.id;who.appendChild(a)}else who.textContent=p.firstName;
-    tr.append(who,el("td",p.visible||p.mine?p.title:"Hidden by this person"),el("td",STAGE[p.status]||p.status),el("td",money(p.costUsd)));body.appendChild(tr);
+    const tr=el("tr"),who=el("td"),a=el("a",p.firstName+(p.mine?" (you)":""));a.href=p.mine?"#mine":"#view-"+p.id;who.appendChild(a);
+    tr.append(who,el("td",p.title),el("td",STAGE[p.status]||p.status),el("td",money(p.costUsd)));body.appendChild(tr);
   });
   $("groupBox").hidden=false;
 }
 async function showOther(id){
-  hideAll();tabs("group");$("shareBox").hidden=true;
+  hideAll();tabs("group");
   const r=await fetch(API+"/view/"+encodeURIComponent(id));
-  if(r.status===403){location.hash="#group";return}
   if(!r.ok)throw new Error("http");
   const d=await r.json();heading(d);$("eyebrow").textContent=d.firstName+"'s page · read only";
   if(d.plan.length){renderBlocks($("plan"),d.plan);$("planBox").hidden=false}
   if(d.intro.length){renderBlocks($("intro"),d.intro);$("introBox").hidden=false}
-  const l=$("viewList");l.textContent="";d.sections.forEach(s=>s.questions.forEach(q=>l.appendChild(el("li",q.text))));
-  $("viewQs").hidden=!d.sections.length;
+  $("viewNote").textContent=d.seq?"Submission "+d.seq+", "+fmt(d.submittedAt)+". Read only.":"No answers submitted yet.";
+  const l=$("viewList");l.textContent="";
+  d.items.forEach((q,i)=>{const w=el("div",null,"qa");w.appendChild(el("b",(i+1)+". "+q.question));const has=!!q.answer.trim();if(d.seq)w.appendChild(el("p",has?q.answer:"Not answered",has?"has":""));l.appendChild(w)});
+  $("viewQs").hidden=!d.items.length;
 }
 async function route(){
   const h=location.hash.slice(1);
@@ -215,11 +216,6 @@ async function route(){
     else showMine(await loadMine());
   }catch(e){fail("We couldn't load this page. Check your connection and try again.")}
 }
-$("share").addEventListener("change",async e=>{
-  const want=e.target.checked;
-  try{await call("/visibility",{method:"PUT",body:JSON.stringify({visible:want})})}
-  catch(err){e.target.checked=!want;fail("That setting wasn't saved. Check your connection and try again.")}
-});
 window.addEventListener("hashchange",route);
 $("retry").addEventListener("click",route);
 loadMine().catch(()=>{}).then(route);
