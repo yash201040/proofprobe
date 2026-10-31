@@ -68,12 +68,19 @@ Keep question ids stable when revising, so saved answers stay attached.
 
 Blocks for `intro.json` and `plan.json` are an array of: `{"t":"section","title":"","note":"","open":true,"blocks":[]}`, `{"t":"h2"|"h3"|"p"|"callout","text":""}`, `{"t":"ul"|"ol","items":[]}`, `{"t":"table","head":[],"rows":[[]]}`, `{"t":"links","links":[{"label":"","url":"https://…","note":""}]}`. Everything renders as plain text.
 
-**How pages must read:**
-- Use tables by default. Reach for a comparison table before a paragraph or a bullet list.
-- Grade with colour. A table cell can be `{"text":"High","tone":"good"}`, with tones `good`, `warn`, `bad` and `info`. Use them for ratings, risk, fit and confidence, and keep them consistent.
-- Put everything in collapsible `section` blocks, each with a short `note`. Leave only the first one or two `open`.
-- Open with a short plain summary of what matters.
-- Keep prose rare and short: simple words, one idea per sentence, two sentences at most in a table cell. Write for a smart friend outside the field.
+Also: `{"t":"bars","title":"","max":10,"items":[{"label":"","value":8,"text":"8/10","note":""}]}` for a bar chart, and table cells of `{"text":"High","tone":"good"}` for a coloured grade or `{"text":"8/10","score":8,"max":10}` for a small meter. Tones are `good`, `warn`, `bad` and `info`.
+
+## How every page must read
+
+These rules apply to every `intro.json` and `plan.json`. Check the page against them before publishing.
+
+- **Tables first.** Use as many comparison tables as the content supports. Before writing prose, ask what is being compared and on which dimensions.
+- **Make tables detailed.** Choose columns that help a decision, such as cost, time, effort, risk, fit, demand and evidence strength. Mix data types: money, ranges, dates, ratings, yes or no, and short text. Use a separate table when a topic needs different columns.
+- **Show it visually.** Use a coloured grade for ratings, risk, fit and confidence, a meter for scores, and bars to compare one number across options. Keep colours meaning the same thing throughout: `good` is favourable, `warn` is mixed, `bad` is a blocker, and `info` is neutral.
+- **Keep charts honest.** Use one unit per chart, and never chart different units together. Don't invent precision: label estimates as estimates, and show the source and strength of each key number.
+- **Fold everything.** Put all content in `section` blocks with a short `note`. Leave only the first one or two `open`.
+- **Open with the answer.** Start with a short summary and a table of what decides the outcome.
+- **Keep words short.** Use short paragraphs or bullets only for what a table can't hold. Use simple words, one idea per sentence, and two sentences at most in a table cell. Write for a smart friend outside the field.
 
 ## Step 2: in-depth research
 

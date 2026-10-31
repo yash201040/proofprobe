@@ -43,6 +43,9 @@ textarea{grid-column:2;width:100%;min-height:76px;margin-top:7px;padding:8px 10p
 .notice{padding-block:22px 40px;border-top:1px solid var(--line);font-size:15px;color:var(--muted)}.qa b{display:block;font-weight:600}.qa p{white-space:pre-wrap;color:var(--muted);margin-top:3px}.qa p.has{color:var(--ink)}
 #viewList{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,520px),1fr));gap:18px 36px}
 @media (min-width:1100px){.blocks ul{columns:2;column-gap:44px}.blocks li{break-inside:avoid}}
+.bars{display:grid;gap:7px}.bars h3{font-size:17px}.barrow{display:grid;grid-template-columns:minmax(0,260px) minmax(0,1fr) 72px;gap:12px;align-items:center;min-height:28px}.track{height:10px;background:var(--zebra);border-radius:0 4px 4px 0;overflow:hidden}.fill{display:block;height:100%;background:var(--accent);border-radius:0 4px 4px 0}.barval{font-variant-numeric:tabular-nums;font-weight:600;text-align:right}
+.meter{display:grid;grid-template-columns:minmax(40px,84px) auto;gap:8px;align-items:center;font-variant-numeric:tabular-nums;font-weight:600}
+@media (max-width:640px){.barrow{grid-template-columns:minmax(0,1fr) 64px}.barrow .track{grid-column:1/-1;grid-row:2}}
 .you{color:var(--muted);font-size:14px;margin-left:6px}
 </style></head><body><div class="wrap">
 <nav class="tabs" aria-label="Pages"><a href="#mine" id="tabMine">This page</a><a href="#group" id="tabGroup">Group</a></nav>
@@ -79,12 +82,14 @@ const blocks={},sectionCounts=[];let ids=[],submitKey=null,busy=false,closed=fal
 function el(tag,text,cls){const e=document.createElement(tag);if(text!=null)e.textContent=text;if(cls)e.className=cls;return e}
 function safeUrl(u){try{const x=new URL(u);return x.protocol==="https:"?x.href:null}catch(e){return null}}
 // Content blocks are rendered as text only, so nothing stored can inject markup.
-function fillCell(td,c){if(typeof c==="string"){td.textContent=c;return}const t=["good","warn","bad","info"].includes(c.tone)?" "+c.tone:"";td.appendChild(el("span",c.text,t?"chip"+t:null))}
+function track(value,max){const t=el("span",null,"track"),f=el("span",null,"fill");f.style.width=Math.min(100,max>0?value/max*100:0)+"%";t.appendChild(f);return t}
+function fillCell(td,c){if(typeof c==="string"){td.textContent=c;return}if(typeof c.score==="number"){const m=el("span",null,"meter");m.title=c.text;m.append(track(c.score,c.max||10),el("span",c.text));td.appendChild(m);return}const t=["good","warn","bad","info"].includes(c.tone)?" "+c.tone:"";td.appendChild(el("span",c.text,t?"chip"+t:null))}
 function renderBlocks(host,list){
   host.textContent="";
   list.forEach(b=>{try{
     if(b.t==="section"){const d=el("details",null,"fold"),s=el("summary");d.open=!!b.open;s.appendChild(el("span",b.title));if(b.note)s.appendChild(el("small",b.note));const inner=el("div",null,"blocks");renderBlocks(inner,b.blocks);d.append(s,inner);host.appendChild(d)}
     else if(b.t==="h2"||b.t==="h3"||b.t==="p")host.appendChild(el(b.t,b.text));
+    else if(b.t==="bars"){const box=el("div",null,"bars");box.appendChild(el("h3",b.title));const max=b.max||Math.max(...b.items.map(i=>i.value),1);b.items.forEach(i=>{const r=el("div",null,"barrow"),v=i.text||String(i.value);r.title=i.label+": "+v+(i.note?". "+i.note:"");r.append(el("span",i.label),track(i.value,max),el("span",v,"barval"));box.appendChild(r)});host.appendChild(box)}
     else if(b.t==="callout")host.appendChild(el("p",b.text,"callout"));
     else if(b.t==="ul"||b.t==="ol"){const l=el(b.t);(b.items||[]).forEach(i=>l.appendChild(el("li",i)));host.appendChild(l)}
     else if(b.t==="links"){const l=el("ul");(b.links||[]).forEach(k=>{const u=safeUrl(k.url);const li=el("li");if(u){const a=el("a",k.label||u);a.href=u;a.target="_blank";a.rel="noopener noreferrer";li.appendChild(a)}else li.textContent=k.label||"";if(k.note)li.appendChild(document.createTextNode(" "+k.note));l.appendChild(li)});host.appendChild(l)}
