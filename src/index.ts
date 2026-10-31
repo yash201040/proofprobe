@@ -56,10 +56,13 @@ function validSections(v: unknown): v is Section[] {
   return true;
 }
 const isStrings = (v: unknown) => Array.isArray(v) && v.every((x) => typeof x === "string");
+const TONES = ["good", "warn", "bad", "info"];
+const isCell = (c: any) => typeof c === "string" || (typeof c?.text === "string" && (c.tone === undefined || TONES.includes(c.tone)));
 function validBlock(b: any): boolean {
+  if (b?.t === "section") return typeof b.title === "string" && Array.isArray(b.blocks) && b.blocks.every(validBlock);
   if (["h2", "h3", "p", "callout"].includes(b?.t)) return typeof b.text === "string";
   if (b?.t === "ul" || b?.t === "ol") return isStrings(b.items);
-  if (b?.t === "table") return isStrings(b.head) && Array.isArray(b.rows) && b.rows.every(isStrings);
+  if (b?.t === "table") return isStrings(b.head) && Array.isArray(b.rows) && b.rows.every((r: unknown) => Array.isArray(r) && r.every(isCell));
   if (b?.t === "links") return Array.isArray(b.links) && b.links.every((k: any) => typeof k?.url === "string");
   return false;
 }

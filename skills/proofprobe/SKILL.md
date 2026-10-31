@@ -66,7 +66,14 @@ Then carry on with Step 2 as normal.
 ```
 Keep question ids stable when revising, so saved answers stay attached.
 
-Blocks for `intro.json` and `plan.json` are an array of: `{"t":"h2"|"h3"|"p"|"callout","text":""}`, `{"t":"ul"|"ol","items":[]}`, `{"t":"table","head":[],"rows":[[]]}`, `{"t":"links","links":[{"label":"","url":"https://…","note":""}]}`. Everything renders as plain text.
+Blocks for `intro.json` and `plan.json` are an array of: `{"t":"section","title":"","note":"","open":true,"blocks":[]}`, `{"t":"h2"|"h3"|"p"|"callout","text":""}`, `{"t":"ul"|"ol","items":[]}`, `{"t":"table","head":[],"rows":[[]]}`, `{"t":"links","links":[{"label":"","url":"https://…","note":""}]}`. Everything renders as plain text.
+
+**How pages must read:**
+- Use tables by default. Reach for a comparison table before a paragraph or a bullet list.
+- Grade with colour. A table cell can be `{"text":"High","tone":"good"}`, with tones `good`, `warn`, `bad` and `info`. Use them for ratings, risk, fit and confidence, and keep them consistent.
+- Put everything in collapsible `section` blocks, each with a short `note`. Leave only the first one or two `open`.
+- Open with a short plain summary of what matters.
+- Keep prose rare and short: simple words, one idea per sentence, two sentences at most in a table cell. Write for a smart friend outside the field.
 
 ## Step 2: in-depth research
 

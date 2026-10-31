@@ -3,9 +3,9 @@
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Familjen+Grotesk:wght@500;700&family=Source+Sans+3:wght@400;600;700&family=JetBrains+Mono:wght@500&display=swap">
 <style>
 /* A signal chart: the page clears gates in order, and state shows as go / caution / stop. */
-:root{--bg:#EDF1EF;--surface:#FBFCFB;--ink:#15242B;--muted:#50626A;--line:#C8D3D0;--accent:#0A6670;--accent-soft:#D5E8E7;--go:#1B7249;--wait:#8F5B00;--stop:#A8352B;--stop-soft:#F6DDD9;
+:root{--bg:#EDF1EF;--surface:#FBFCFB;--ink:#15242B;--muted:#50626A;--line:#C8D3D0;--accent:#0A6670;--accent-soft:#D5E8E7;--go:#1B7249;--go-soft:#D9EEE2;--wait:#8F5B00;--wait-soft:#F5E8CC;--stop:#A8352B;--stop-soft:#F6DDD9;--info:#1F5F99;--info-soft:#DBE8F5;--zebra:#F1F5F3;
 --display:"Familjen Grotesk","Segoe UI",system-ui,sans-serif;--body:"Source Sans 3","Segoe UI",system-ui,sans-serif;--mono:"JetBrains Mono",ui-monospace,Menlo,monospace}
-@media (prefers-color-scheme:dark){:root{--bg:#0F181C;--surface:#172329;--ink:#E5EEEE;--muted:#A0B1B6;--line:#31424A;--accent:#5FC6C9;--accent-soft:#17383D;--go:#6FD09D;--wait:#E9BC68;--stop:#F0978C;--stop-soft:#42201C;color-scheme:dark}}
+@media (prefers-color-scheme:dark){:root{--bg:#0F181C;--surface:#172329;--ink:#E5EEEE;--muted:#A0B1B6;--line:#31424A;--accent:#5FC6C9;--accent-soft:#17383D;--go:#6FD09D;--go-soft:#153527;--wait:#E9BC68;--wait-soft:#3A2C12;--stop:#F0978C;--stop-soft:#42201C;--info:#8FC1F0;--info-soft:#16304A;--zebra:#1C2A31;color-scheme:dark}}
 *{box-sizing:border-box}[hidden]{display:none!important}
 body{margin:0;background:var(--bg);color:var(--ink);font:400 17px/1.55 var(--body)}
 .wrap{max-width:1440px;margin:0 auto;padding-inline:max(16px,env(safe-area-inset-left,0px)) max(16px,env(safe-area-inset-right,0px))}
@@ -19,7 +19,13 @@ section{padding-block:28px;border-top:1px solid var(--line)}
 .blocks{display:grid;gap:12px}.blocks ul,.blocks ol{margin:0;padding-left:22px}.blocks li{margin-bottom:5px}
 .callout{background:var(--accent-soft);padding:14px 16px}.tablebox{overflow-x:auto;border:1px solid var(--line);background:var(--surface)}
 table{border-collapse:collapse;width:100%;font-size:15.5px}th,td{text-align:left;padding:9px 12px;border-bottom:1px solid var(--line);vertical-align:top}
-th{font:500 12px var(--mono);text-transform:uppercase;color:var(--muted)}tr:last-child td{border-bottom:0}
+th{font:500 12px var(--mono);text-transform:uppercase;color:var(--muted)}tr:last-child td{border-bottom:0}thead th{background:var(--accent-soft);color:var(--ink)}tbody tr:nth-child(even) td{background:var(--zebra)}td:first-child{font-weight:600}
+.chip{display:inline-block;padding:2px 9px;border-radius:999px;font-weight:600;font-size:14.5px;line-height:1.35}.chip.good{color:var(--go);background:var(--go-soft)}.chip.warn{color:var(--wait);background:var(--wait-soft)}.chip.bad{color:var(--stop);background:var(--stop-soft)}.chip.info{color:var(--info);background:var(--info-soft)}
+details>summary{cursor:pointer;list-style:none}details>summary::-webkit-details-marker{display:none}
+.fold{background:var(--surface);border:1px solid var(--line)}.fold>summary{display:flex;flex-wrap:wrap;gap:2px 10px;align-items:baseline;padding:14px 16px;font:700 20px/1.2 var(--display)}.fold>summary small{font:400 15.5px var(--body);color:var(--muted)}.fold>.blocks{padding:0 16px 16px}
+summary::before{content:"▸";color:var(--accent);margin-right:8px;display:inline-block;transition:transform .15s}details[open]>summary::before{transform:rotate(90deg)}
+@media (prefers-reduced-motion:reduce){summary::before{transition:none}}
+.sec>summary{display:block}.sec .sc{font:500 13px var(--mono);color:var(--muted);margin-left:8px}
 .bar{position:sticky;top:0;z-index:4;background:var(--bg);padding-block:10px;display:flex;flex-wrap:wrap;gap:10px;align-items:center;border-bottom:1px solid var(--line)}
 .count{font:500 13px var(--mono);color:var(--muted);margin-right:auto}
 button{font:600 15px var(--body);padding:7px 13px;border-radius:5px;border:1px solid var(--accent);background:var(--accent);color:var(--surface);cursor:pointer}
@@ -68,25 +74,29 @@ const $=id=>document.getElementById(id);
 const fmt=iso=>new Date(iso).toLocaleString([],{dateStyle:"medium",timeStyle:"short"});
 let drafts={};try{drafts=JSON.parse(localStorage.getItem(DRAFT_KEY)||"{}")}catch(e){drafts={}}
 const putDrafts=()=>{try{localStorage.setItem(DRAFT_KEY,JSON.stringify(drafts))}catch(e){}};
-const blocks={};let ids=[],submitKey=null,busy=false,closed=false,saveError=null;
+const blocks={},sectionCounts=[];let ids=[],submitKey=null,busy=false,closed=false,saveError=null;
 
 function el(tag,text,cls){const e=document.createElement(tag);if(text!=null)e.textContent=text;if(cls)e.className=cls;return e}
 function safeUrl(u){try{const x=new URL(u);return x.protocol==="https:"?x.href:null}catch(e){return null}}
 // Content blocks are rendered as text only, so nothing stored can inject markup.
+function fillCell(td,c){if(typeof c==="string"){td.textContent=c;return}const t=["good","warn","bad","info"].includes(c.tone)?" "+c.tone:"";td.appendChild(el("span",c.text,t?"chip"+t:null))}
 function renderBlocks(host,list){
   host.textContent="";
   list.forEach(b=>{try{
-    if(b.t==="h2"||b.t==="h3"||b.t==="p")host.appendChild(el(b.t,b.text));
+    if(b.t==="section"){const d=el("details",null,"fold"),s=el("summary");d.open=!!b.open;s.appendChild(el("span",b.title));if(b.note)s.appendChild(el("small",b.note));const inner=el("div",null,"blocks");renderBlocks(inner,b.blocks);d.append(s,inner);host.appendChild(d)}
+    else if(b.t==="h2"||b.t==="h3"||b.t==="p")host.appendChild(el(b.t,b.text));
     else if(b.t==="callout")host.appendChild(el("p",b.text,"callout"));
     else if(b.t==="ul"||b.t==="ol"){const l=el(b.t);(b.items||[]).forEach(i=>l.appendChild(el("li",i)));host.appendChild(l)}
     else if(b.t==="links"){const l=el("ul");(b.links||[]).forEach(k=>{const u=safeUrl(k.url);const li=el("li");if(u){const a=el("a",k.label||u);a.href=u;a.target="_blank";a.rel="noopener noreferrer";li.appendChild(a)}else li.textContent=k.label||"";if(k.note)li.appendChild(document.createTextNode(" "+k.note));l.appendChild(li)});host.appendChild(l)}
-    else if(b.t==="table"){const box=el("div",null,"tablebox"),t=el("table"),th=el("tr");(b.head||[]).forEach(c=>th.appendChild(el("th",c)));const hd=el("thead");hd.appendChild(th);t.appendChild(hd);const bd=el("tbody");(b.rows||[]).forEach(r=>{const tr=el("tr");r.forEach(c=>tr.appendChild(el("td",c)));bd.appendChild(tr)});t.appendChild(bd);box.appendChild(t);host.appendChild(box)}
+    else if(b.t==="table"){const box=el("div",null,"tablebox"),t=el("table"),th=el("tr");(b.head||[]).forEach(c=>th.appendChild(el("th",c)));const hd=el("thead");hd.appendChild(th);t.appendChild(hd);const bd=el("tbody");(b.rows||[]).forEach(r=>{const tr=el("tr");r.forEach(c=>{const td=el("td");fillCell(td,c);tr.appendChild(td)});bd.appendChild(tr)});t.appendChild(bd);box.appendChild(t);host.appendChild(box)}
   }catch(e){}});
 }
 function renderForm(sections){
-  const form=$("form");form.textContent="";ids=[];let n=0;
-  sections.forEach(s=>{
-    const box=el("fieldset",null,"sec"+(s.first?" first":""));const h=el("h3",s.title);if(s.note)h.appendChild(el("small",s.note));box.appendChild(h);
+  const form=$("form");form.textContent="";ids=[];sectionCounts.length=0;let n=0;
+  sections.forEach((s,si)=>{
+    const box=el("details",null,"sec"+(s.first?" first":""));box.open=si===0;
+    const sum=el("summary"),h=el("h3",s.title),sc=el("span",null,"sc");h.appendChild(sc);if(s.note)h.appendChild(el("small",s.note));sum.appendChild(h);box.appendChild(sum);
+    sectionCounts.push({sc,ids:s.questions.map(q=>q.id),box});
     const qs=el("div",null,"qs");
     s.questions.forEach(q=>{
       n++;ids.push(q.id);const dom="q-"+q.id;
@@ -115,6 +125,7 @@ function bar(){
   const answered=ids.filter(i=>blocks[i].saved.trim()).length,un=ids.filter(dirty).length;
   $("count").textContent=saveError||(answered+" of "+ids.length+" saved"+(un?" · "+un+" unsaved":""));
   $("count").style.color=saveError?"var(--stop)":"";
+  sectionCounts.forEach(x=>{x.sc.textContent=x.ids.filter(i=>blocks[i].saved.trim()).length+" of "+x.ids.length+" saved"});
   const s=$("saveAll");s.disabled=!un||busy||closed;s.textContent=busy&&un?"Saving...":un||!answered?"Save all changes":"All changes saved";
   $("submit").disabled=busy||closed||un>0;
   $("submitHint").textContent=un?"Press Save all changes first. Submit unlocks once everything is saved.":"";
@@ -185,7 +196,7 @@ async function loadMine(){
       const dr=drafts[id];
       if(dr&&dr.text===b.saved)delete drafts[id];
       else if(dr&&dr.base!==b.savedAt){b.conflict=dr.text;delete drafts[id]}
-      b.ta.value=drafts[id]?drafts[id].text:b.saved;paint(id);
+      b.ta.value=drafts[id]?drafts[id].text:b.saved;paint(id);if(dirty(id)||b.conflict)sectionCounts.forEach(x=>{if(x.ids.includes(id))x.box.open=true});
     });
     putDrafts();renderLog(d.submissions);bar();
     const last=d.submissions[d.submissions.length-1];

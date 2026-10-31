@@ -79,6 +79,10 @@ refused = false; try { execFileSync("node", ["bin/proofprobe.mjs", "publish", cr
 ok(refused, "publishing can't silently drop earlier questions");
 const rot = pp("rotate", other.id); const old = await fetch(other.link); ok(old.status === 404 && rot.includes("new link"), "a leaked link can be replaced");
 ok((await page.$eval(".notice", (e) => e.textContent)).startsWith("Privacy:"), "privacy notice is shown");
+writeFileSync(qf + ".intro", JSON.stringify([{ t: "section", title: "Compare", blocks: [{ t: "table", head: ["Route", "Fit"], rows: [["A", { text: "High", tone: "good" }]] }] }]));
+pp("publish", created.id, "--intro", qf + ".intro");
+await page.reload({ waitUntil: "networkidle0" }); await page.waitForSelector("#intro .fold");
+ok((await page.$("#intro .chip.good")) !== null && (await page.$eval("#intro details", (e) => !e.open)), "sections fold and table grades are coloured");
 const wrong = await fetch(new URL(created.link).origin + "/c/wrongtoken"); ok(wrong.status === 404, "wrong link is refused");
 const adm = await fetch(new URL(created.link).origin + "/admin/cases"); ok(adm.status === 404, "admin needs its token");
 console.log("ALL PASSED");
