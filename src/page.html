@@ -50,10 +50,10 @@ textarea{grid-column:2;width:100%;min-height:76px;margin-top:7px;padding:8px 10p
 .burger{width:42px;height:42px;padding:0;border-radius:50%;background:transparent;color:var(--ink);border:1px solid var(--line);font-size:17px}.menu{position:absolute;top:60px;right:0;z-index:6;min-width:170px;padding:7px;background:var(--surface);border:1px solid var(--line);border-radius:12px}.menu a{display:block;padding:9px 12px;border-radius:8px;color:var(--ink);text-decoration:none;font-weight:600}.menu a:hover{background:var(--accent-soft)}
 .eyebrow a{color:inherit;text-decoration:none}
 .access{display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin-top:14px;font-size:15.5px;color:var(--muted)}button.ghost{background:transparent;color:var(--accent)}
-.unlock{margin-top:12px;max-width:440px}.unlock label{font-weight:600;display:block;margin-bottom:6px}.unlockrow{display:flex;gap:8px}.unlockrow input{flex:1;min-width:0;padding:8px 10px;font:400 16px var(--body);color:var(--ink);background:var(--surface);border:1px solid var(--line);border-radius:4px}
 .profiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,420px),1fr));gap:16px}.profile{background:var(--surface);border:1px solid var(--line);padding:18px}.profile h2{font-size:24px}.pagelink{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:4px 12px;padding:12px 0;border-top:1px solid var(--line);margin-top:12px;text-decoration:none;color:var(--ink)}.pagelink:hover b{color:var(--accent)}.pagelink small{color:var(--muted);font-size:14.5px}
 .reroute{background:var(--info-soft);padding:14px 16px}.reroute label{font-weight:600;display:block}.reroute small{display:block;font:400 15.5px var(--body);color:var(--muted);margin-top:2px}.reroute textarea{min-height:64px}.reroute .saverow{margin-top:8px}#rerouteInfo{margin-top:14px}
 .menu a{display:flex;align-items:center;gap:10px}.ico{width:18px;height:18px;flex:none}
+dialog{width:min(420px,calc(100vw - 32px));padding:22px;border:1px solid var(--line);border-radius:10px;background:var(--surface);color:var(--ink)}dialog::backdrop{background:rgba(0,0,0,.5)}dialog h3{margin-bottom:12px}dialog label{display:block;font-weight:600;margin-bottom:6px}dialog input{width:100%;padding:9px 10px;font:400 16px var(--body);color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:4px}.dialogrow{display:flex;justify-content:flex-end;gap:8px;margin-top:12px}#unlockErr{margin-top:8px;min-height:20px}
 </style></head><body><div class="wrap">
 <div class="topbar"><a class="brandlink" href="/">ProofProbe</a>
   <button class="burger" id="burger" type="button" aria-label="Menu" aria-expanded="false" aria-controls="menu">☰</button>
@@ -61,8 +61,7 @@ textarea{grid-column:2;width:100%;min-height:76px;margin-top:7px;padding:8px 10p
 <header><div class="eyebrow" id="eyebrow"><a href="/probes">Probes</a></div><h1 id="title">Probes</h1>
   <p class="cost" id="cost" hidden></p>
   <p class="callout" id="rerouteInfo" hidden></p>
-  <div class="access" id="access" hidden><span id="accessText"></span><button type="button" id="unlockBtn">Unlock to edit</button><button type="button" id="lockBtn" class="ghost" hidden>Lock</button></div>
-  <div class="unlock" id="unlockBox" hidden><label for="password">Password for this page</label><div class="unlockrow"><input id="password" type="password" autocomplete="current-password"><button type="button" id="unlockGo">Unlock</button></div><p class="state err" id="unlockErr" role="alert"></p></div>
+  <div class="access" id="access" hidden><span id="accessText"></span><button type="button" id="unlockBtn">Edit this page</button><button type="button" id="lockBtn" class="ghost" hidden>Stop editing</button></div>
 </header>
 <div id="fatal" class="alert" hidden><p id="fatalText"></p><p style="margin-top:9px"><button type="button" id="retry">Try again</button></p></div>
 <section id="dirBox" hidden><div id="profiles" class="profiles"></div><p id="dirEmpty" hidden>No probes published yet.</p></section>
@@ -82,6 +81,7 @@ textarea{grid-column:2;width:100%;min-height:76px;margin-top:7px;padding:8px 10p
     <p id="submitHint" class="state warn" style="margin-top:8px"></p>
     <p id="submitStatus" role="status" style="margin-top:10px"></p><ul id="log" class="log"></ul></div>
 </div></section>
+<dialog id="unlockBox" aria-labelledby="unlockTitle"><h3 id="unlockTitle">Edit this page</h3><label for="password">Enter this page's password</label><input id="password" type="password" autocomplete="current-password"><p class="state err" id="unlockErr" role="alert"></p><div class="dialogrow"><button type="button" class="ghost" id="unlockCancel">Cancel</button><button type="button" id="unlockGo">Continue</button></div></dialog>
 <footer class="notice">Privacy: anyone with this site's address can read every page, including research, documents and submitted answers. Saved answers stay out of view until submitted. Only someone with a page's password can edit it.</footer>
 </div>
 <script>
@@ -167,7 +167,7 @@ async function saveAll(){
   }catch(e){
     const stale=e.status===409||e.status===404;
     const tooLong=e.status===413&&e.body&&e.body.id&&blocks[e.body.id];
-    saveError=e.status===401?"Editing is locked. Refresh and unlock this page.":e.status===403?"This form is closed, so nothing was saved.":stale?"Something changed elsewhere. Refresh this page. Your text is kept on this device.":tooLong?"Q"+tooLong.n+" is too long to save. Please shorten it.":"Not saved. Check your connection and try again. Your text is kept on this device.";
+    saveError=e.status===401?"Editing has ended. Refresh and press Edit this page.":e.status===403?"This form is closed, so nothing was saved.":stale?"Something changed elsewhere. Refresh this page. Your text is kept on this device.":tooLong?"Q"+tooLong.n+" is too long to save. Please shorten it.":"Not saved. Check your connection and try again. Your text is kept on this device.";
   }
   busy=false;bar();
 }
@@ -186,7 +186,7 @@ $("submit").addEventListener("click",async()=>{
     st.textContent="Submission "+r.seq+" received with "+r.answered+" of "+r.total+" answers."+change+" You can close this page.";
     busy=false;bar();
     const d=await fetch(API).then(x=>x.json()).catch(()=>null);if(d&&d.submissions)renderLog(d.submissions);
-  }catch(e){st.textContent=e.status===401?"Editing is locked. Refresh and unlock this page.":e.status===403?"This form is closed, so nothing was submitted.":"Your submission wasn't confirmed. Check your connection and press Submit answers again."}
+  }catch(e){st.textContent=e.status===401?"Editing has ended. Refresh and press Edit this page.":e.status===403?"This form is closed, so nothing was submitted.":"Your submission wasn't confirmed. Check your connection and press Submit answers again."}
   busy=false;bar();
 });
 $("form").addEventListener("submit",e=>e.preventDefault());
@@ -231,8 +231,8 @@ async function showPage(){
   if(d.plan.length){renderBlocks($("plan"),d.plan);$("planBox").hidden=false}
   if(d.intro.length){renderBlocks($("intro"),d.intro);$("introBox").hidden=false}
   const ri=$("rerouteInfo");ri.textContent=d.reroute?"New direction requested: "+d.reroute.message:"";ri.hidden=!d.reroute;
-  $("access").hidden=false;$("unlockBox").hidden=true;$("unlockBtn").hidden=d.editable||!d.hasPassword;$("lockBtn").hidden=!d.editable;
-  $("accessText").textContent=d.editable?"Editing is unlocked on this device.":d.hasPassword?"View only.":"View only. Editing isn't set up yet.";
+  $("access").hidden=false;$("unlockBtn").hidden=d.editable||!d.hasPassword;$("lockBtn").hidden=!d.editable;
+  $("accessText").textContent=d.editable?"You can edit this page on this device.":d.hasPassword?"View only.":"View only. Editing isn't set up yet.";
   if(d.editable)showEdit(d);else showRead(d);
 }
 async function showDirectory(){
@@ -257,14 +257,15 @@ $("rerouteSend").addEventListener("click",async()=>{
     const r=await call("/reroute",{method:"POST",body:JSON.stringify({message:$("rerouteText").value})});
     st.textContent="Received "+fmt(r.at)+". You can skip the questions. This page will update when the new research is ready.";
     const ri=$("rerouteInfo");ri.textContent="New direction requested: "+r.message;ri.hidden=false;
-  }catch(e){b.disabled=false;st.textContent=e.status===401?"Editing is locked. Refresh and unlock this page.":"That wasn't sent. Check your connection and try again."}
+  }catch(e){b.disabled=false;st.textContent=e.status===401?"Editing has ended. Refresh and press Edit this page.":"That wasn't sent. Check your connection and try again."}
 });
-$("unlockBtn").addEventListener("click",()=>{$("unlockBox").hidden=false;$("password").focus()});
+$("unlockBtn").addEventListener("click",()=>{$("unlockErr").textContent="";$("unlockBox").showModal();$("password").focus()});
+$("unlockCancel").addEventListener("click",()=>$("unlockBox").close());
 async function tryUnlock(){
   const err=$("unlockErr");err.textContent="";
   try{
     await call("/unlock",{method:"POST",body:JSON.stringify({password:$("password").value})});
-    $("password").value="";await route();
+    $("password").value="";$("unlockBox").close();await route();
   }catch(e){
     if(e.status===401)err.textContent="That password isn't right.";
     else err.textContent="Couldn't unlock. Check your connection and try again.";

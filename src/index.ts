@@ -375,11 +375,6 @@ export default {
       if (parts[0] === "probes" && (parts.length === 1 || parts.length === 3) && page) return html(APP, request);
       if (!schemaReady) { await migrate(env); schemaReady = true; }
       if (parts[0] === "admin") return await admin(request, env, parts.slice(1), ray);
-      if (parts[0] === "c" && parts[1] && page) {
-        // Links from before passwords existed now open the public page. They no longer allow editing.
-        const old = await env.DB.prepare("SELECT c.slug, p.slug AS profile FROM cases c JOIN profiles p ON p.id = c.profile_id WHERE c.token_hash = ?").bind(await sha256(parts[1])).first<any>();
-        return old ? Response.redirect(`${url.origin}/probes/${old.profile}/${old.slug}`, 302) : notFound();
-      }
       if (parts[0] !== "api") return notFound();
       if (parts[1] === "probes" && parts.length === 2 && page) return json({ profiles: await directory(env) });
       if (parts[1] === "pages" && parts[2] && parts[3]) {
