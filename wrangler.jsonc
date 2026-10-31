@@ -1,0 +1,10 @@
+{
+  "name": "knowledge-gap",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-10-01",
+  "workers_dev": true,
+  "observability": { "enabled": true },
+  "rules": [{ "type": "Text", "globs": ["**/*.html"], "fallthrough": true }],
+  "d1_databases": [{ "binding": "DB", "database_name": "knowledge-gap" }],
+  "vars": { "APP_VERSION": "0.1.0", "ADMIN_TOKEN_SHA256": "" }
+}

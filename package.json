@@ -1,0 +1,13 @@
+{
+  "name": "knowledge-gap",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev --local --port 8799",
+    "test:e2e": "node test/e2e.mjs"
+  },
+  "devDependencies": {
+    "puppeteer-core": "24.10.0",
+    "wrangler": "4.156.0"
+  }
+}
