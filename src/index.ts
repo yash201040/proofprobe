@@ -13,7 +13,8 @@ const ADMIN_DAYS = 90;
 const ADMIN_MAX_FAILS = 6;
 const ADMIN_LOCK_MINUTES = 15;
 const ADMIN_SESSION = "__admin";
-const SCHEMA_VERSION = "3";
+const SCHEMA_VERSION = "4";
+const FIRST_STEP = "Research and questions";
 const STATUSES = ["draft", "open", "submitted", "plan_ready", "closed"];
 const TONES = ["good", "warn", "bad", "info"];
 
@@ -53,10 +54,11 @@ function log(env: Env, ray: string, level: string, msg: string, extra: Record<st
 interface Question { id: string; text: string; why?: string }
 interface Section { title: string; note?: string; first?: boolean; questions: Question[] }
 interface CaseRow {
-  id: string; title: string; first_name: string; status: string; intro_json: string; questions_json: string; plan_json: string;
+  id: string; title: string; first_name: string; status: string;
   created_at: string; updated_at: string; profile_id: string | null; slug: string | null;
-  questions_at: string | null; plan_at: string | null; p_name: string; p_slug: string; p_hash: string | null; p_salt: string | null; p_version: number;
+  p_name: string; p_slug: string; p_hash: string | null; p_salt: string | null; p_version: number;
 }
+interface Step { n: number; title: string; intro: unknown[]; sections: Section[]; plan: unknown[]; createdAt: string }
 interface ProfileRow { id: string; slug: string; name: string; password_hash: string | null; password_salt: string | null; password_enc: string | null; password_iv: string | null; pw_version: number }
 
 async function freeSlug(env: Env, table: "profiles" | "cases", base: string, scope?: string) {
@@ -89,12 +91,25 @@ async function schemaCurrent(env: Env) {
 }
 async function migrate(env: Env) {
   await env.DB.batch(SCHEMA.map((q) => env.DB.prepare(q)));
+  const subs = new Set((await env.DB.prepare("SELECT name FROM pragma_table_info('submissions')").all()).results.map((r: any) => r.name as string));
+  if (!subs.has("step_n")) await env.DB.prepare("ALTER TABLE submissions ADD COLUMN step_n INTEGER NOT NULL DEFAULT 1").run();
   const cols = new Set((await env.DB.prepare("SELECT name FROM pragma_table_info('cases')").all()).results.map((r: any) => r.name as string));
-  for (const name of ["questions_at", "plan_at"]) if (!cols.has(name)) await env.DB.prepare(`ALTER TABLE cases ADD COLUMN ${name} TEXT`).run();
-  for (const old of ["password_hash", "password_salt", "password_enc", "password_iv", "pw_version"])
+  if (cols.has("intro_json")) {
+    // Pages used to hold one set of content. It becomes their first step.
+    await env.DB.prepare(`INSERT OR IGNORE INTO steps(case_id, n, title, intro_json, questions_json, plan_json, created_at)
+      SELECT id, 1, ?, intro_json, questions_json, plan_json, created_at FROM cases`).bind(FIRST_STEP).run();
+  }
+  for (const old of ["intro_json", "questions_json", "plan_json", "questions_at", "plan_at", "password_hash", "password_salt", "password_enc", "password_iv", "pw_version"])
     if (cols.has(old)) await env.DB.prepare(`ALTER TABLE cases DROP COLUMN ${old}`).run();
   await setSettings(env, { schema_version: SCHEMA_VERSION });
 }
+
+async function loadSteps(env: Env, id: string): Promise<Step[]> {
+  const r = await env.DB.prepare("SELECT * FROM steps WHERE case_id = ? ORDER BY n").bind(id).all<any>();
+  return r.results.map((x) => ({ n: x.n, title: x.title, intro: parse(x.intro_json, []), sections: parse<Section[]>(x.questions_json, []), plan: parse(x.plan_json, []), createdAt: x.created_at }));
+}
+// People answer the newest step that has questions. Earlier steps stay as they were.
+const answerStep = (steps: Step[]) => [...steps].reverse().find((x) => flatten(x.sections).length) ?? null;
 
 function flatten(sections: Section[]) {
   return sections.flatMap((s) => s.questions.map((q) => ({ id: q.id, section: s.title, question: q.text })));
@@ -126,19 +141,18 @@ function validBlock(b: any): boolean {
 }
 const validBlocks = (v: unknown) => Array.isArray(v) && v.every(validBlock);
 
-const isCurrent = (submittedAt: string, questionsAt: string | null) => !questionsAt || submittedAt >= questionsAt;
 // What's waiting for the owner. This is only a list: nothing here can start research.
 async function pendingWork(env: Env) {
-  const r = await env.DB.prepare(`SELECT c.id, c.title, c.status, c.questions_at, c.plan_at, p.name AS profile, p.slug AS profile_slug, c.slug,
+  const r = await env.DB.prepare(`SELECT c.id, c.title, p.name AS profile, p.slug AS profile_slug, c.slug,
     (SELECT message FROM reroutes x WHERE x.case_id = c.id AND x.handled_at IS NULL ORDER BY x.id DESC LIMIT 1) AS reroute,
     (SELECT at FROM reroutes x WHERE x.case_id = c.id AND x.handled_at IS NULL ORDER BY x.id DESC LIMIT 1) AS reroute_at,
-    (SELECT MAX(submitted_at) FROM submissions s WHERE s.case_id = c.id) AS last_submitted
+    (SELECT MAX(submitted_at) FROM submissions s WHERE s.case_id = c.id) AS last_submitted,
+    (SELECT MAX(created_at) FROM steps t WHERE t.case_id = c.id) AS latest_step
     FROM cases c JOIN profiles p ON p.id = c.profile_id WHERE c.status NOT IN ('draft', 'closed') ORDER BY c.created_at`).all<any>();
   return r.results.flatMap((c) => {
     const base = { id: c.id, profile: c.profile, title: c.title, path: `/probes/${c.profile_slug}/${c.slug}`, prompt: `/proofprobe continue ${c.profile}: ${c.title}` };
     if (c.reroute) return [{ ...base, kind: "reroute", since: c.reroute_at, detail: c.reroute }];
-    const ready = c.last_submitted && isCurrent(c.last_submitted, c.questions_at) && (!c.plan_at || c.last_submitted > c.plan_at);
-    return ready ? [{ ...base, kind: "answers", since: c.last_submitted, detail: null }] : [];
+    return c.last_submitted && c.last_submitted > c.latest_step ? [{ ...base, kind: "answers", since: c.last_submitted, detail: null }] : [];
   });
 }
 async function deleteCase(env: Env, id: string, ray: string) {
@@ -147,6 +161,7 @@ async function deleteCase(env: Env, id: string, ray: string) {
     env.DB.prepare("DELETE FROM cost_entries WHERE case_id = ?").bind(id),
     env.DB.prepare("DELETE FROM submissions WHERE case_id = ?").bind(id),
     env.DB.prepare("DELETE FROM reroutes WHERE case_id = ?").bind(id),
+    env.DB.prepare("DELETE FROM steps WHERE case_id = ?").bind(id),
     env.DB.prepare("DELETE FROM cases WHERE id = ?").bind(id),
     audit(env, null, "admin", "page_deleted", id, ray),
   ]);
@@ -160,6 +175,10 @@ async function costUsd(env: Env, caseId: string) {
 async function summaries(env: Env, caseId: string) {
   const r = await env.DB.prepare("SELECT seq, submitted_at, answered, total, changed_json FROM submissions WHERE case_id = ? ORDER BY seq").bind(caseId).all();
   return r.results.map((x: any) => ({ seq: x.seq, submittedAt: x.submitted_at, answered: x.answered, total: x.total, changed: parse(x.changed_json, []) }));
+}
+async function summariesWithStep(env: Env, caseId: string) {
+  const r = await env.DB.prepare("SELECT seq, step_n, submitted_at, answered, total, changed_json FROM submissions WHERE case_id = ? ORDER BY seq").bind(caseId).all<any>();
+  return r.results.map((x) => ({ seq: x.seq, stepN: x.step_n, submittedAt: x.submitted_at, answered: x.answered, total: x.total, changed: parse(x.changed_json, []) }));
 }
 async function currentAnswers(env: Env, caseId: string) {
   const r = await env.DB.prepare("SELECT question_id, text, updated_at FROM answers WHERE case_id = ?").bind(caseId).all();
@@ -226,22 +245,24 @@ async function submit(env: Env, row: CaseRow, key: string, ray: string) {
   const seen = await env.DB.prepare("SELECT seq, submitted_at, answered, total, changed_json FROM submissions WHERE case_id = ? AND idem_key = ?").bind(row.id, key).first<any>();
   if (seen) return json({ seq: seen.seq, submittedAt: seen.submitted_at, answered: seen.answered, total: seen.total, changed: parse(seen.changed_json, []), replay: true });
 
+  const step = answerStep(await loadSteps(env, row.id));
+  if (!step) return json({ error: "no_questions" }, 409);
   const current = await currentAnswers(env, row.id);
-  const items = flatten(parse<Section[]>(row.questions_json, [])).map((q) => ({ ...q, answer: current[q.id]?.text ?? "", updatedAt: current[q.id]?.updatedAt ?? null }));
+  const items = flatten(step.sections).map((q) => ({ ...q, answer: current[q.id]?.text ?? "", updatedAt: current[q.id]?.updatedAt ?? null }));
   const answered = items.filter((i) => i.answer.trim()).length;
   if (!answered) return json({ error: "no_saved_answers" }, 409);
 
-  const prev = await env.DB.prepare("SELECT seq, payload FROM submissions WHERE case_id = ? ORDER BY seq DESC LIMIT 1").bind(row.id).first<any>();
+  const prev = await env.DB.prepare("SELECT seq, step_n, payload FROM submissions WHERE case_id = ? ORDER BY seq DESC LIMIT 1").bind(row.id).first<any>();
   const before = new Map(parse<{ id: string; answer: string }[]>(prev?.payload ?? "[]", []).map((i) => [i.id, i.answer]));
-  const changed = prev ? items.filter((i) => (before.get(i.id) ?? "") !== i.answer).map((i) => i.id) : [];
+  const changed = prev && prev.step_n === step.n ? items.filter((i) => (before.get(i.id) ?? "") !== i.answer).map((i) => i.id) : [];
   const payload = JSON.stringify(items);
   const hash = await sha256(payload);
   const seq = (prev?.seq ?? 0) + 1;
   const at = new Date().toISOString();
   try {
     await env.DB.batch([
-      env.DB.prepare("INSERT INTO submissions(case_id, seq, idem_key, submitted_at, answered, total, changed_json, payload, sha256) VALUES (?,?,?,?,?,?,?,?,?)")
-        .bind(row.id, seq, key, at, answered, items.length, JSON.stringify(changed), payload, hash),
+      env.DB.prepare("INSERT INTO submissions(case_id, seq, step_n, idem_key, submitted_at, answered, total, changed_json, payload, sha256) VALUES (?,?,?,?,?,?,?,?,?,?)")
+        .bind(row.id, seq, step.n, key, at, answered, items.length, JSON.stringify(changed), payload, hash),
       env.DB.prepare("UPDATE cases SET status = CASE WHEN status = 'open' THEN 'submitted' ELSE status END, updated_at = ? WHERE id = ?").bind(at, row.id),
       audit(env, row.id, "editor", "submit", `seq=${seq} answered=${answered}`, ray),
     ]);
@@ -268,21 +289,20 @@ async function directory(env: Env) {
 async function pageApi(request: Request, env: Env, row: CaseRow, rest: string, ray: string) {
   const editable = await canEdit(request, env, row);
   if (rest === "" && request.method === "GET") {
-    const [lastR, costR, rerouteR] = await env.DB.batch([
-      env.DB.prepare("SELECT seq, submitted_at, payload FROM submissions WHERE case_id = ? ORDER BY seq DESC LIMIT 1").bind(row.id),
+    const [stepR, costR, rerouteR] = await env.DB.batch([
+      env.DB.prepare("SELECT * FROM steps WHERE case_id = ? ORDER BY n").bind(row.id),
       env.DB.prepare("SELECT COALESCE(SUM(usd_micro), 0) AS micro FROM cost_entries WHERE case_id = ?").bind(row.id),
       env.DB.prepare("SELECT message, at FROM reroutes WHERE case_id = ? AND handled_at IS NULL ORDER BY id DESC LIMIT 1").bind(row.id),
     ]);
-    const found = lastR.results[0] as any;
-    // Answers to retired questions stay in the logs, but they no longer belong on the page.
-    const last = found && isCurrent(found.submitted_at, row.questions_at) ? found : null;
-    return json({
-      title: row.title, name: row.p_name, profileSlug: row.p_slug, status: row.status,
-      intro: parse(row.intro_json, []), plan: parse(row.plan_json, []), costUsd: ((costR.results[0] as any)?.micro ?? 0) / 1_000_000,
-      hasPassword: !!row.p_hash, editable, reroute: rerouteR.results[0] ?? null, seq: last?.seq ?? null, submittedAt: last?.submitted_at ?? null,
-      items: last ? parse(last.payload, []) : flatten(parse<Section[]>(row.questions_json, [])).map((q) => ({ ...q, answer: "" })),
-      ...(editable ? { sections: parse(row.questions_json, []), answers: await currentAnswers(env, row.id), submissions: await summaries(env, row.id) } : {}),
-    });
+    const steps: Step[] = (stepR.results as any[]).map((x) => ({ n: x.n, title: x.title, intro: parse(x.intro_json, []), sections: parse<Section[]>(x.questions_json, []), plan: parse(x.plan_json, []), createdAt: x.created_at }));
+    const open = answerStep(steps);
+    // Answers and requested directions are private to the profile. Visitors get research, questions, status and cost.
+    const pub = { title: row.title, name: row.p_name, profileSlug: row.p_slug, status: row.status, costUsd: ((costR.results[0] as any)?.micro ?? 0) / 1_000_000, hasPassword: !!row.p_hash, editable, steps, openStep: open?.n ?? null, rerouting: !!rerouteR.results[0] };
+    if (!editable) return json(pub);
+    const subs = await env.DB.prepare("SELECT seq, step_n, submitted_at, payload FROM submissions WHERE case_id = ? ORDER BY seq").bind(row.id).all<any>();
+    const logs: Record<string, unknown> = {};
+    for (const x of subs.results) logs[x.step_n] = { seq: x.seq, submittedAt: x.submitted_at, items: parse(x.payload, []) };
+    return json({ ...pub, reroute: rerouteR.results[0] ?? null, answers: await currentAnswers(env, row.id), submissions: await summaries(env, row.id), logs });
   }
   if (rest === "unlock" && request.method === "POST") return unlock(request, env, row, ray);
   if (rest === "lock" && request.method === "POST") {
@@ -316,7 +336,7 @@ async function pageApi(request: Request, env: Env, row: CaseRow, rest: string, r
   }
   const body = await request.json().catch(() => null) as { answers?: Record<string, unknown>; bases?: Record<string, string | null> } | null;
   if (!body?.answers || typeof body.answers !== "object") return json({ error: "bad_request" }, 400);
-  const known = new Set(flatten(parse<Section[]>(row.questions_json, [])).map((q) => q.id));
+  const known = new Set(flatten(answerStep(await loadSteps(env, row.id))?.sections ?? []).map((q) => q.id));
   const entries = Object.entries(body.answers);
   if (!entries.length) return json({ error: "bad_request" }, 400);
   for (const [id, text] of entries) {
@@ -397,13 +417,20 @@ async function adminSite(request: Request, env: Env, parts: string[], ray: strin
   }
   if (what === "overview" && request.method === "GET") {
     const profiles = await env.DB.prepare(`SELECT p.id, p.name, p.slug, p.password_hash IS NOT NULL AS has_password, (SELECT COUNT(*) FROM cases c WHERE c.profile_id = p.id) AS pages FROM profiles p ORDER BY p.created_at`).all();
-    const r = await env.DB.prepare(`SELECT c.id, c.title, c.status, c.updated_at, c.questions_json, p.name AS profile, p.slug AS profile_slug, c.slug,
+    const stepRows = await env.DB.prepare("SELECT case_id, n, questions_json FROM steps ORDER BY n").all<any>();
+    const totals = new Map<string, number>(), stepCount = new Map<string, number>();
+    for (const x of stepRows.results) {
+      stepCount.set(x.case_id, (stepCount.get(x.case_id) ?? 0) + 1);
+      const n = flatten(parse<Section[]>(x.questions_json, [])).length;
+      if (n) totals.set(x.case_id, n);
+    }
+    const r = await env.DB.prepare(`SELECT c.id, c.title, c.status, c.updated_at, p.name AS profile, p.slug AS profile_slug, c.slug,
       (SELECT COUNT(*) FROM submissions s WHERE s.case_id = c.id) AS submissions,
       (SELECT COUNT(*) FROM answers a WHERE a.case_id = c.id AND trim(a.text) != '') AS saved,
       EXISTS (SELECT 1 FROM reroutes r WHERE r.case_id = c.id AND r.handled_at IS NULL) AS rerouting,
       (SELECT COALESCE(SUM(e.usd_micro), 0) / 1000000.0 FROM cost_entries e WHERE e.case_id = c.id) AS cost_usd
       FROM cases c JOIN profiles p ON p.id = c.profile_id ORDER BY c.created_at`).all<any>();
-    return json({ pending: await pendingWork(env), profiles: profiles.results, pages: r.results.map(({ questions_json, ...x }) => ({ ...x, total: flatten(parse<Section[]>(questions_json, [])).length })) });
+    return json({ pending: await pendingWork(env), profiles: profiles.results, pages: r.results.map((x) => ({ ...x, total: totals.get(x.id) ?? 0, steps: stepCount.get(x.id) ?? 1 })) });
   }
   if (what === "profiles" && !id && request.method === "POST") {
     const b = await request.json().catch(() => null) as { name?: unknown } | null;
@@ -444,7 +471,7 @@ async function adminSite(request: Request, env: Env, parts: string[], ray: strin
   if (!sub && request.method === "DELETE") { await deleteCase(env, id, ray); return json({ ok: true }); }
   if (sub === "answers" && request.method === "PUT") {
     const b = await request.json().catch(() => null) as { answers?: Record<string, unknown> } | null;
-    const known = new Set(flatten(parse<Section[]>(row.questions_json, [])).map((q) => q.id));
+    const known = new Set((await loadSteps(env, id)).flatMap((x) => flatten(x.sections).map((q) => q.id)));
     const entries = Object.entries(b?.answers ?? {});
     if (!entries.length || entries.some(([k, v]) => !known.has(k) || typeof v !== "string" || (v as string).length > MAX_ANSWER)) return json({ error: "bad_request" }, 400);
     const at = new Date().toISOString();
@@ -461,10 +488,10 @@ async function adminSite(request: Request, env: Env, parts: string[], ray: strin
     const auditRows = await env.DB.prepare("SELECT actor, action, detail, at FROM audit_log WHERE case_id = ? OR detail = ? ORDER BY id DESC LIMIT 50").bind(id, "profile=" + row.profile_id).all();
     const costs = await env.DB.prepare("SELECT usd_micro, label, at FROM cost_entries WHERE case_id = ? ORDER BY id").bind(id).all<any>();
     return json({
-      title: row.title, profile: p?.name, status: row.status, sections: parse(row.questions_json, []), answers: await currentAnswers(env, id),
+      title: row.title, profile: p?.name, status: row.status, steps: await loadSteps(env, id), answers: await currentAnswers(env, id),
       reroute: await openReroute(env, id), costUsd: await costUsd(env, id), audit: auditRows.results,
       costs: costs.results.map((c) => ({ usd: c.usd_micro / 1_000_000, label: c.label, at: c.at })),
-      submissions: await Promise.all(subs.results.map(async (s) => ({ seq: s.seq, submittedAt: s.submitted_at, answered: s.answered, total: s.total, intact: (await sha256(s.payload)) === s.sha256, items: parse(s.payload, null) }))),
+      submissions: await Promise.all(subs.results.map(async (s) => ({ seq: s.seq, stepN: s.step_n, submittedAt: s.submitted_at, answered: s.answered, total: s.total, intact: (await sha256(s.payload)) === s.sha256, items: parse(s.payload, null) }))),
     });
   }
   return notFound();
@@ -506,6 +533,7 @@ async function admin(request: Request, env: Env, parts: string[], ray: string) {
     const slug = await freeSlug(env, "cases", slugify(b.title), p.id);
     await env.DB.batch([
       env.DB.prepare("INSERT INTO cases(id, token_hash, title, first_name, profile_id, slug, created_at, updated_at) VALUES (?,?,?,?,?,?,?,?)").bind(caseId, await sha256(randomToken()), b.title, p.name, p.id, slug, now, now),
+      env.DB.prepare("INSERT INTO steps(case_id, n, title, created_at) VALUES (?,1,?,?)").bind(caseId, FIRST_STEP, now),
       audit(env, caseId, "admin", "create", null, ray),
     ]);
     return json({ id: caseId, path: `/probes/${p.slug}/${slug}`, profile: p.name, profileCreated: !match }, 201);
@@ -516,30 +544,39 @@ async function admin(request: Request, env: Env, parts: string[], ray: string) {
 
   if (!sub && request.method === "GET") {
     const p = await env.DB.prepare("SELECT slug, name FROM profiles WHERE id = ?").bind(row.profile_id).first<any>();
-    return json({ id: row.id, title: row.title, profile: p?.name, path: `/probes/${p?.slug}/${row.slug}`, status: row.status, hasPassword: !!(await profileOf(env, row.profile_id))?.password_hash, costUsd: await costUsd(env, id), reroute: await openReroute(env, id), questionsAt: row.questions_at, intro: parse(row.intro_json, []), plan: parse(row.plan_json, []), sections: parse(row.questions_json, []), answers: await currentAnswers(env, id), submissions: await summaries(env, id) });
+    const steps = await loadSteps(env, id), open = answerStep(steps), submissions = await summariesWithStep(env, id), last = submissions[submissions.length - 1];
+    return json({ id: row.id, title: row.title, profile: p?.name, path: `/probes/${p?.slug}/${row.slug}`, status: row.status, hasPassword: !!(await profileOf(env, row.profile_id))?.password_hash, costUsd: await costUsd(env, id), reroute: await openReroute(env, id), steps, openStep: open?.n ?? null, sections: open?.sections ?? [], submissionCurrent: !!last && !!open && last.stepN === open.n, answers: await currentAnswers(env, id), submissions });
   }
   if (!sub && request.method === "PATCH") {
-    const b = await request.json().catch(() => null) as { intro?: unknown; questions?: unknown; plan?: unknown; status?: string } | null;
+    const b = await request.json().catch(() => null) as { intro?: unknown; questions?: unknown; plan?: unknown; status?: string; newStep?: unknown; step?: unknown } | null;
     if (!b) return json({ error: "bad_request" }, 400);
     if (b.questions !== undefined && !validSections(b.questions)) return json({ error: "invalid_questions" }, 400);
     if (b.intro !== undefined && !validBlocks(b.intro)) return json({ error: "invalid_intro" }, 400);
     if (b.plan !== undefined && !validBlocks(b.plan)) return json({ error: "invalid_plan" }, 400);
     if (b.status !== undefined && !STATUSES.includes(b.status)) return json({ error: "invalid_status" }, 400);
-    const intro = b.intro !== undefined ? JSON.stringify(b.intro) : row.intro_json;
-    const questions = b.questions !== undefined ? JSON.stringify(b.questions) : row.questions_json;
-    // New questions after a change of direction replace the old path, and new ids make earlier submissions out of date.
-    const rerouted = b.questions !== undefined ? await openReroute(env, id) : null;
-    const plan = b.plan !== undefined ? JSON.stringify(b.plan) : rerouted ? "[]" : row.plan_json;
-    const status = b.status ?? (rerouted ? "open" : row.status);
-    const oldIds = new Set(flatten(parse<Section[]>(row.questions_json, [])).map((q) => q.id));
-    const addsQuestions = b.questions !== undefined && flatten(b.questions as Section[]).some((q) => !oldIds.has(q.id));
-    const questionsAt = addsQuestions ? now : row.questions_at;
-    const planAt = b.plan !== undefined && (b.plan as unknown[]).length ? now : rerouted ? null : row.plan_at;
-    if (intro.length + questions.length + plan.length > MAX_DOC) return json({ error: "too_large" }, 413);
+    if (b.newStep !== undefined && (typeof b.newStep !== "string" || !b.newStep.trim())) return json({ error: "invalid_step_title" }, 400);
+    const steps = await loadSteps(env, id), latest = steps[steps.length - 1], changesContent = b.intro !== undefined || b.questions !== undefined || b.plan !== undefined;
+    const rerouted = await openReroute(env, id);
+    const size = (x: unknown) => JSON.stringify(x ?? []).length;
+    if (size(b.intro) + size(b.questions) + size(b.plan) > MAX_DOC) return json({ error: "too_large" }, 413);
+    const writes: D1PreparedStatement[] = [];
+    if (typeof b.newStep === "string") {
+      writes.push(env.DB.prepare("INSERT INTO steps(case_id, n, title, intro_json, questions_json, plan_json, created_at) VALUES (?,?,?,?,?,?,?)")
+        .bind(id, latest.n + 1, b.newStep.trim(), JSON.stringify(b.intro ?? []), JSON.stringify(b.questions ?? []), JSON.stringify(b.plan ?? []), now));
+    } else if (changesContent) {
+      const target = b.step === undefined ? latest : steps.find((x) => x.n === b.step);
+      if (!target) return json({ error: "unknown_step" }, 404);
+      // New research must never overwrite what people already responded to.
+      const answered = await env.DB.prepare("SELECT 1 FROM submissions WHERE case_id = ? AND step_n = ? LIMIT 1").bind(id, target.n).first();
+      if (b.step === undefined && (answered || rerouted)) return json({ error: "use_new_step" }, 409);
+      writes.push(env.DB.prepare("UPDATE steps SET intro_json = ?, questions_json = ?, plan_json = ? WHERE case_id = ? AND n = ?")
+        .bind(JSON.stringify(b.intro ?? target.intro), JSON.stringify(b.questions ?? target.sections), JSON.stringify(b.plan ?? target.plan), id, target.n));
+    }
+    const closesReroute = !!rerouted && (typeof b.newStep === "string" || b.questions !== undefined);
+    if (closesReroute) writes.push(env.DB.prepare("UPDATE reroutes SET handled_at = ? WHERE case_id = ? AND handled_at IS NULL").bind(now, id));
     await env.DB.batch([
-      env.DB.prepare("UPDATE cases SET intro_json = ?, questions_json = ?, plan_json = ?, status = ?, questions_at = ?, plan_at = ?, updated_at = ? WHERE id = ?").bind(intro, questions, plan, status, questionsAt, planAt, now, id),
-      // New questions answer an open change of direction.
-      ...(b.questions !== undefined ? [env.DB.prepare("UPDATE reroutes SET handled_at = ? WHERE case_id = ? AND handled_at IS NULL").bind(now, id)] : []),
+      ...writes,
+      env.DB.prepare("UPDATE cases SET status = ?, updated_at = ? WHERE id = ?").bind(b.status ?? (closesReroute ? "open" : row.status), now, id),
       audit(env, id, "admin", "update", Object.keys(b).join(","), ray),
     ]);
     return json({ ok: true });
@@ -547,7 +584,7 @@ async function admin(request: Request, env: Env, parts: string[], ray: string) {
   if (sub === "import" && request.method === "POST") {
     // Answers collected somewhere else become a normal submission.
     const b = await request.json().catch(() => null) as { answers?: Record<string, unknown> } | null;
-    const known = new Set(flatten(parse<Section[]>(row.questions_json, [])).map((q) => q.id));
+    const known = new Set(flatten(answerStep(await loadSteps(env, id))?.sections ?? []).map((q) => q.id));
     const entries = Object.entries(b?.answers ?? {});
     if (!entries.length || entries.some(([k, v]) => !known.has(k) || typeof v !== "string" || (v as string).length > MAX_ANSWER)) return json({ error: "bad_answers" }, 400);
     await env.DB.batch([

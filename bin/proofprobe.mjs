@@ -47,21 +47,30 @@ switch (cmd) {
     break;
   }
   case "publish": {
-    const body = {};
+    const body = {}, newStep = flag(a, "new-step"), step = flag(a, "step");
+    if (newStep) body.newStep = newStep;
+    if (step) body.step = Number(step);
     if (flag(a, "intro")) body.intro = readJson(flag(a, "intro"));
+    if (flag(a, "plan")) body.plan = readJson(flag(a, "plan"));
+    if (flag(a, "status")) body.status = flag(a, "status");
     if (flag(a, "questions")) {
       body.questions = readJson(flag(a, "questions"));
       const qs = body.questions.flatMap((s) => s.questions);
       if (!qs.length || !qs[qs.length - 1].catchAll) throw new Error('the last question must be an open "anything we missed?" with "catchAll": true');
-      const existing = (await api("GET", "/cases/" + a[0])).sections.flatMap((s) => s.questions.map((q) => q.id));
-      const kept = new Set(qs.map((q) => q.id));
-      const dropped = existing.filter((id) => !kept.has(id));
-      if (dropped.length && !a.includes("--allow-drop")) throw new Error(`this would drop questions ${dropped.join(", ")}. Publish the full list, or pass --allow-drop`);
+      if (!newStep) {
+        const r = await api("GET", "/cases/" + a[0]);
+        const target = r.steps.find((s) => s.n === (step ? Number(step) : r.steps[r.steps.length - 1].n));
+        const existing = (target?.sections ?? []).flatMap((s) => s.questions.map((q) => q.id));
+        const kept = new Set(qs.map((q) => q.id)), dropped = existing.filter((id) => !kept.has(id));
+        if (dropped.length && !a.includes("--allow-drop")) throw new Error(`this would drop questions ${dropped.join(", ")}. Publish the full list, or pass --allow-drop`);
+      }
     }
-    if (flag(a, "plan")) body.plan = readJson(flag(a, "plan"));
-    if (flag(a, "status")) body.status = flag(a, "status");
-    out(await api("PATCH", "/cases/" + a[0], body));
-    console.log("link: " + cfg().baseUrl + (await api("GET", "/cases/" + a[0])).path);
+    const c = cfg(), res = await fetch(`${c.baseUrl}/admin/cases/${a[0]}`, { method: "PATCH", headers: { Authorization: "Bearer " + c.adminToken, "Content-Type": "application/json" }, body: JSON.stringify(body) });
+    const r = await res.json();
+    if (r.error === "use_new_step") { console.error('This step already has responses, or a new direction is waiting. Add the new work with --new-step "Title". To correct existing content, use --step N.'); process.exit(1); }
+    if (!res.ok) throw new Error(`publish: ${res.status} ${JSON.stringify(r)}`);
+    console.log("published");
+    console.log("link: " + c.baseUrl + (await api("GET", "/cases/" + a[0])).path);
     break;
   }
   case "cost": out(await api("POST", `/cases/${a[0]}/costs`, { usd: Number(a[1]), label: a.slice(2).join(" ") || "research" })); break;
@@ -77,10 +86,13 @@ switch (cmd) {
     break;
   }
   case "export": {
-    const r = await api("GET", "/cases/" + a[0]), dir = join(dirname(CFG), "cases", a[0]);
-    mkdirSync(dir, { recursive: true });
-    for (const [name, value] of [["intro", r.intro], ["plan", r.plan], ["questions", r.sections]]) writeFileSync(join(dir, name + ".json"), JSON.stringify(value, null, 2));
-    console.log(`Saved the published intro, plan and questions to ${dir}`);
+    const r = await api("GET", "/cases/" + a[0]);
+    for (const s of r.steps) {
+      const dir = join(dirname(CFG), "cases", a[0], "step-" + s.n);
+      mkdirSync(dir, { recursive: true });
+      for (const [name, value] of [["intro", s.intro], ["plan", s.plan], ["questions", s.sections]]) writeFileSync(join(dir, name + ".json"), JSON.stringify(value, null, 2));
+    }
+    console.log(`Saved ${r.steps.length} step(s) to ${join(dirname(CFG), "cases", a[0])}/step-N`);
     break;
   }
   case "pending": out((await api("GET", "/pending")).pending); break;
@@ -93,8 +105,8 @@ switch (cmd) {
   case "link": console.log(cfg().baseUrl + (await api("GET", "/cases/" + a[0])).path); break;
   case "status": {
     const r = await api("GET", "/cases/" + a[0]);
-    const total = r.sections.flatMap((s) => s.questions).length, last = r.submissions[r.submissions.length - 1];
-    out({ id: r.id, title: r.title, status: r.status, reroute: r.reroute, submissionCurrent: !!last && (!r.questionsAt || last.submittedAt >= r.questionsAt), questions: total, savedAnswers: Object.values(r.answers).filter((x) => x.text.trim()).length, submissions: r.submissions });
+    const total = r.sections.flatMap((s) => s.questions).length;
+    out({ id: r.id, title: r.title, status: r.status, reroute: r.reroute, submissionCurrent: r.submissionCurrent, steps: r.steps.map((s) => `${s.n}: ${s.title}`), questions: total, savedAnswers: Object.values(r.answers).filter((x) => x.text.trim()).length, submissions: r.submissions });
     break;
   }
   case "fetch": {
@@ -105,5 +117,5 @@ switch (cmd) {
     break;
   }
   case "purge": out(await api("DELETE", "/cases/" + a[0])); break;
-  default: console.log("proofprobe init [--url U] | new --profile NAME --title T [--new-profile] | profiles | pending | export ID | import ID --answers F | cost ID USD [label] | password ID [--set P] | admin-setup | publish ID [--intro F] [--questions F] [--plan F] [--status S] [--allow-drop] | list | link ID | status ID | fetch ID [--seq N] [--out F] | purge ID");
+  default: console.log("proofprobe init [--url U] | new --profile NAME --title T [--new-profile] | profiles | pending | export ID | import ID --answers F | cost ID USD [label] | password ID [--set P] | admin-setup | publish ID [--intro F] [--questions F] [--plan F] [--status S] [--new-step TITLE | --step N] [--allow-drop] | list | link ID | status ID | fetch ID [--seq N] [--out F] | purge ID");
 }

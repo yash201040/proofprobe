@@ -32,7 +32,8 @@ Local test: put `ADMIN_TOKEN_SHA256=<hash>` and `PASSWORD_KEY=<base64 key>` in `
 
 ## Data rules
 
-- Anyone can read every page, including submitted answers, and a notice says so. Each profile has one password, which unlocks all of its pages and no others.
+- Anyone can read each page's research, questions, status and cost, and a notice says so. Answers stay private to the profile's password holder and the owner. Each profile has one password, which unlocks all of its pages and no others.
+- Each research stage is a step, shown as a view on the same page. New research adds a step and never replaces one.
 - Submitting stores a log and starts nothing. Research continues only when `/proofprobe` is run.
 - The cost shown on a page is treg data spend logged with `proofprobe cost`. Claude usage is not included.
 - Submissions are append-only. A database trigger blocks updates, and each log stores a SHA-256 so corruption is detectable.

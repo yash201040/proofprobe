@@ -1,7 +1,8 @@
 <!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%23071019'/%3E%3Ccircle cx='16' cy='16' r='10' fill='none' stroke='%235FC6C9' stroke-width='2'/%3E%3Ccircle cx='16' cy='16' r='3.5' fill='%23FFB454'/%3E%3C/svg%3E">
 <title>ProofProbe</title>
 <meta name="description" content="Any goal. One proven path.">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,800&family=Instrument+Sans:wght@400;500;600&display=swap">
+<link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,800&family=Instrument+Sans:wght@400;500;600&display=swap" onload="this.onload=null;this.rel='stylesheet'">
 <style>
 /* Concept: a field of uncertainty that scroll resolves into one bright path, and the night sky turns to daylight as it does. */
 :root{--night:#071019;--day:#EEF2EA;--ink:#F2F7F6;--muted:#9FB6BC;--pulse:#FFB454;--line:rgba(255,255,255,.16);
@@ -9,7 +10,7 @@
 body.day{--ink:#0C1C24;--muted:#4B5F66;--line:rgba(12,28,36,.18);color-scheme:light}
 *{box-sizing:border-box}html{-webkit-text-size-adjust:100%}
 body{margin:0;background:var(--night);color:var(--ink);font:400 18px/1.5 var(--body);transition:color .5s ease;overflow-x:hidden}
-canvas{position:fixed;inset:0;width:100%;height:100%;display:block;pointer-events:none}
+canvas{position:fixed;inset:0;width:100%;height:100lvh;display:block;pointer-events:none}
 a{color:inherit}
 :focus-visible{outline:2px solid var(--pulse);outline-offset:3px}
 .top{position:fixed;inset:0 0 auto;z-index:5;display:flex;align-items:center;justify-content:space-between;padding:calc(env(safe-area-inset-top,0px) + 16px) max(20px,env(safe-area-inset-right,0px)) 16px max(20px,env(safe-area-inset-left,0px))}
@@ -37,7 +38,7 @@ body.day .step{color:#A85E00}
 .ripple{position:absolute;width:12px;height:12px;margin:-6px 0 0 -6px;border-radius:50%;background:rgba(255,200,120,.65);pointer-events:none;animation:ripple .6s ease-out forwards}
 @keyframes ripple{to{transform:scale(32);opacity:0}}
 .ico{width:18px;height:18px;flex:none}
-.adminlink{position:absolute;right:max(20px,env(safe-area-inset-right,0px));bottom:calc(env(safe-area-inset-bottom,0px) + 18px);display:inline-flex;align-items:center;gap:6px;padding:6px 8px;border-radius:8px;font-size:14px;color:var(--muted);text-decoration:none;opacity:.55;transition:opacity .2s ease,transform .2s ease}.adminlink .ico{width:14px;height:14px}.adminlink:hover{opacity:1;transform:translateY(-1px)}.adminlink:active{transform:scale(.96)}
+.adminlink{min-height:40px;position:absolute;right:max(20px,env(safe-area-inset-right,0px));bottom:calc(env(safe-area-inset-bottom,0px) + 18px);display:inline-flex;align-items:center;gap:6px;padding:6px 8px;border-radius:8px;font-size:14px;color:var(--muted);text-decoration:none;opacity:.55;transition:opacity .2s ease,transform .2s ease}.adminlink .ico{width:14px;height:14px}.adminlink:hover{opacity:1;transform:translateY(-1px)}.adminlink:active{transform:scale(.96)}
 .cue{position:absolute;left:50%;bottom:26px;width:1px;height:46px;background:linear-gradient(var(--pulse),transparent);animation:cue 2s ease-in-out infinite}
 .hero{position:relative}
 @keyframes cue{50%{transform:translateY(10px);opacity:.4}}
@@ -49,6 +50,8 @@ body.day .ticks i.on{background:#A85E00}
 .reveal{opacity:0;transform:translateY(26px);transition:opacity .8s ease,transform .8s cubic-bezier(.2,.7,.2,1)}
 .reveal.in{opacity:1;transform:none}
 @media (prefers-reduced-motion:reduce){.reveal{opacity:1;transform:none;transition:none}.word>span{transform:none;transition:none}.cue{animation:none}.cta,.cta .arrow,.cta .ico{transition:none}}
+@media (hover:none){.cta:hover{box-shadow:0 8px 22px rgba(12,28,36,.2)}.cta:hover::before{opacity:0}.cta:hover .arrow,.cta:hover .ico{transform:none}.adminlink:hover{opacity:.55;transform:none}}
+@media (max-width:360px){#rulerLabel{display:none}}
 </style></head><body>
 <canvas id="c" aria-hidden="true"></canvas>
 <div class="top"><span class="brand">ProofProbe</span></div>
@@ -134,7 +137,9 @@ function loop(t){
   if(!document.hidden)raf=requestAnimationFrame(loop);
 }
 function start(){if(still){read();now=target;draw(now,0)}else if(!raf)raf=requestAnimationFrame(loop)}
-addEventListener("resize",()=>{layout();start()});
+// A phone address bar hiding changes only the height, so ignore that or the particles jump.
+let lastW=innerWidth;
+addEventListener("resize",()=>{if(innerWidth===lastW&&matchMedia("(pointer:coarse)").matches)return;lastW=innerWidth;layout();start()});
 addEventListener("scroll",()=>{if(still)start()},{passive:true});
 document.addEventListener("visibilitychange",start);
 document.querySelectorAll("h2").forEach(h=>{

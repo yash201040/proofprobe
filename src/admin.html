@@ -1,4 +1,5 @@
 <!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%23071019'/%3E%3Ccircle cx='16' cy='16' r='10' fill='none' stroke='%235FC6C9' stroke-width='2'/%3E%3Ccircle cx='16' cy='16' r='3.5' fill='%23FFB454'/%3E%3C/svg%3E">
 <title>ProofProbe Admin</title>
 <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Familjen+Grotesk:wght@500;700&family=Source+Sans+3:wght@400;600;700&family=JetBrains+Mono:wght@500&display=swap" onload="this.onload=null;this.rel='stylesheet'">
 <style>
@@ -33,7 +34,7 @@ footer{margin-top:24px;color:var(--muted);font-size:15px}
 .skel{display:grid;gap:12px;padding-block:8px 26px}.skel i{display:block;height:64px;border-radius:6px;background:linear-gradient(100deg,var(--line) 30%,var(--surface) 50%,var(--line) 70%);background-size:220% 100%;opacity:.55;animation:shimmer 1.05s linear infinite}.skel i:first-child{height:120px}
 @keyframes shimmer{from{background-position:120% 0}to{background-position:-120% 0}}
 @media (prefers-reduced-motion:reduce){#loadbar::before{animation:none;width:100%}.skel i{animation:none}}
-@media (max-width:640px){
+@media (max-width:860px){
   table.cards thead{display:none}
   table.cards,table.cards tbody,table.cards tr{display:block;width:100%}
   table.cards tr{padding:11px 12px;border-bottom:1px solid var(--line)}table.cards tr:last-child{border-bottom:0}
@@ -43,10 +44,15 @@ footer{margin-top:24px;color:var(--muted);font-size:15px}
   table.cards td:first-child{display:block;font-size:17px;font-weight:600;padding-bottom:6px}table.cards td:first-child::before{content:none}
   table.cards .chip{justify-self:start;white-space:normal}
 }
-@media (max-width:640px){table.cards td.act{display:block}table.cards .row input{min-width:0}}
+@media (max-width:860px){table.cards td.act{display:block}table.cards .row input{min-width:0}}
 @keyframes rainbow{to{background-position:200% 50%}}
 .brand{display:inline-block;transition:transform .2s ease}.brand:hover,.brand:focus-visible{background:linear-gradient(90deg,#FF5E7E,#FFB454,#7BE495,#5FC6C9,#7C8CFF,#D478FF,#FF5E7E);background-size:200% auto;-webkit-background-clip:text;background-clip:text;color:transparent;animation:rainbow 1.4s linear infinite;transform:translateY(-1px) scale(1.03)}.brand:active{transform:scale(.97)}
 @media (prefers-reduced-motion:reduce){.brand:hover,.brand:focus-visible{animation:none;transform:none}}
+td,li,p,h1,h2,summary,.qa{overflow-wrap:anywhere}
+.row button{flex:none}
+.link,td.act button,td .pwset{white-space:nowrap}
+@media (min-width:861px){#rows td:nth-child(2){min-width:190px}#rows td:nth-child(5),#rows td:nth-child(3){white-space:nowrap}.pwi{min-width:150px}}
+@media (pointer:coarse){summary{min-height:44px}.fold>summary{align-items:center}.sec>summary{align-items:center}details.fold>summary{display:flex;align-items:center}button{min-height:42px}.infobtn{min-height:20px}.saverow button{min-height:40px}}
 </style></head><body><div id="loadbar" role="progressbar" aria-label="Loading"></div><div class="wrap">
 <div class="top"><a class="brand" href="/">ProofProbe</a><div class="row"><a href="/probes">Probes</a><button type="button" class="ghost" id="logout" hidden>Log out</button></div></div>
 
@@ -67,7 +73,7 @@ footer{margin-top:24px;color:var(--muted);font-size:15px}
   <div class="tablebox" style="margin-block:10px 8px"><table class="cards"><thead><tr><th>Profile</th><th>Pages</th><th>Password</th><th>Change password</th></tr></thead><tbody id="profiles"></tbody></table></div>
   <div class="row"><input id="newProfile" placeholder="New profile name" aria-label="New profile name" style="max-width:280px"><button type="button" class="ghost" id="addProfile">Add profile</button><span class="muted" id="pwMsg"></span></div>
   <h2 style="margin-top:24px">Pages</h2>
-  <div class="tablebox" style="margin-top:10px"><table class="cards"><thead><tr><th>Profile</th><th>Page</th><th>Stage</th><th>Saved</th><th>Submissions</th><th>Cost</th><th>Last change</th><th></th></tr></thead><tbody id="rows"></tbody></table></div>
+  <div class="tablebox" style="margin-top:10px"><table class="cards"><thead><tr><th>Profile</th><th>Page</th><th>Stage</th><th>Steps</th><th>Saved</th><th>Submissions</th><th>Cost</th><th>Last change</th><th></th></tr></thead><tbody id="rows"></tbody></table></div>
   <section class="panel" id="detail" hidden></section>
 </main>
 <footer id="foot" hidden>Everything here is private to this login. Password views and answer edits are recorded in the activity log.</footer>
@@ -145,7 +151,7 @@ async function loadApp(){
     const stage=el("td");stage.appendChild(el("span",s,"chip "+tone));
     const a=el("a",p.title);a.href="/probes/"+p.profile_slug+"/"+p.slug;const title=el("td");title.appendChild(a);
     const act=el("td");act.appendChild(open);
-    act.className="act";tr.append(el("td",p.profile),title,stage,el("td",p.saved+" of "+p.total,"num"),el("td",String(p.submissions),"num"),el("td",money(p.cost_usd),"num"),el("td",fmt(p.updated_at)),act);
+    act.className="act";tr.append(el("td",p.profile),title,stage,el("td",String(p.steps),"num"),el("td",p.saved+" of "+p.total,"num"),el("td",String(p.submissions),"num"),el("td",money(p.cost_usd),"num"),el("td",fmt(p.updated_at)),act);
     body.appendChild(tr);
   });
   document.querySelectorAll("table.cards").forEach(labelCards);
@@ -155,7 +161,7 @@ async function loadDetail(id){
   box.appendChild(el("h2",d.profile+": "+d.title));
   if(d.reroute)box.appendChild(el("p","New direction requested "+fmt(d.reroute.at)+": "+d.reroute.message,"chip warn"));
 
-  const qs=d.sections.flatMap(s=>s.questions);
+  const seenQ=new Set(),qs=d.steps.flatMap(s=>s.sections.flatMap(x=>x.questions)).filter(q=>!seenQ.has(q.id)&&seenQ.add(q.id));
   const ans=el("details",null,"fold");ans.open=true;const sm=el("summary","Saved answers ("+qs.filter(q=>(d.answers[q.id]?.text||"").trim()).length+" of "+qs.length+")");ans.appendChild(sm);
   const g=el("div",null,"grid2");g.style.marginTop="12px";const fields={};
   qs.forEach((q,i)=>{const w=el("div",null,"qa");const l=el("label",(i+1)+". "+q.text);l.htmlFor="a-"+q.id;const ta=el("textarea");ta.id="a-"+q.id;ta.value=d.answers[q.id]?.text||"";fields[q.id]=ta;w.append(l,ta);g.appendChild(w)});
@@ -171,7 +177,7 @@ async function loadDetail(id){
   const logs=el("details",null,"fold");logs.appendChild(el("summary","Submission logs ("+d.submissions.length+")"));
   if(!d.submissions.length)logs.appendChild(el("p","Nothing submitted yet.","muted"));
   d.submissions.slice().reverse().forEach(s=>{
-    const one=el("details",null,"fold"),h=el("summary","Submission "+s.seq+", "+fmt(s.submittedAt)+", "+s.answered+" of "+s.total+" answers"+(s.intact?"":" (failed integrity check)"));one.appendChild(h);
+    const one=el("details",null,"fold"),h=el("summary","Submission "+s.seq+" (step "+s.stepN+"), "+fmt(s.submittedAt)+", "+s.answered+" of "+s.total+" answers"+(s.intact?"":" (failed integrity check)"));one.appendChild(h);
     const inner=el("div",null,"grid2");inner.style.marginTop="10px";(s.items||[]).forEach((q,i)=>{const w=el("div",null,"qa");w.append(el("b",(i+1)+". "+q.question),el("p",q.answer||"Not answered"));inner.appendChild(w)});one.appendChild(inner);logs.appendChild(one);
   });
   box.appendChild(logs);

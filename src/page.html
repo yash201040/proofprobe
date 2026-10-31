@@ -1,4 +1,5 @@
 <!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%23071019'/%3E%3Ccircle cx='16' cy='16' r='10' fill='none' stroke='%235FC6C9' stroke-width='2'/%3E%3Ccircle cx='16' cy='16' r='3.5' fill='%23FFB454'/%3E%3C/svg%3E">
 <title>ProofProbe</title>
 <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Familjen+Grotesk:wght@500;700&family=Source+Sans+3:wght@400;600;700&family=JetBrains+Mono:wght@500&display=swap" onload="this.onload=null;this.rel='stylesheet'">
 <style>
@@ -109,13 +110,40 @@ dialog{width:min(420px,calc(100vw - 32px));padding:22px;border:1px solid var(--l
 .dirtools .filterpanel label{display:flex;align-items:center;gap:10px;min-height:38px;padding:4px 6px;border-radius:6px;font-size:16px;font-weight:500;color:var(--ink);cursor:pointer}.filterpanel label:hover{background:var(--accent-soft)}.filterpanel input{width:18px;height:18px;flex:none;accent-color:var(--accent)}
 @media (max-width:640px){.filterwrap{flex:1 1 120px}#filterBtn{width:100%}.filterpanel{position:fixed;left:14px;right:14px;top:auto;bottom:calc(env(safe-area-inset-bottom,0px) + 14px);width:auto;max-height:70vh}}
 .nb{white-space:nowrap}
+td,th,li,p,h1,h2,h3,summary,.qa,.pagelink b,.who,.chip,label{overflow-wrap:anywhere}
+th{overflow-wrap:normal}
+#sortDir{min-width:154px}
+.notfound{margin-top:12px;display:inline-block}
+@media (hover:none){.profile.single:hover{transform:none;border-color:var(--line);box-shadow:none}.profile.single:hover::before,.pagelink.row:hover::before{opacity:0;animation:none}.profile.single:hover .pagelink b{color:inherit}.pagelink.row:hover{background:none}.infobtn:hover{color:var(--muted);border-color:var(--line);transform:none}.brandlink:hover{background:none;color:var(--ink);animation:none;transform:none}.filterpanel label:hover{background:none}.dirtools select:hover{border-color:var(--line)}}
+.editbtn{display:inline-flex;align-items:center;gap:8px;position:relative;overflow:hidden;transition:transform .25s cubic-bezier(.2,1.4,.4,1),box-shadow .2s ease}.lk{width:17px;height:17px;flex:none}.lk .sh{transition:transform .25s ease;transform-origin:16px 11px}
+.editbtn::after{content:"";position:absolute;top:0;bottom:0;left:-60%;width:40%;background:linear-gradient(100deg,transparent,rgba(255,255,255,.35),transparent);transform:skewX(-18deg)}
+.editbtn:active{transform:scale(.96)}
+@media (hover:hover){.editbtn:hover{transform:translateY(-2px);box-shadow:0 8px 20px color-mix(in srgb,var(--accent) 34%,transparent)}.editbtn:hover .sh{transform:rotate(14deg)}.editbtn:hover::after{animation:cardflash .7s ease-out}}
+.unlocked{display:inline-flex;align-items:center;gap:6px;font-weight:600;color:var(--go)}
+.steptabs{display:flex;flex-wrap:wrap;gap:8px;padding-block:2px 16px}
+.steptab{max-width:100%;text-align:left;min-height:42px;background:transparent;color:var(--muted);border:1px solid var(--line);border-radius:999px;padding:7px 15px;transition:color .15s ease,border-color .15s ease,background .15s ease}.steptab b{font-family:var(--mono);font-weight:500;font-size:12.5px;margin-right:7px}.steptab[aria-current=true]{background:var(--accent);border-color:var(--accent);color:var(--surface)}
+@media (hover:hover){.steptab:not([aria-current=true]):hover{color:var(--accent);border-color:var(--accent)}}
+#unlockfx{position:fixed;inset:0;z-index:50;display:grid;place-items:center;pointer-events:none;background:color-mix(in srgb,var(--bg) 26%,transparent);animation:fxfade 1.25s ease forwards}
+#unlockfx svg{grid-area:1/1;width:clamp(120px,34vmin,190px);height:auto;stroke:var(--go);filter:drop-shadow(0 6px 22px color-mix(in srgb,var(--bg) 70%,transparent));animation:fxpop 1.25s cubic-bezier(.2,1.2,.4,1) forwards}
+.fxring{grid-area:1/1;width:clamp(120px,34vmin,190px);aspect-ratio:1;border-radius:50%;border:3px solid var(--go);opacity:0;animation:fxring .9s ease-out .32s}
+.fxsh{transform-origin:82px 56px;animation:fxopen .42s cubic-bezier(.3,1.5,.5,1) .22s forwards}
+.fxtick{stroke-dasharray:50;stroke-dashoffset:50;animation:fxtick .3s ease-out .46s forwards}
+@keyframes fxfade{0%{opacity:0}12%{opacity:1}72%{opacity:1}100%{opacity:0}}
+@keyframes fxpop{0%{transform:scale(.72)}22%{transform:scale(1.04)}34%{transform:scale(1)}100%{transform:scale(1)}}
+@keyframes fxopen{to{transform:translateY(-8px) rotate(26deg)}}
+@keyframes fxtick{to{stroke-dashoffset:0}}
+@keyframes fxring{0%{opacity:.8;transform:scale(.8)}100%{opacity:0;transform:scale(2.3)}}
+@media (prefers-reduced-motion:reduce){#unlockfx svg,.fxsh,.fxring{animation:none}.fxtick{stroke-dashoffset:0;animation:none}#unlockfx{animation:fxfade .9s linear forwards}}
+@media (pointer:coarse){summary{min-height:44px}.fold>summary{align-items:center}.sec>summary{align-items:center}details.fold>summary{display:flex;align-items:center}button{min-height:42px}.infobtn{min-height:20px}.saverow button{min-height:40px}}
 </style></head><body><div id="loadbar" role="progressbar" aria-label="Loading"></div><div class="wrap">
 <div class="topbar"><a class="brandlink" href="/">ProofProbe</a></div>
 <header><div class="eyebrow" id="eyebrow"></div><h1 id="title"></h1>
   <p class="cost" id="cost" hidden></p>
   <p class="callout" id="rerouteInfo" hidden></p>
-  <div class="access" id="access" hidden><span id="accessText"></span><button type="button" id="unlockBtn">Edit this page</button><button type="button" id="lockBtn" class="ghost" hidden>Stop editing</button></div>
+  <div class="access" id="access" hidden><span id="accessText"></span><span class="unlocked" id="unlockedTag" hidden><svg class="lk" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 7.5-2"/></svg>Unlocked</span><button type="button" id="unlockBtn" class="editbtn"><svg class="lk" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="9" rx="2"/><path class="sh" d="M8 11V8a4 4 0 0 1 8 0v3"/></svg><span>Follow Up</span></button><button type="button" id="lockBtn" class="ghost" hidden>Stop editing</button></div>
 </header>
+<nav class="steptabs" id="stepTabs" aria-label="Research steps" hidden></nav>
+<div id="unlockfx" hidden aria-hidden="true"><div class="fxring"></div><svg viewBox="0 0 120 120" fill="none" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"><path class="fxsh" d="M38 56V38a22 22 0 0 1 44 0v18"/><rect class="fxbody" x="24" y="56" width="72" height="52" rx="12"/><path class="fxtick" d="M46 82l10 10 19-20"/></svg></div>
 <div class="skel" id="skel" aria-hidden="true"><i></i><i></i><i></i></div>
 <div id="tip" role="tooltip" hidden></div>
 <div id="fatal" class="alert" hidden><p id="fatalText"></p><p style="margin-top:9px"><button type="button" id="retry">Try again</button></p></div>
@@ -136,8 +164,8 @@ dialog{width:min(420px,calc(100vw - 32px));padding:22px;border:1px solid var(--l
     <p id="submitHint" class="state warn" style="margin-top:8px"></p>
     <p id="submitStatus" role="status" style="margin-top:10px"></p><ul id="log" class="log"></ul></div>
 </div></section>
-<dialog id="unlockBox" aria-labelledby="unlockTitle"><h3 id="unlockTitle">Edit this page</h3><label for="password">Enter your profile password</label><input id="password" type="password" autocomplete="current-password"><p class="state err" id="unlockErr" role="alert"></p><div class="dialogrow"><button type="button" class="ghost" id="unlockCancel">Cancel</button><button type="button" id="unlockGo">Continue</button></div></dialog>
-<footer class="notice" id="notice">Privacy: anyone with this site's address can read every page, including research, documents and submitted answers. Saved answers stay out of view until submitted. Only someone with a profile's password can edit its pages.</footer>
+<dialog id="unlockBox" aria-labelledby="unlockTitle"><h3 id="unlockTitle">Follow Up</h3><label for="password">Enter your profile password to answer and edit</label><input id="password" type="password" autocomplete="current-password"><p class="state err" id="unlockErr" role="alert"></p><div class="dialogrow"><button type="button" class="ghost" id="unlockCancel">Cancel</button><button type="button" id="unlockGo">Continue</button></div></dialog>
+<footer class="notice" id="notice">Privacy: anyone with this site's address can read each page's research, questions, status and cost. Answers stay private. Only someone with a profile's password, and the site owner, can see or edit them.</footer>
 </div>
 <script>
 const seg=location.pathname.split("/").filter(Boolean),onPage=seg.length===3;
@@ -199,6 +227,7 @@ function renderBlocks(host,list){
     else if(b.t==="table"){const box=el("div",null,"tablebox"),t=el("table",null,(b.head||[]).length>2?"cards":null),th=el("tr");(b.head||[]).forEach(c=>th.appendChild(el("th",c)));const hd=el("thead");hd.appendChild(th);t.appendChild(hd);const bd=el("tbody");(b.rows||[]).forEach(r=>{const tr=el("tr");r.forEach((c,i)=>{const td=el("td");td.dataset.label=(b.head||[])[i]||"";fillCell(td,c);tr.appendChild(td)});bd.appendChild(tr)});t.appendChild(bd);box.appendChild(t);host.appendChild(box)}
   }catch(e){}});
 }
+function grow(t){t.style.height="auto";t.style.height=t.scrollHeight+2+"px"}
 function renderForm(sections){
   const form=$("form");form.textContent="";ids=[];sectionCounts.length=0;let n=0;
   sections.forEach((s,si)=>{
@@ -215,6 +244,7 @@ function renderForm(sections){
       restore.addEventListener("click",()=>{const b=blocks[q.id];ta.value=b.conflict;drafts[q.id]={text:b.conflict,base:b.savedAt};b.conflict=null;putDrafts();paint(q.id);bar()});
       row.append(st,restore);w.append(el("div",String(n),"num"),c,ta,row);qs.appendChild(w);
       blocks[q.id]={ta,st,restore,n,saved:"",savedAt:null,conflict:null};
+      ta.addEventListener("input",()=>grow(ta));
       ta.addEventListener("input",()=>{const b=blocks[q.id];saveError=null;submitKey=null;b.conflict=null;if(ta.value===b.saved)delete drafts[q.id];else drafts[q.id]={text:ta.value,base:b.savedAt};putDrafts();paint(q.id);bar()});
     });
     box.appendChild(qs);form.appendChild(box);
@@ -255,7 +285,7 @@ async function saveAll(){
   }catch(e){
     const stale=e.status===409||e.status===404;
     const tooLong=e.status===413&&e.body&&e.body.id&&blocks[e.body.id];
-    saveError=e.status===401?"Editing has ended. Refresh and press Edit this page.":e.status===403?"This form is closed, so nothing was saved.":stale?"Something changed elsewhere. Refresh this page. Your text is kept on this device.":tooLong?"Q"+tooLong.n+" is too long to save. Please shorten it.":"Not saved. Check your connection and try again. Your text is kept on this device.";
+    saveError=e.status===401?"Your session has ended. Refresh and press Follow Up.":e.status===403?"This form is closed, so nothing was saved.":stale?"Something changed elsewhere. Refresh this page. Your text is kept on this device.":tooLong?"Q"+tooLong.n+" is too long to save. Please shorten it.":"Not saved. Check your connection and try again. Your text is kept on this device.";
   }
   busy=false;bar();
 }
@@ -274,7 +304,7 @@ $("submit").addEventListener("click",async()=>{
     st.textContent="Submission "+r.seq+" received with "+r.answered+" of "+r.total+" answers."+change+" You can close this page.";
     busy=false;bar();
     const d=await fetch(API).then(x=>x.json()).catch(()=>null);if(d&&d.submissions)renderLog(d.submissions);
-  }catch(e){st.textContent=e.status===401?"Editing has ended. Refresh and press Edit this page.":e.status===403?"This form is closed, so nothing was submitted.":"Your submission wasn't confirmed. Check your connection and press Submit answers again."}
+  }catch(e){st.textContent=e.status===401?"Your session has ended. Refresh and press Follow Up.":e.status===403?"This form is closed, so nothing was submitted.":"Your submission wasn't confirmed. Check your connection and press Submit answers again."}
   busy=false;bar();
 });
 $("form").addEventListener("submit",e=>e.preventDefault());
@@ -284,16 +314,20 @@ const money=n=>"$"+Number(n).toFixed(n>0&&n<1?3:2);
 const STAGE={draft:"Being prepared",open:"Answering questions",submitted:"Answers in",plan_ready:"Path ready",closed:"Closed"};
 const TONE={open:"warn",submitted:"info",plan_ready:"good",closed:"bad"};
 function fail(m){$("fatalText").textContent=m;$("fatal").hidden=false}
-function showRead(d){
-  $("viewNote").textContent=d.seq?"Submission "+d.seq+", "+fmt(d.submittedAt)+". Read only.":"No answers submitted yet.";
+function notFound(){document.title="Page not found";$("title").textContent="Page not found";const e=$("eyebrow");e.textContent="";const a=el("a","Back to Probes");a.href="/probes";e.appendChild(a);const n=$("notice");if(n)n.hidden=true}
+function showRead(d,s){
+  const qs=s.sections.flatMap(x=>x.questions),log=d.logs&&d.logs[s.n];
+  $("viewNote").textContent=!d.editable?"Answers are private to this profile.":log?"Submission "+log.seq+", "+fmt(log.submittedAt)+". Read only.":"No answers were submitted for this step.";
   const l=$("viewList");l.textContent="";
-  d.items.forEach((q,i)=>{const w=el("div",null,"qa");w.appendChild(el("b",(i+1)+". "+q.question));const has=!!q.answer.trim();if(d.seq)w.appendChild(el("p",has?q.answer:"Not answered",has?"has":""));l.appendChild(w)});
-  $("viewQs").hidden=!d.items.length;$("qBox").hidden=true;
+  qs.forEach((q,i)=>{const w=el("div",null,"qa");w.appendChild(el("b",(i+1)+". "+q.text));
+    if(d.editable&&log){const it=log.items.find(x=>x.id===q.id),t=it?it.answer.trim():"";w.appendChild(el("p",t?it.answer:"Not answered",t?"has":""))}
+    l.appendChild(w)});
+  $("viewQs").hidden=!qs.length;$("qBox").hidden=true;
 }
-function showEdit(d){
+function showEdit(d,s){
   closed=d.status==="closed";
-  if(!formReady&&d.sections.length){
-    renderForm(d.sections);
+  if(!formReady){
+    renderForm(s.sections);
     ids.forEach(id=>{
       const b=blocks[id],a=d.answers[id];b.saved=a?a.text:"";b.savedAt=a?a.updatedAt:null;
       const dr=drafts[id];
@@ -301,29 +335,38 @@ function showEdit(d){
       else if(dr&&dr.base!==b.savedAt){b.conflict=dr.text;delete drafts[id]}
       b.ta.value=drafts[id]?drafts[id].text:b.saved;paint(id);if(dirty(id)||b.conflict)sectionCounts.forEach(x=>{if(x.ids.includes(id))x.box.open=true});
     });
-    putDrafts();renderLog(d.submissions);bar();
+    putDrafts();renderLog(d.submissions);bar();ids.forEach(id=>{if(blocks[id].ta.value)requestAnimationFrame(()=>grow(blocks[id].ta))});
     const last=d.submissions[d.submissions.length-1];
     if(last)$("submitStatus").textContent="Last submitted "+fmt(last.submittedAt)+".";
     if(closed)$("submitStatus").textContent="This form is closed.";
     formReady=true;
   }
   if(d.reroute&&!$("rerouteText").value){$("rerouteText").value=d.reroute.message;$("rerouteState").textContent="Received "+fmt(d.reroute.at)+". This page will update when the new research is ready."}
-  $("qBox").hidden=!d.sections.length;$("viewQs").hidden=true;
+  $("qBox").hidden=false;$("viewQs").hidden=true;
 }
+let pageData=null;
+function renderStep(n){
+  const d=pageData,s=d.steps.find(x=>x.n===n)||d.steps[d.steps.length-1];
+  const t=$("stepTabs");t.hidden=d.steps.length<2;t.textContent="";
+  d.steps.forEach(x=>{const b=el("button",null,"steptab");b.type="button";b.dataset.step=x.n;b.setAttribute("aria-current",String(x.n===s.n));b.append(el("b","Step "+x.n),x.title);b.addEventListener("click",()=>{if(location.hash==="#step-"+x.n)renderStep(x.n);else location.hash="step-"+x.n});t.appendChild(b)});
+    $("planBox").hidden=!s.plan.length;if(s.plan.length)renderBlocks($("plan"),s.plan);
+  $("introBox").hidden=!s.intro.length;if(s.intro.length)renderBlocks($("intro"),s.intro);
+  if(d.editable&&s.n===d.openStep)showEdit(d,s);else showRead(d,s);
+}
+const hashStep=()=>{const m=location.hash.match(/^#step-(\d+)$/);return m?Number(m[1]):null};
 async function showPage(){
   $("fatal").hidden=true;
   const r=await fetch(API);if(!r.ok)throw r;
-  const d=await r.json();
+  const d=pageData=await r.json();
   document.title=d.title;$("title").textContent=d.title;
   const eb=$("eyebrow");eb.textContent="";const a=el("a","Probes");a.href="/probes";eb.append(a," / "+d.name);
   $("cost").textContent="Research cost so far: "+money(d.costUsd);$("cost").hidden=false;
-  if(d.plan.length){renderBlocks($("plan"),d.plan);$("planBox").hidden=false}
-  if(d.intro.length){renderBlocks($("intro"),d.intro);$("introBox").hidden=false}
-  const ri=$("rerouteInfo");ri.textContent=d.reroute?"New direction requested: "+d.reroute.message:"";ri.hidden=!d.reroute;
-  $("access").hidden=false;$("unlockBtn").hidden=d.editable||!d.hasPassword;$("lockBtn").hidden=!d.editable;
-  $("accessText").textContent=d.editable?"You can edit all of "+d.name+"'s pages on this device.":d.hasPassword?"View only.":"View only. Editing isn't set up yet.";
-  if(d.editable)showEdit(d);else showRead(d);
+  const ri=$("rerouteInfo");ri.textContent=d.reroute?"New direction requested: "+d.reroute.message:d.rerouting?"A new direction is being researched.":"";ri.hidden=!ri.textContent;
+  $("access").hidden=false;$("unlockBtn").hidden=d.editable||!d.hasPassword;$("lockBtn").hidden=!d.editable;$("unlockedTag").hidden=!d.editable;
+  $("accessText").textContent=d.editable?"":d.hasPassword?"":"Editing isn't set up yet.";$("accessText").hidden=!$("accessText").textContent;
+  renderStep(hashStep()??d.steps[d.steps.length-1].n);
 }
+function playUnlock(){const f=$("unlockfx");f.hidden=false;f.style.animation="none";void f.offsetWidth;f.style.animation="";setTimeout(()=>{f.hidden=true},1300)}
 const day=iso=>new Date(iso).toLocaleDateString([],{dateStyle:"medium"});
 const stageOf=g=>g.rerouting?"rerouting":g.status;
 const STAGE_NAME=k=>k==="rerouting"?"Changing direction":STAGE[k]||k;
@@ -346,6 +389,10 @@ function buildFilters(){
   STATUS_FILTERS.forEach(k=>s.appendChild(filterBox("status",k,STAGE_NAME(k))));
   directory.slice().sort((x,y)=>x.name.localeCompare(y.name,undefined,{sensitivity:"base"})).forEach(x=>p.appendChild(filterBox("profile",x.slug,x.name)));
 }
+const VIEW_KEY="probes-view";
+function saveView(){try{sessionStorage.setItem(VIEW_KEY,JSON.stringify({sort:$("sortBy").value,dir:sortDir,status:[...picked.status],profile:[...picked.profile],y:scrollY}))}catch(e){}}
+function loadView(){try{const v=JSON.parse(sessionStorage.getItem(VIEW_KEY)||"null");if(!v)return 0;$("sortBy").value=SORTS[v.sort]?v.sort:"created";sortDir=v.dir==="asc"?"asc":"desc";picked.status=new Set(v.status);picked.profile=new Set(v.profile);return v.y||0}catch(e){return 0}}
+function placeFilter(){const f=$("filterPanel");f.style.left="";if(innerWidth>640){const r=f.getBoundingClientRect();if(r.right>innerWidth-12)f.style.left=(innerWidth-12-r.right)+"px"}}
 function closeFilter(){$("filterPanel").hidden=true;$("filterBtn").setAttribute("aria-expanded","false")}
 function renderDirectory(){
   const sort=$("sortBy").value,host=$("profiles"),flip=sortDir==="asc"?1:-1;host.textContent="";
@@ -371,17 +418,18 @@ async function showDirectory(){
   $("fatal").hidden=true;$("title").textContent="Probes";document.title="Probes";
   const r=await fetch("/api/probes");if(!r.ok)throw r;
   directory=(await r.json()).profiles;
-  buildFilters();
-  renderDirectory();$("dirBox").hidden=false;$("notice").hidden=true;
+  const y=loadView();buildFilters();
+  renderDirectory();$("dirBox").hidden=false;$("notice").hidden=true;if(y)requestAnimationFrame(()=>scrollTo(0,y));
+  addEventListener("pagehide",saveView);
 }
 $("sortBy").addEventListener("change",()=>{sortDir=SORTS[$("sortBy").value][2];renderDirectory()});
-$("sortDir").addEventListener("click",()=>{sortDir=sortDir==="asc"?"desc":"asc";renderDirectory()});$("filterBtn").addEventListener("click",e=>{e.stopPropagation();const open=$("filterPanel").hidden;$("filterPanel").hidden=!open;$("filterBtn").setAttribute("aria-expanded",String(open))});
+$("sortDir").addEventListener("click",()=>{sortDir=sortDir==="asc"?"desc":"asc";renderDirectory()});$("filterBtn").addEventListener("click",e=>{e.stopPropagation();const open=$("filterPanel").hidden;$("filterPanel").hidden=!open;$("filterBtn").setAttribute("aria-expanded",String(open));if(open)placeFilter()});
 $("filterPanel").addEventListener("click",e=>e.stopPropagation());
 $("filterClear").addEventListener("click",()=>{picked.status.clear();picked.profile.clear();buildFilters();renderDirectory()});
 document.addEventListener("click",closeFilter);document.addEventListener("keydown",e=>{if(e.key==="Escape")closeFilter()});
 async function route(){
   try{if(onPage)await showPage();else await showDirectory()}
-  catch(e){fail(e&&e.status===404?"This page doesn't exist.":"We couldn't load this page. Check your connection and try again.")}
+  catch(e){if(e&&e.status===404)notFound();else fail("We couldn't load this page. Check your connection and try again.")}
   loaded();
 }
 $("rerouteText").addEventListener("input",e=>{$("rerouteSend").disabled=!e.target.value.trim();$("rerouteState").textContent=""});
@@ -391,7 +439,7 @@ $("rerouteSend").addEventListener("click",async()=>{
     const r=await call("/reroute",{method:"POST",body:JSON.stringify({message:$("rerouteText").value})});
     st.textContent="Received "+fmt(r.at)+". You can skip the questions. This page will update when the new research is ready.";
     const ri=$("rerouteInfo");ri.textContent="New direction requested: "+r.message;ri.hidden=false;
-  }catch(e){b.disabled=false;st.textContent=e.status===401?"Editing has ended. Refresh and press Edit this page.":"That wasn't sent. Check your connection and try again."}
+  }catch(e){b.disabled=false;st.textContent=e.status===401?"Your session has ended. Refresh and press Follow Up.":"That wasn't sent. Check your connection and try again."}
 });
 $("unlockBtn").addEventListener("click",()=>{$("unlockErr").textContent="";$("unlockBox").showModal();$("password").focus()});
 $("unlockCancel").addEventListener("click",()=>$("unlockBox").close());
@@ -399,7 +447,7 @@ async function tryUnlock(){
   const err=$("unlockErr");err.textContent="";
   try{
     await call("/unlock",{method:"POST",body:JSON.stringify({password:$("password").value})});
-    $("password").value="";$("unlockBox").close();await route();
+    $("password").value="";$("unlockBox").close();playUnlock();await route();
   }catch(e){
     if(e.status===401)err.textContent="That password isn't right.";
     else err.textContent="Couldn't unlock. Check your connection and try again.";
@@ -412,6 +460,7 @@ $("tip").addEventListener("pointerenter",()=>clearTimeout(tipTimer));$("tip").ad
 document.addEventListener("click",e=>{if(tipFor&&!e.target.closest("#tip"))hideTip()});
 document.addEventListener("keydown",e=>{if(e.key==="Escape")hideTip()});
 addEventListener("scroll",()=>{if(tipFor)hideTip()},{passive:true});
+addEventListener("hashchange",()=>{if(pageData)renderStep(hashStep()??pageData.steps[pageData.steps.length-1].n)});
 $("retry").addEventListener("click",route);
 route();
 </script></body></html>
