@@ -76,10 +76,14 @@ await paint.setRequestInterception(true);
 paint.on("request", (r) => { if (r.url().includes("/api/pages/")) setTimeout(() => r.continue(), 900); else r.continue(); });
 await paint.goto(first.link, { waitUntil: "domcontentloaded" });
 ok((await paint.$("#loadbar")) && (await paint.$("#skel")), "the loading bar shows before content arrives");
-await paint.waitForSelector("#access:not([hidden])"); await paint.waitForFunction(() => !document.querySelector("#loadbar"));
+await paint.waitForSelector("#pin:not([hidden])"); await paint.waitForFunction(() => !document.querySelector("#loadbar"));
 ok(!(await paint.$("#skel")), "the loading bar clears when content arrives"); await paint.close();
-await page.goto(first.link, { waitUntil: "networkidle0" }); await page.waitForSelector("#access:not([hidden])");
+await page.goto(first.link, { waitUntil: "networkidle0" }); await page.waitForSelector("#pin:not([hidden])");
 ok((await shown("#viewQs")) && !(await shown("#qBox")) && (await page.$$("#form textarea")).length === 0, "a visitor gets a read-only page");
+await page.evaluate(() => scrollTo(0, document.documentElement.scrollHeight)); await new Promise((r) => setTimeout(r, 120));
+const fu = await page.$eval("#unlockBtn", (e) => { const r = e.getBoundingClientRect(); return [r.top, innerWidth - r.right, r.height, e.textContent.trim()]; });
+ok(fu[0] < 30 && fu[1] < 40 && fu[2] >= 48 && fu[3] === "Follow Up", "Follow Up is large and pinned top right after scrolling");
+await page.evaluate(() => scrollTo(0, 0));
 const anon = await fetch(first.api + "/answers", { method: "PUT", body: JSON.stringify({ answers: { a1: "hack" } }) });
 const anonSub = await fetch(first.api + "/submit", { method: "POST", body: JSON.stringify({ key: "anon-key-001" }) });
 ok(anon.status === 401 && anonSub.status === 401, "writing without a password is refused");
@@ -93,6 +97,9 @@ await page.waitForSelector("#q-a1"); ok(await shown("#qBox"), "the right passwor
 ok(await page.$eval("#unlockfx", (e) => !e.hidden), "the unlock animation plays");
 await page.waitForFunction(() => document.querySelector("#unlockfx").hidden, { timeout: 2500 });
 ok(await page.$eval("#unlockedTag", (e) => !e.hidden), "the page shows it is unlocked");
+const pinned = async (w, h) => { await page.setViewport({ width: w, height: h }); await page.evaluate(() => scrollTo(0, document.documentElement.scrollHeight)); await new Promise((r) => setTimeout(r, 150)); return page.evaluate(() => { const p = document.querySelector("#pin").getBoundingClientRect(), b = document.querySelector(".bar").getBoundingClientRect(); return p.top >= 0 && p.top < 30 && p.right <= innerWidth && p.left >= 0 && (b.bottom <= p.top || b.top >= p.bottom - 1 || b.height === 0); }); };
+ok((await pinned(1280, 800)) && (await pinned(390, 700)) && (await pinned(320, 600)), "the pinned controls stay on screen at any scroll and clear the save bar");
+await page.setViewport({ width: 1280, height: 800 }); await page.evaluate(() => scrollTo(0, 0));
 
 ok(await dis("#saveAll"), "save disabled before any change");
 await page.type("#q-a1", "first answer");
@@ -185,7 +192,7 @@ pp("export", first.id); ok(JSON.parse(readFileSync(join(config, "..", "cases", f
 ok((await txt(".notice")).startsWith("Privacy:"), "privacy notice is shown");
 
 const newPw = pp("password", first.id).match(/password: (\S+)/)[1];
-await page.reload({ waitUntil: "networkidle0" }); await page.waitForSelector("#access:not([hidden])");
+await page.reload({ waitUntil: "networkidle0" }); await page.waitForSelector("#pin:not([hidden])");
 ok(!(await shown("#qBox")) && newPw !== first.pw, "changing a password locks open devices");
 const tries = []; for (let i = 0; i < 12; i++) tries.push((await fetch(other.api + "/unlock", { method: "POST", body: JSON.stringify({ password: "guess-" + i }) })).status);
 ok(tries.every((s) => s === 401), "wrong guesses never lock anyone out");

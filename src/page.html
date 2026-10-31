@@ -135,13 +135,21 @@ th{overflow-wrap:normal}
 @keyframes fxring{0%{opacity:.8;transform:scale(.8)}100%{opacity:0;transform:scale(2.3)}}
 @media (prefers-reduced-motion:reduce){#unlockfx svg,.fxsh,.fxring{animation:none}.fxtick{stroke-dashoffset:0;animation:none}#unlockfx{animation:fxfade .9s linear forwards}}
 @media (pointer:coarse){summary{min-height:44px}.fold>summary{align-items:center}.sec>summary{align-items:center}details.fold>summary{display:flex;align-items:center}button{min-height:42px}.infobtn{min-height:20px}.saverow button{min-height:40px}}
+.pin{position:fixed;z-index:20;top:calc(env(safe-area-inset-top,0px) + 9px);right:max(16px,calc((100vw - 1440px)/2 + 16px),env(safe-area-inset-right,0px));display:flex;align-items:center;gap:10px}
+.pin .editbtn{min-height:50px;padding:12px 24px;border-radius:999px;font-size:18px;gap:10px;box-shadow:0 8px 24px color-mix(in srgb,var(--accent) 32%,rgba(0,0,0,.28))}.pin .editbtn .lk{width:21px;height:21px}
+.pin .unlocked,.pin #lockBtn{min-height:46px;border-radius:999px;background:var(--surface);box-shadow:0 6px 18px rgba(0,0,0,.22)}.pin .unlocked{padding:0 16px;border:1px solid var(--line)}.pin #lockBtn{padding:8px 18px}
+.topbar{min-height:68px}
+.bar{top:calc(env(safe-area-inset-top,0px) + 66px)}
+@media (max-width:640px){.pin{top:calc(env(safe-area-inset-top,0px) + 8px);gap:7px}.pin .editbtn{min-height:48px;padding:10px 20px;font-size:17px}.pin .unlocked{padding:0 11px}.pin #lockBtn{padding:6px 13px}.bar{top:calc(env(safe-area-inset-top,0px) + 62px)}}
+@media (max-width:370px){.pin .unlocked{font-size:0;gap:0}.pin .unlocked .lk{width:19px;height:19px}}
 </style></head><body><div id="loadbar" role="progressbar" aria-label="Loading"></div><div class="wrap">
 <div class="topbar"><a class="brandlink" href="/">ProofProbe</a></div>
 <header><div class="eyebrow" id="eyebrow"></div><h1 id="title"></h1>
   <p class="cost" id="cost" hidden></p>
   <p class="callout" id="rerouteInfo" hidden></p>
-  <div class="access" id="access" hidden><span id="accessText"></span><span class="unlocked" id="unlockedTag" hidden><svg class="lk" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 7.5-2"/></svg>Unlocked</span><button type="button" id="unlockBtn" class="editbtn"><svg class="lk" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="9" rx="2"/><path class="sh" d="M8 11V8a4 4 0 0 1 8 0v3"/></svg><span>Follow Up</span></button><button type="button" id="lockBtn" class="ghost" hidden>Stop editing</button></div>
+  <div class="access" id="access" hidden><span id="accessText"></span></div>
 </header>
+<div class="pin" id="pin" hidden><span class="unlocked" id="unlockedTag" hidden><svg class="lk" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 7.5-2"/></svg>Unlocked</span><button type="button" id="unlockBtn" class="editbtn"><svg class="lk" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="9" rx="2"/><path class="sh" d="M8 11V8a4 4 0 0 1 8 0v3"/></svg><span>Follow Up</span></button><button type="button" id="lockBtn" class="ghost" hidden>Stop editing</button></div>
 <nav class="steptabs" id="stepTabs" aria-label="Research steps" hidden></nav>
 <div id="unlockfx" hidden aria-hidden="true"><div class="fxring"></div><svg viewBox="0 0 120 120" fill="none" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"><path class="fxsh" d="M38 56V38a22 22 0 0 1 44 0v18"/><rect class="fxbody" x="24" y="56" width="72" height="52" rx="12"/><path class="fxtick" d="M46 82l10 10 19-20"/></svg></div>
 <div class="skel" id="skel" aria-hidden="true"><i></i><i></i><i></i></div>
@@ -362,7 +370,7 @@ async function showPage(){
   const eb=$("eyebrow");eb.textContent="";const a=el("a","Probes");a.href="/probes";eb.append(a," / "+d.name);
   $("cost").textContent="Research cost so far: "+money(d.costUsd);$("cost").hidden=false;
   const ri=$("rerouteInfo");ri.textContent=d.reroute?"New direction requested: "+d.reroute.message:d.rerouting?"A new direction is being researched.":"";ri.hidden=!ri.textContent;
-  $("access").hidden=false;$("unlockBtn").hidden=d.editable||!d.hasPassword;$("lockBtn").hidden=!d.editable;$("unlockedTag").hidden=!d.editable;
+  $("pin").hidden=!(d.editable||d.hasPassword);$("access").hidden=d.editable||d.hasPassword;$("unlockBtn").hidden=d.editable||!d.hasPassword;$("lockBtn").hidden=!d.editable;$("unlockedTag").hidden=!d.editable;
   $("accessText").textContent=d.editable?"":d.hasPassword?"":"Editing isn't set up yet.";$("accessText").hidden=!$("accessText").textContent;
   renderStep(hashStep()??d.steps[d.steps.length-1].n);
 }
