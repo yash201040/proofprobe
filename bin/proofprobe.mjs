@@ -1,12 +1,12 @@
 #!/usr/bin/env node
-// Admin helper for Knowledge Gap. Config and case links stay in .gap/ (git-ignored).
+// Admin helper for ProofProbe. Config and case links stay in .proofprobe/ (git-ignored).
 import { readFileSync, writeFileSync, existsSync, mkdirSync, chmodSync } from "node:fs";
 import { randomBytes, createHash } from "node:crypto";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
-const CFG = process.env.GAP_CONFIG ?? join(ROOT, ".gap/config.json");
-const cfg = () => { if (!existsSync(CFG)) throw new Error("run: gap init"); return JSON.parse(readFileSync(CFG, "utf8")); };
+const CFG = process.env.GAP_CONFIG ?? join(ROOT, ".proofprobe/config.json");
+const cfg = () => { if (!existsSync(CFG)) throw new Error("run: proofprobe init"); return JSON.parse(readFileSync(CFG, "utf8")); };
 const saveCfg = (c) => { mkdirSync(dirname(CFG), { recursive: true }); writeFileSync(CFG, JSON.stringify(c, null, 2)); chmodSync(CFG, 0o600); };
 const readJson = (p) => JSON.parse(readFileSync(p, "utf8"));
 async function api(method, path, body) {
@@ -35,8 +35,8 @@ switch (cmd) {
   case "new": {
     const r = await api("POST", "/cases", { title: flag(a, "title"), firstName: flag(a, "name") });
     const c = cfg(); c.links[r.id] = c.baseUrl + "/c/" + r.token; saveCfg(c);
-    mkdirSync(join(ROOT, ".gap/cases", r.id), { recursive: true });
-    out({ id: r.id, link: c.links[r.id], folder: join(ROOT, ".gap/cases", r.id) });
+    mkdirSync(join(ROOT, ".proofprobe/cases", r.id), { recursive: true });
+    out({ id: r.id, link: c.links[r.id], folder: join(ROOT, ".proofprobe/cases", r.id) });
     break;
   }
   case "publish": {
@@ -80,5 +80,5 @@ switch (cmd) {
     break;
   }
   case "purge": out(await api("DELETE", "/cases/" + a[0])); break;
-  default: console.log("gap init [--url U] | new --name N --title T | cost ID USD [label] | rotate ID | publish ID [--intro F] [--questions F] [--plan F] [--status S] [--allow-drop] | list | link ID | status ID | fetch ID [--seq N] [--out F] | purge ID");
+  default: console.log("proofprobe init [--url U] | new --name N --title T | cost ID USD [label] | rotate ID | publish ID [--intro F] [--questions F] [--plan F] [--status S] [--allow-drop] | list | link ID | status ID | fetch ID [--seq N] [--out F] | purge ID");
 }

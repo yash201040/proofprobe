@@ -33,7 +33,7 @@ const parse = <T,>(s: string, fallback: T): T => { try { return JSON.parse(s) as
 
 // Field contract from the platform guide. Answer text and tokens are never logged.
 function log(env: Env, ray: string, level: string, msg: string, extra: Record<string, unknown> = {}) {
-  console.log(JSON.stringify({ app: "knowledge-gap", version: env.APP_VERSION, ray_id: ray, level, msg, ...extra }));
+  console.log(JSON.stringify({ app: "proofprobe", version: env.APP_VERSION, ray_id: ray, level, msg, ...extra }));
 }
 
 interface Question { id: string; text: string; why?: string }

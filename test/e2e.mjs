@@ -2,14 +2,14 @@
 import puppeteer from "puppeteer-core";
 import { execFileSync } from "node:child_process";
 import { writeFileSync, readFileSync } from "node:fs";
-const config = ".gap/test-config.json";
-const main = JSON.parse(readFileSync(".gap/config.json", "utf8"));
+const config = ".proofprobe/test-config.json";
+const main = JSON.parse(readFileSync(".proofprobe/config.json", "utf8"));
 writeFileSync(config, JSON.stringify({ adminToken: main.adminToken, baseUrl: "http://localhost:8799", links: {} }));
-const gap = (...a) => execFileSync("node", ["bin/gap.mjs", ...a], { encoding: "utf8", env: { ...process.env, GAP_CONFIG: config } });
-const created = JSON.parse(gap("new", "--name", "Test", "--title", "E2E case"));
-const qf = "/tmp/gap-q-" + process.pid + ".json";
+const pp = (...a) => execFileSync("node", ["bin/proofprobe.mjs", ...a], { encoding: "utf8", env: { ...process.env, GAP_CONFIG: config } });
+const created = JSON.parse(pp("new", "--name", "Test", "--title", "E2E case"));
+const qf = "/tmp/proofprobe-q-" + process.pid + ".json";
 writeFileSync(qf, JSON.stringify([{ title: "A", note: "n", first: true, questions: [{ id: "a1", text: "One?", why: "w" }, { id: "a2", text: "Two?", catchAll: true }] }]));
-gap("publish", created.id, "--questions", qf, "--status", "open");
+pp("publish", created.id, "--questions", qf, "--status", "open");
 const cleanup = [created.id];
 const browser = await puppeteer.launch({ executablePath: "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome", headless: "new" });
 try {
@@ -44,11 +44,11 @@ await page.waitForFunction(() => document.querySelector("#saveAll").textContent 
 await settle("#submit"); await page.click("#submit");
 await page.waitForFunction(() => /Submission 2 received/.test(document.querySelector("#submitStatus").textContent));
 ok((await txt("#submitStatus")).includes("Q2"), "submission 2 names what changed");
-const s2 = JSON.parse(gap("fetch", created.id)), s1 = JSON.parse(gap("fetch", created.id, "--seq", "1"));
+const s2 = JSON.parse(pp("fetch", created.id)), s1 = JSON.parse(pp("fetch", created.id, "--seq", "1"));
 ok(s2.seq === 2 && s2.intact && s2.items[1].answer === "second answer", "latest log is intact and complete");
 ok(s1.seq === 1 && s1.intact && s1.items[1].answer === "", "first log is unchanged");
-const other = JSON.parse(gap("new", "--name", "Other", "--title", "Other goal")); cleanup.push(other.id);
-gap("publish", other.id, "--questions", qf, "--status", "open"); gap("cost", other.id, "0.25", "research");
+const other = JSON.parse(pp("new", "--name", "Other", "--title", "Other goal")); cleanup.push(other.id);
+pp("publish", other.id, "--questions", qf, "--status", "open"); pp("cost", other.id, "0.25", "research");
 await page.goto(created.link + "#group", { waitUntil: "networkidle0" });
 await page.waitForFunction(() => /Other/.test(document.querySelector("#people").textContent));
 ok((await txt("#people")).includes("$0.250"), "group shows each person's cost");
@@ -68,18 +68,18 @@ const theirs = await (await fetch(other.link + "/api/case")).json();
 ok(write.ok && again.answers.a1.text === "first answer draft" && theirs.answers.a1.text === "overwrite", "a shared question id still can't cross people");
 const stale = await fetch(created.link + "/api/answers", { method: "PUT", body: JSON.stringify({ answers: { a1: "old" }, bases: { a1: "2000-01-01" } }) });
 ok(stale.status === 409, "a stale save is refused, not overwritten");
-await page.evaluate((k, base) => localStorage.setItem(k, JSON.stringify({ a1: { text: "laptop draft", base } })), "gap-drafts-v2-" + new URL(created.link).pathname.slice(-10), "2000-01-01");
+await page.evaluate((k, base) => localStorage.setItem(k, JSON.stringify({ a1: { text: "laptop draft", base } })), "proofprobe-drafts-v2-" + new URL(created.link).pathname.slice(-10), "2000-01-01");
 await page.reload({ waitUntil: "networkidle0" }); await page.waitForSelector("#q-a1");
 ok((await page.$eval("#q-a1", (e) => e.value)) === "first answer draft", "an old draft doesn't replace newer saved text");
 const bad = JSON.stringify([{ t: "ul", items: "oops" }]); writeFileSync(qf + ".bad", bad);
-let refused = false; try { execFileSync("node", ["bin/gap.mjs", "publish", created.id, "--intro", qf + ".bad"], { stdio: "ignore", env: { ...process.env, GAP_CONFIG: config } }); } catch { refused = true; }
+let refused = false; try { execFileSync("node", ["bin/proofprobe.mjs", "publish", created.id, "--intro", qf + ".bad"], { stdio: "ignore", env: { ...process.env, GAP_CONFIG: config } }); } catch { refused = true; }
 ok(refused, "a malformed block is refused");
 writeFileSync(qf + ".less", JSON.stringify([{ title: "A", questions: [{ id: "a9", text: "New?", catchAll: true }] }]));
-refused = false; try { execFileSync("node", ["bin/gap.mjs", "publish", created.id, "--questions", qf + ".less"], { stdio: "ignore", env: { ...process.env, GAP_CONFIG: config } }); } catch { refused = true; }
+refused = false; try { execFileSync("node", ["bin/proofprobe.mjs", "publish", created.id, "--questions", qf + ".less"], { stdio: "ignore", env: { ...process.env, GAP_CONFIG: config } }); } catch { refused = true; }
 ok(refused, "publishing can't silently drop earlier questions");
-const rot = gap("rotate", other.id); const old = await fetch(other.link); ok(old.status === 404 && rot.includes("new link"), "a leaked link can be replaced");
+const rot = pp("rotate", other.id); const old = await fetch(other.link); ok(old.status === 404 && rot.includes("new link"), "a leaked link can be replaced");
 ok((await page.$eval(".notice", (e) => e.textContent)).startsWith("Privacy:"), "privacy notice is shown");
 const wrong = await fetch(new URL(created.link).origin + "/c/wrongtoken"); ok(wrong.status === 404, "wrong link is refused");
 const adm = await fetch(new URL(created.link).origin + "/admin/cases"); ok(adm.status === 404, "admin needs its token");
 console.log("ALL PASSED");
-} finally { await browser.close(); for (const id of cleanup) gap("purge", id); }
+} finally { await browser.close(); for (const id of cleanup) pp("purge", id); }

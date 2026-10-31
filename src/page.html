@@ -1,5 +1,5 @@
 <!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>Knowledge Gap</title>
+<title>ProofProbe</title>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Familjen+Grotesk:wght@500;700&family=Source+Sans+3:wght@400;600;700&family=JetBrains+Mono:wght@500&display=swap">
 <style>
 /* A signal chart: the page clears gates in order, and state shows as go / caution / stop. */
@@ -37,7 +37,7 @@ textarea{grid-column:2;width:100%;min-height:76px;margin-top:7px;padding:8px 10p
 .notice{padding-block:22px 40px;border-top:1px solid var(--line);font-size:15px;color:var(--muted);max-width:68ch}.qa b{display:block;font-weight:600}.qa p{white-space:pre-wrap;color:var(--muted);margin-top:3px}.qa p.has{color:var(--ink)}
 </style></head><body><div class="wrap">
 <nav class="tabs" aria-label="Pages"><a href="#mine" id="tabMine">My page</a><a href="#group" id="tabGroup">Group</a></nav>
-<header><div class="eyebrow" id="eyebrow">Loading</div><h1 id="title">Knowledge Gap</h1>
+<header><div class="eyebrow" id="eyebrow">Loading</div><h1 id="title">ProofProbe</h1>
   <p class="cost" id="cost" hidden></p>
 </header>
 <div id="fatal" class="alert" hidden><p id="fatalText"></p><p style="margin-top:9px"><button type="button" id="retry">Try again</button></p></div>
@@ -60,7 +60,7 @@ textarea{grid-column:2;width:100%;min-height:76px;margin-top:7px;padding:8px 10p
 </div>
 <script>
 const API=location.pathname.replace(/\/+$/,"")+"/api";
-const DRAFT_KEY="gap-drafts-v2-"+location.pathname.slice(-10);
+const DRAFT_KEY="proofprobe-drafts-v2-"+location.pathname.slice(-10);
 const $=id=>document.getElementById(id);
 const fmt=iso=>new Date(iso).toLocaleString([],{dateStyle:"medium",timeStyle:"short"});
 let drafts={};try{drafts=JSON.parse(localStorage.getItem(DRAFT_KEY)||"{}")}catch(e){drafts={}}

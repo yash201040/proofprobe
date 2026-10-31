@@ -1,20 +1,20 @@
-# Knowledge Gap
+# ProofProbe
 
 Two-step research that turns any starting point into a clear, data-backed path: a job or interview to prepare for, a search for side income, a startup idea, or another goal.
 
 1. **Broad probing:** research the goal, then publish exhaustive personalised questions.
 2. **In-depth research:** when asked, read the latest submission and publish the path on the same page, as one recommendation or up to three alternatives.
 
-- **`/gap` skill** (`skills/gap/SKILL.md`): runs in Claude Code. Opus does the thinking and treg does the live research, so the server needs no AI key.
+- **`/proofprobe` skill** (`skills/proofprobe/SKILL.md`): runs in Claude Code. Opus does the thinking and treg does the live research, so the server needs no AI key.
 - **Worker** (`src/`): hosts each case at a private link. No sign-in. People save and submit answers, and the plan appears on the same page.
-- **`bin/gap.mjs`**: admin helper to create, publish, check and fetch cases.
+- **`bin/proofprobe.mjs`**: admin helper to create, publish, check and fetch cases.
 
 ## Setup
 
 ```
 npm install
-node bin/gap.mjs init --url https://<worker-url>
-ln -s "$PWD/skills/gap" ~/.claude/skills/gap
+node bin/proofprobe.mjs init --url https://<worker-url>
+ln -s "$PWD/skills/proofprobe" ~/.claude/skills/proofprobe
 npx wrangler login
 npx wrangler secret put ADMIN_TOKEN_SHA256     # paste the hash printed by init
 npx wrangler deploy
@@ -25,11 +25,11 @@ Local test: put `ADMIN_TOKEN_SHA256=<hash>` in `.dev.vars`, run `npm run dev`, t
 ## Data rules
 
 - Sharing: send each person their own link. There is no login, password or email. A closed friend group can read every page and submitted answers, and a notice says so. Only a person's own link can change their answers.
-- Submitting stores a log and starts nothing. Research continues only when `/gap` is run.
+- Submitting stores a log and starts nothing. Research continues only when `/proofprobe` is run.
 - The cost shown on a page is treg data spend logged with `gap cost`. Claude usage is not included.
 - Submissions are append-only. A database trigger blocks updates, and each log stores a SHA-256 so corruption is detectable.
 - Page content is rendered as text only, so stored content cannot inject markup.
-- CVs and research notes stay in `.gap/` on this machine, which git ignores. Only questions, intro, plan and costs go to the server.
+- CVs and research notes stay in `.proofprobe/` on this machine, which git ignores. Only questions, intro, plan and costs go to the server.
 - Answer text and tokens are never logged.
 
 ## Platform guide deviations
