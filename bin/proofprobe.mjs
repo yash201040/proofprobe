@@ -76,6 +76,13 @@ switch (cmd) {
     console.log(`Open this one-time link within 30 minutes to choose the master password:\n${cfg().baseUrl}/admin#setup=${r.code}`);
     break;
   }
+  case "export": {
+    const r = await api("GET", "/cases/" + a[0]), dir = join(dirname(CFG), "cases", a[0]);
+    mkdirSync(dir, { recursive: true });
+    for (const [name, value] of [["intro", r.intro], ["plan", r.plan], ["questions", r.sections]]) writeFileSync(join(dir, name + ".json"), JSON.stringify(value, null, 2));
+    console.log(`Saved the published intro, plan and questions to ${dir}`);
+    break;
+  }
   case "pending": out((await api("GET", "/pending")).pending); break;
   case "profiles": out(await api("GET", "/profiles")); break;
   case "import": {
@@ -98,5 +105,5 @@ switch (cmd) {
     break;
   }
   case "purge": out(await api("DELETE", "/cases/" + a[0])); break;
-  default: console.log("proofprobe init [--url U] | new --profile NAME --title T [--new-profile] | profiles | pending | import ID --answers F | cost ID USD [label] | password ID [--set P] | admin-setup | publish ID [--intro F] [--questions F] [--plan F] [--status S] [--allow-drop] | list | link ID | status ID | fetch ID [--seq N] [--out F] | purge ID");
+  default: console.log("proofprobe init [--url U] | new --profile NAME --title T [--new-profile] | profiles | pending | export ID | import ID --answers F | cost ID USD [label] | password ID [--set P] | admin-setup | publish ID [--intro F] [--questions F] [--plan F] [--status S] [--allow-drop] | list | link ID | status ID | fetch ID [--seq N] [--out F] | purge ID");
 }

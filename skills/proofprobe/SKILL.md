@@ -65,6 +65,15 @@ This works the same for jobs, side income, startups and any other goal. Someone 
 3. Keep any existing answers that still matter by reusing their question ids.
 4. Log the cost, then publish the new `intro.json` and `questions.json` with `--status open`, plus `--allow-drop` for retired questions. Publishing new questions closes the request and clears any old path from the page. Earlier submissions stay in the logs, but they no longer count until someone submits again.
 
+## Updating an existing page
+
+Use this for "/proofprobe refresh <profile or page>", or when an older page needs to meet the current standard.
+
+1. Find the page with `proofprobe list`, then run `proofprobe export <id>`. It saves the live `intro.json`, `plan.json` and `questions.json` to the case folder.
+2. Rewrite them to match "How every page must read", using the research already done. If that research is in another chat or folder, read it there. Keep question ids unchanged, so answers stay attached.
+3. Spend on new research only if a claim can't be supported and the user agrees.
+4. Publish with `proofprobe publish <id>`, passing only the files you changed.
+
 ## Moving existing research in
 
 Use this when Step 1 already happened in another chat or folder. Don't repeat the research.
@@ -116,7 +125,8 @@ These rules apply to every `intro.json` and `plan.json`. Check the page against 
 - **Make tables detailed.** Choose columns that help a decision, such as cost, time, effort, risk, fit, demand and evidence strength. Mix data types: money, ranges, dates, ratings, yes or no, and short text. Use a separate table when a topic needs different columns.
 - **Show it visually.** Use a coloured grade for ratings, risk, fit and confidence, a meter for scores, and bars to compare one number across options. Keep colours meaning the same thing throughout: `good` is favourable, `warn` is mixed, `bad` is a blocker, and `info` is neutral.
 - **Keep charts honest.** Use one unit per chart, and never chart different units together. Don't invent precision: label estimates as estimates, and show the source and strength of each key number.
-- **Use info icons sparingly.** Keep cells short, and add `info` only where a value needs its reason, source, assumption or a caveat that changes how to read it. Use one or two sentences. Skip it when the cell is self-explanatory, and never hide anything vital there, because many people won't open it.
+- **Reasoning cells: conclusion, then proof.** Start with a plain conclusion anyone can follow, then give one or two concise data points for that exact row, and name their source. Use proper nouns, keywords and real numbers, such as "Demand is real but young. Dravin counted 90 firms selling this in Sep 2026." Avoid generic lines with no proof, and don't stack more figures than the point needs.
+- **Info icons give context, not data.** Put the numbers and sources in the visible cell. Use `info` for what's behind it: why it's written this way, what kind of source it comes from, how the thing works, or how to read it. Keep it to one or two sentences with no figures or data points, and add it only where it helps. Never hide anything vital there, because many people won't open it.
 - **Fold everything.** Put all content in `section` blocks with a short `note`. Leave only the first one or two `open`.
 - **Open with the answer.** Start with a short summary and a table of what decides the outcome.
 - **Keep words short.** Use short paragraphs or bullets only for what a table can't hold. Use simple words, one idea per sentence, and two sentences at most in a table cell. Write for a smart friend outside the field.

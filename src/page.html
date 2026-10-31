@@ -133,7 +133,9 @@ function safeUrl(u){try{const x=new URL(u);return x.protocol==="https:"?x.href:n
 function track(value,max){const t=el("span",null,"track"),f=el("span",null,"fill");f.style.width=Math.min(100,max>0?value/max*100:0)+"%";t.appendChild(f);return t}
 let tipFor=null,tipTimer=0;
 function showTip(btn){
-  clearTimeout(tipTimer);const tip=$("tip");if(tipFor&&tipFor!==btn)tipFor.setAttribute("aria-expanded","false");
+  clearTimeout(tipTimer);const tip=$("tip");
+  if(tipFor===btn&&!tip.hidden)return; // Already open, so a click must not move it.
+  if(tipFor)tipFor.setAttribute("aria-expanded","false");
   tipFor=btn;tip.textContent=btn.dataset.info;tip.hidden=false;btn.setAttribute("aria-expanded","true");
   const r=btn.getBoundingClientRect(),w=tip.offsetWidth,h=tip.offsetHeight;
   tip.style.left=Math.max(12,Math.min(innerWidth-w-12,r.left+r.width/2-w/2))+"px";

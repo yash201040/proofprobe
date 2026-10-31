@@ -117,6 +117,10 @@ await page.reload({ waitUntil: "networkidle0" }); await page.waitForSelector("#i
 ok((await page.$("#intro .chip.good")) && (await page.$("#intro .meter .fill")) && (await page.$("#intro .barrow .fill")), "folding sections, grades, meters and bars render");
 await page.hover("#intro .infobtn"); await page.waitForFunction(() => !document.querySelector("#tip").hidden && document.querySelector("#tip").textContent === "Extra detail here");
 ok(true, "hovering an info icon shows the detail");
+await new Promise((r) => setTimeout(r, 250));
+const tipTop = () => page.$eval("#tip", (e) => e.getBoundingClientRect().top);
+const beforeClick = await tipTop(); await page.click("#intro .infobtn"); await new Promise((r) => setTimeout(r, 250));
+ok(Math.abs((await tipTop()) - beforeClick) < 0.5, "clicking an open info icon doesn't move it");
 await page.mouse.move(2, 2); await page.waitForFunction(() => document.querySelector("#tip").hidden);
 const tap = await browser.newPage(); await tap.setViewport({ width: 390, height: 800, isMobile: true, hasTouch: true }); await tap.goto(first.link, { waitUntil: "networkidle0" }); await tap.waitForSelector("#intro .infobtn");
 await tap.tap("#intro .infobtn"); await tap.waitForFunction(() => !document.querySelector("#tip").hidden);
@@ -128,6 +132,7 @@ writeFileSync(qf + ".bad", JSON.stringify([{ t: "ul", items: "oops" }]));
 ok(ppFails("publish", first.id, "--intro", qf + ".bad"), "a malformed block is refused");
 writeFileSync(qf + ".less", JSON.stringify([{ title: "A", questions: [{ id: "a9", text: "New?", catchAll: true }] }]));
 ok(ppFails("publish", first.id, "--questions", qf + ".less"), "publishing can't drop earlier questions");
+pp("export", first.id); ok(JSON.parse(readFileSync(join(config, "..", "cases", first.id, "intro.json"), "utf8"))[0].title === "Compare", "a published page can be exported for editing");
 ok((await txt(".notice")).startsWith("Privacy:"), "privacy notice is shown");
 
 const newPw = pp("password", first.id).match(/password: (\S+)/)[1];
