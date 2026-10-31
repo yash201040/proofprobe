@@ -38,7 +38,11 @@ switch (cmd) {
   case "publish": {
     const body = {};
     if (flag(a, "intro")) body.intro = readJson(flag(a, "intro"));
-    if (flag(a, "questions")) body.questions = readJson(flag(a, "questions"));
+    if (flag(a, "questions")) {
+      body.questions = readJson(flag(a, "questions"));
+      const qs = body.questions.flatMap((s) => s.questions);
+      if (!qs.length || !qs[qs.length - 1].catchAll) throw new Error('the last question must be an open "anything we missed?" with "catchAll": true');
+    }
     if (flag(a, "plan")) body.plan = readJson(flag(a, "plan"));
     if (flag(a, "status")) body.status = flag(a, "status");
     out(await api("PATCH", "/cases/" + a[0], body));

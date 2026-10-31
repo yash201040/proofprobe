@@ -5,7 +5,7 @@ import { writeFileSync } from "node:fs";
 const gap = (...a) => execFileSync("node", ["bin/gap.mjs", ...a], { encoding: "utf8" });
 const created = JSON.parse(gap("new", "--name", "Test", "--title", "E2E case"));
 const qf = "/tmp/gap-q-" + process.pid + ".json";
-writeFileSync(qf, JSON.stringify([{ title: "A", note: "n", first: true, questions: [{ id: "a1", text: "One?", why: "w" }, { id: "a2", text: "Two?" }] }]));
+writeFileSync(qf, JSON.stringify([{ title: "A", note: "n", first: true, questions: [{ id: "a1", text: "One?", why: "w" }, { id: "a2", text: "Two?", catchAll: true }] }]));
 gap("publish", created.id, "--questions", qf, "--status", "open");
 const browser = await puppeteer.launch({ executablePath: "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome", headless: "new" });
 const page = await browser.newPage();
