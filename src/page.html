@@ -82,6 +82,11 @@ dialog{width:min(420px,calc(100vw - 32px));padding:22px;border:1px solid var(--l
   table.cards td:first-child{display:block;font-size:17px;font-weight:600;padding-bottom:6px}table.cards td:first-child::before{content:none}
   table.cards .chip{justify-self:start;white-space:normal}
 }
+.infobtn{display:inline-grid;place-items:center;width:20px;height:20px;min-height:0;margin-left:6px;padding:0;border:1px solid var(--line);border-radius:50%;background:transparent;color:var(--muted);font:600 12px/1 var(--body);vertical-align:middle;cursor:help;position:relative;transition:color .15s ease,border-color .15s ease,transform .15s ease}
+.infobtn::after{content:"";position:absolute;inset:-12px}.infobtn:hover,.infobtn[aria-expanded=true]{color:var(--accent);border-color:var(--accent);transform:scale(1.12)}
+.cellwrap{display:inline-flex;align-items:center;max-width:100%;min-width:0}
+#tip{position:fixed;z-index:40;max-width:320px;padding:10px 13px;border:1px solid var(--line);border-radius:10px;background:var(--surface);color:var(--ink);font-size:15.5px;line-height:1.45;box-shadow:0 10px 30px rgba(0,0,0,.28)}
+@media (max-width:640px){#tip{left:12px!important;right:12px;top:auto!important;bottom:calc(env(safe-area-inset-bottom,0px) + 14px);max-width:none;padding:14px 16px;font-size:16px}}
 </style></head><body><div id="loadbar" role="progressbar" aria-label="Loading"></div><div class="wrap">
 <div class="topbar"><a class="brandlink" href="/">ProofProbe</a></div>
 <header><div class="eyebrow" id="eyebrow"></div><h1 id="title"></h1>
@@ -90,6 +95,7 @@ dialog{width:min(420px,calc(100vw - 32px));padding:22px;border:1px solid var(--l
   <div class="access" id="access" hidden><span id="accessText"></span><button type="button" id="unlockBtn">Edit this page</button><button type="button" id="lockBtn" class="ghost" hidden>Stop editing</button></div>
 </header>
 <div class="skel" id="skel" aria-hidden="true"><i></i><i></i><i></i></div>
+<div id="tip" role="tooltip" hidden></div>
 <div id="fatal" class="alert" hidden><p id="fatalText"></p><p style="margin-top:9px"><button type="button" id="retry">Try again</button></p></div>
 <section id="dirBox" hidden><div id="profiles" class="profiles"></div><p id="dirEmpty" hidden>No probes published yet.</p></section>
 <section id="planBox" hidden><div class="stack"><h2>Recommended path</h2><div id="plan" class="blocks"></div></div></section>
@@ -125,13 +131,38 @@ function el(tag,text,cls){const e=document.createElement(tag);if(text!=null)e.te
 function safeUrl(u){try{const x=new URL(u);return x.protocol==="https:"?x.href:null}catch(e){return null}}
 // Content blocks are rendered as text only, so nothing stored can inject markup.
 function track(value,max){const t=el("span",null,"track"),f=el("span",null,"fill");f.style.width=Math.min(100,max>0?value/max*100:0)+"%";t.appendChild(f);return t}
-function fillCell(td,c){if(typeof c==="string"){td.textContent=c;return}if(typeof c.score==="number"){const m=el("span",null,"meter");m.title=c.text;m.append(track(c.score,c.max||10),el("span",c.text));td.appendChild(m);return}const t=["good","warn","bad","info"].includes(c.tone)?" "+c.tone:"";td.appendChild(el("span",c.text,t?"chip"+t:null))}
+let tipFor=null,tipTimer=0;
+function showTip(btn){
+  clearTimeout(tipTimer);const tip=$("tip");if(tipFor&&tipFor!==btn)tipFor.setAttribute("aria-expanded","false");
+  tipFor=btn;tip.textContent=btn.dataset.info;tip.hidden=false;btn.setAttribute("aria-expanded","true");
+  const r=btn.getBoundingClientRect(),w=tip.offsetWidth,h=tip.offsetHeight;
+  tip.style.left=Math.max(12,Math.min(innerWidth-w-12,r.left+r.width/2-w/2))+"px";
+  tip.style.top=(r.top-h-10<8?r.bottom+10:r.top-h-10)+"px";
+}
+function hideTip(){clearTimeout(tipTimer);if(tipFor)tipFor.setAttribute("aria-expanded","false");tipFor=null;$("tip").hidden=true}
+const hideSoon=()=>{tipTimer=setTimeout(hideTip,160)};
+function infoBtn(text){
+  const b=el("button","i","infobtn");b.type="button";b.dataset.info=text;b.setAttribute("aria-label","More detail");b.setAttribute("aria-expanded","false");
+  b.addEventListener("pointerenter",e=>{if(e.pointerType==="mouse")showTip(b)});
+  b.addEventListener("pointerleave",e=>{if(e.pointerType==="mouse")hideSoon()});
+  b.addEventListener("focus",()=>showTip(b));b.addEventListener("blur",hideSoon);
+  b.addEventListener("click",e=>{e.preventDefault();e.stopPropagation();if(tipFor===b&&e.detail===0)hideTip();else showTip(b)});
+  return b;
+}
+function fillCell(td,c){
+  if(typeof c==="string"){td.textContent=c;return}
+  let body;
+  if(typeof c.score==="number"){body=el("span",null,"meter");body.title=c.text;body.append(track(c.score,c.max||10),el("span",c.text))}
+  else{const t=["good","warn","bad","info"].includes(c.tone)?" "+c.tone:"";body=el("span",c.text,t?"chip"+t:null)}
+  if(!c.info){td.appendChild(body);return}
+  const w=el("span",null,"cellwrap");w.append(body,infoBtn(c.info));td.appendChild(w);
+}
 function renderBlocks(host,list){
   host.textContent="";
   list.forEach(b=>{try{
     if(b.t==="section"){const d=el("details",null,"fold"),s=el("summary");d.open=!!b.open;s.appendChild(el("span",b.title));if(b.note)s.appendChild(el("small",b.note));const inner=el("div",null,"blocks");renderBlocks(inner,b.blocks);d.append(s,inner);host.appendChild(d)}
     else if(b.t==="h2"||b.t==="h3"||b.t==="p")host.appendChild(el(b.t,b.text));
-    else if(b.t==="bars"){const box=el("div",null,"bars");box.appendChild(el("h3",b.title));const max=b.max||Math.max(...b.items.map(i=>i.value),1);b.items.forEach(i=>{const r=el("div",null,"barrow"),v=i.text||String(i.value);r.title=i.label+": "+v+(i.note?". "+i.note:"");r.append(el("span",i.label),track(i.value,max),el("span",v,"barval"));box.appendChild(r)});host.appendChild(box)}
+    else if(b.t==="bars"){const box=el("div",null,"bars");box.appendChild(el("h3",b.title));const max=b.max||Math.max(...b.items.map(i=>i.value),1);b.items.forEach(i=>{const r=el("div",null,"barrow"),v=i.text||String(i.value);r.title=i.label+": "+v+(i.note?". "+i.note:"");const lab=el("span",i.label);if(i.info)lab.appendChild(infoBtn(i.info));r.append(lab,track(i.value,max),el("span",v,"barval"));box.appendChild(r)});host.appendChild(box)}
     else if(b.t==="callout")host.appendChild(el("p",b.text,"callout"));
     else if(b.t==="ul"||b.t==="ol"){const l=el(b.t);(b.items||[]).forEach(i=>l.appendChild(el("li",i)));host.appendChild(l)}
     else if(b.t==="links"){const l=el("ul");(b.links||[]).forEach(k=>{const u=safeUrl(k.url);const li=el("li");if(u){const a=el("a",k.label||u);a.href=u;a.target="_blank";a.rel="noopener noreferrer";li.appendChild(a)}else li.textContent=k.label||"";if(k.note)li.appendChild(document.createTextNode(" "+k.note));l.appendChild(li)});host.appendChild(l)}
@@ -303,6 +334,10 @@ async function tryUnlock(){
 $("unlockGo").addEventListener("click",tryUnlock);
 $("password").addEventListener("keydown",e=>{if(e.key==="Enter"){e.preventDefault();tryUnlock()}});
 $("lockBtn").addEventListener("click",async()=>{try{await call("/lock",{method:"POST",body:"{}"})}catch(e){}location.reload()});
+$("tip").addEventListener("pointerenter",()=>clearTimeout(tipTimer));$("tip").addEventListener("pointerleave",hideSoon);
+document.addEventListener("click",e=>{if(tipFor&&!e.target.closest("#tip"))hideTip()});
+document.addEventListener("keydown",e=>{if(e.key==="Escape")hideTip()});
+addEventListener("scroll",()=>{if(tipFor)hideTip()},{passive:true});
 $("retry").addEventListener("click",route);
 route();
 </script></body></html>

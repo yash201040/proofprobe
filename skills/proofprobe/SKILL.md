@@ -106,7 +106,7 @@ Keep question ids stable when revising, so saved answers stay attached.
 
 Blocks for `intro.json` and `plan.json` are an array of: `{"t":"section","title":"","note":"","open":true,"blocks":[]}`, `{"t":"h2"|"h3"|"p"|"callout","text":""}`, `{"t":"ul"|"ol","items":[]}`, `{"t":"table","head":[],"rows":[[]]}`, `{"t":"links","links":[{"label":"","url":"https://…","note":""}]}`. Everything renders as plain text.
 
-Also: `{"t":"bars","title":"","max":10,"items":[{"label":"","value":8,"text":"8/10","note":""}]}` for a bar chart, and table cells of `{"text":"High","tone":"good"}` for a coloured grade or `{"text":"8/10","score":8,"max":10}` for a small meter. Tones are `good`, `warn`, `bad` and `info`.
+Also: `{"t":"bars","title":"","max":10,"items":[{"label":"","value":8,"text":"8/10","note":""}]}` for a bar chart, and table cells of `{"text":"High","tone":"good"}` for a coloured grade or `{"text":"8/10","score":8,"max":10}` for a small meter. Any of these cells, and any `bars` item, can add `"info":"..."`, up to 500 characters, which shows an info icon that opens on hover or tap. Tones are `good`, `warn`, `bad` and `info`.
 
 ## How every page must read
 
@@ -116,6 +116,7 @@ These rules apply to every `intro.json` and `plan.json`. Check the page against 
 - **Make tables detailed.** Choose columns that help a decision, such as cost, time, effort, risk, fit, demand and evidence strength. Mix data types: money, ranges, dates, ratings, yes or no, and short text. Use a separate table when a topic needs different columns.
 - **Show it visually.** Use a coloured grade for ratings, risk, fit and confidence, a meter for scores, and bars to compare one number across options. Keep colours meaning the same thing throughout: `good` is favourable, `warn` is mixed, `bad` is a blocker, and `info` is neutral.
 - **Keep charts honest.** Use one unit per chart, and never chart different units together. Don't invent precision: label estimates as estimates, and show the source and strength of each key number.
+- **Use info icons sparingly.** Keep cells short, and add `info` only where a value needs its reason, source, assumption or a caveat that changes how to read it. Use one or two sentences. Skip it when the cell is self-explanatory, and never hide anything vital there, because many people won't open it.
 - **Fold everything.** Put all content in `section` blocks with a short `note`. Leave only the first one or two `open`.
 - **Open with the answer.** Start with a short summary and a table of what decides the outcome.
 - **Keep words short.** Use short paragraphs or bullets only for what a table can't hold. Use simple words, one idea per sentence, and two sentences at most in a table cell. Write for a smart friend outside the field.
