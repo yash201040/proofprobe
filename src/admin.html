@@ -45,9 +45,14 @@ footer{margin-top:24px;color:var(--muted);font-size:15px}
   table.cards .chip{justify-self:start;white-space:normal}
 }
 @media (max-width:860px){table.cards td.act{display:block}table.cards .row input{min-width:0}}
-@keyframes rainbow{to{background-position:200% 50%}}
-.brand{display:inline-block;transition:transform .2s ease}.brand:hover,.brand:focus-visible{background:linear-gradient(90deg,#FF5E7E,#FFB454,#7BE495,#5FC6C9,#7C8CFF,#D478FF,#FF5E7E);background-size:200% auto;-webkit-background-clip:text;background-clip:text;color:transparent;animation:rainbow 1.4s linear infinite;transform:translateY(-1px) scale(1.03)}.brand:active{transform:scale(.97)}
-@media (prefers-reduced-motion:reduce){.brand:hover,.brand:focus-visible{animation:none;transform:none}}
+/* The name is always drawn as clipped text and never scaled, so hovering can't re-render the glyphs. An ink layer wipes away to show the rainbow. */
+.brand{display:inline-block;color:var(--ink);text-decoration:none}
+@supports ((-webkit-background-clip:text) or (background-clip:text)){
+.brand{color:transparent;-webkit-background-clip:text;background-clip:text;background-image:linear-gradient(var(--ink),var(--ink)),linear-gradient(90deg,#FF5E7E,#FFB454,#7BE495,#5FC6C9,#7C8CFF,#D478FF,#FF5E7E);background-size:100% 100%,200% 100%;background-repeat:no-repeat;background-position:0 0,0 50%;transition:background-size .35s ease}
+.brand:hover,.brand:focus-visible{background-size:0% 100%,200% 100%;animation:rainbow 1.4s linear infinite}
+}
+@keyframes rainbow{to{background-position:0 0,200% 50%}}
+@media (prefers-reduced-motion:reduce){.brand:hover,.brand:focus-visible{animation:none}.brand{transition:none}}
 td,li,p,h1,h2,summary,.qa{overflow-wrap:anywhere}
 .row button{flex:none}
 .link,td.act button,td .pwset{white-space:nowrap}
@@ -158,7 +163,7 @@ $("addProfile").addEventListener("click",async()=>{const n=$("newProfile");try{a
 const DELIVER=[["","Deliver as: best fit"],["the final path, as deterministic steps","Final path"],["a clean PRD","PRD"],["a build plan with a ready prompt for a prototype","Prototype build plan"],["a rulebook or guide","Rulebook or guide"],["a direct answer to the goal","Direct answer"]];
 const CHOICES=["Accept","Reject","Auto"];
 function readChoice(text){const [first,...rest]=(text||"").split("\n"),known=CHOICES.includes(first.trim());return{choice:known?first.trim():"Auto",note:known?rest.join("\n"):text||""}}
-// A full brief for Stage 2.5, so the final report comes out well even when every proposal is left on Auto.
+// A full brief for Stage 3b, so the final report comes out well even when every proposal is left on Auto.
 async function decisionsPrompt(w,deliverAs){
   const d=await api("/pages/"+w.id);
   const step=[...d.steps].reverse().find(s=>s.sections.some(x=>x.questions.some(q=>q.kind==="decision")));
@@ -169,17 +174,17 @@ async function decisionsPrompt(w,deliverAs){
     else{const v=got(q.id).trim();lines.push(n+". [ANSWER] "+q.text+"\n   "+(v||"Skipped"))}}));
   const total=count.Accept+count.Reject+count.Auto,all=count.Auto===total;
   return [w.prompt,"",
-"Stage 2.5: build the final version of this probe, then publish it as Stage 3, the final report.",
+"Stage 3b: build the final version of this probe, then publish it as Stage 4a, the final report.",
 "Page: "+location.origin+w.path+" (page id "+w.id+")",
 "Deliver as: "+(deliverAs||"whatever fits the goal best: the final path as deterministic steps, a clean PRD, a build plan with a ready prototype prompt, a rulebook or guide, or a direct answer. Say which you chose and why."),
 "",
-"Stage 2 decisions"+(sub?", submission "+sub.seq+" on "+new Date(sub.submittedAt).toUTCString():"")+": "+count.Accept+" accepted, "+count.Reject+" rejected, "+count.Auto+" left on Auto.",
+"Stage 3a decisions"+(sub?", submission "+sub.seq+" on "+new Date(sub.submittedAt).toUTCString():"")+": "+count.Accept+" accepted, "+count.Reject+" rejected, "+count.Auto+" left on Auto.",
 ...(all?["Everything was left on Auto. Treat that as full delegation: resolve every proposal yourself, to the same standard as if each had been chosen."]:[]),
 "",...lines,"",
 "How to resolve each decision:",
 "- Accept: build it in as proposed, applying the note if there is one.",
 "- Reject: leave it out. If something depended on it, say what replaces it.",
-"- Auto: this is delegation, not a gap. Start from the default, test it against the Stage 1.5 evidence, the Stage 1 answers, and the accepted and rejected items, then choose. State the resolution and the one reason that decided it.",
+"- Auto: this is delegation, not a gap. Start from the default, test it against the Stage 2b evidence, the Stage 2a answers, and the accepted and rejected items, then choose. State the resolution and the one reason that decided it.",
 "- Keep the whole set consistent. An explicit Accept or Reject wins over an Auto default, and say how any conflict was reconciled.",
 "",
 "Calibrate while you build:",
@@ -188,7 +193,7 @@ async function decisionsPrompt(w,deliverAs){
 "",
 "The final report must:",
 "- Open with the answer: the outcome, the three calls that shaped it most, and what to do first.",
-"- Show each major decision as a \"because\" block: the decision, the evidence behind it with named sources and real numbers, and which Stage 2 choice shaped it, without quoting private notes or answers.",
+"- Show each major decision as a \"because\" block: the decision, the evidence behind it with named sources and real numbers, and which Stage 3a choice shaped it, without quoting private notes or answers.",
 "- End with objective actionables: what to do, in what order, by when, how to tell it worked, and what could fail.",
 "- Follow the ProofProbe skill's page rules, and publish with: proofprobe publish "+w.id+" --new-step \"Final report\" --plan <plan.json> --status plan_ready",
 "",

@@ -4,17 +4,17 @@ ProofProbe turns any starting point into a clear, data-backed path through stage
 
 ## The flow the owner expects
 
-People act at whole-numbered stages. The owner runs each half stage by asking for it, and nothing on the site starts research.
+Stages follow four turns, like moves in a game: in each turn, "a" is the person's move and "b" is research the owner runs by asking for it. Nothing on the site starts research.
 
-0. **Goal.** A signed-in profile sends a goal request, or the owner starts a page.
-0.5. **Broad probing.** Spend treg credits on real analysis, split into a few research tracks, then turn the facts into exhaustive, personalised questions, gate questions first, ending with an open "anything we missed?".
-1. **Answers.** They answer in their own time, or send a new direction, which sends the work back to 0.5. Submitting only stores a log.
-1.5. **Deep research.** Treat the answers as a fence, finish the research, and publish proposals as decision items, each with its evidence and an Auto default.
-2. **Decisions.** They set each proposal to Accept, Reject or Auto. Leaving everything on Auto must still produce a strong result.
-2.5. **Build.** Resolve every decision, build the deliverable (a deterministic path, PRD, build plan, rulebook or direct answer), and calibrate it while building.
-3. **Final report.** A read-only view with reasoning cards for each major call, downloadable as offline HTML or PDF.
+- **1a, Goal.** A signed-in profile sends a goal request, or the owner starts a page.
+- **1b, Broad probing.** Spend treg credits on real analysis, split into a few research tracks, then turn the facts into exhaustive, personalised questions, gate questions first, ending with an open "anything we missed?".
+- **2a, Answers.** They answer in their own time, or send a new direction, which sends the work back to 1b. Submitting only stores a log.
+- **2b, Deep research.** Treat the answers as a fence, finish the research, and publish proposals as decision items, each with its evidence and an Auto default.
+- **3a, Decisions.** They set each proposal to Accept, Reject or Auto. Leaving everything on Auto must still produce a strong result.
+- **3b, Build.** Resolve every decision, build the deliverable (a deterministic path, PRD, build plan, rulebook or direct answer), and calibrate it while building.
+- **4a, Final report.** A read-only view with reasoning cards for each major call, downloadable as offline HTML or PDF.
 
-The page tracker, step tabs and Probes filters derive the stage from each step's content, so publish steps in this shape. The Admin page's Copy prompt for decisions builds a full Stage 2.5 brief.
+The page tracker, step tabs and Probes filters derive the stage from each step's content, so publish steps in this shape. The Admin page's Copy prompt for decisions builds a full Stage 3b brief. The home page shows the turns as a crystal chess game, and `npm run demo:record` re-records it into `docs/demo.webp` for the README.
 
 The full procedure is in `skills/proofprobe/SKILL.md`, available in any Claude Code chat as `/proofprobe`. Follow it rather than improvising. Its section "Moving existing research in" covers work that started in another chat.
 

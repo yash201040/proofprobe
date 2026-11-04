@@ -4,8 +4,16 @@ Live: https://proofprobe.forested-wolfberry.workers.dev
 
 Staged research that turns any starting point into a clear, data-backed final report: a job or interview to prepare for, a search for side income, a startup idea, or another goal.
 
-1. **Broad probing:** research the goal, then publish exhaustive personalised questions.
-2. **In-depth research:** when asked, read the latest submission and publish the path on the same page, as one recommendation or up to three alternatives.
+<p align="center"><a href="https://proofprobe.forested-wolfberry.workers.dev"><img src="docs/demo.webp" width="390" alt="A crystal chess game: you and the probe take turns over four rounds, from setting a goal to one lit path, the final report."></a></p>
+
+Research plays out as turns, like a game of chess. You make each "a" move, and the probe answers with each "b" move:
+
+| Turn | You (a) | Probe (b) |
+| --- | --- | --- |
+| 1 | Set the goal, and bring what you have | Research the whole field, ending in the questions only you can answer |
+| 2 | Answer, skip, or point in a new direction | Research deep inside your answers, ending in proposals |
+| 3 | Accept, reject, or leave each proposal on Auto | Build the deliverable: a path, PRD, build plan, rulebook or answer |
+| 4 | Read the final report, or download it as HTML or PDF | |
 
 - **`/proofprobe` skill** (`skills/proofprobe/SKILL.md`): runs in Claude Code. Opus does the thinking and treg does the live research, so the server needs no AI key.
 - **Worker** (`src/`): hosts the home page and the Probes directory, organised as profiles with one or more pages. Anyone can view a page, and signing in to the profile unlocks editing.
@@ -33,7 +41,7 @@ Local test: put `ADMIN_TOKEN_SHA256=<hash>` and `PASSWORD_KEY=<base64 key>` in `
 ## Data rules
 
 - Anyone can read each page's research, questions, status and cost, and a notice says so. Answers stay private to the signed-in profile and the owner. People apply for a profile, the owner approves it, and signing in unlocks that profile's pages and no others. People can change their own password once signed in.
-- People act at Stages 0 to 3: set a goal, answer questions, decide on proposals (Accept, Reject or Auto), then read and download the final report. The half stages in between are research the owner runs. Each stage is a view on the same page, and new research never replaces an earlier one.
+- People act at Stages 1a, 2a, 3a and 4a: set a goal, answer questions, decide on proposals (Accept, Reject or Auto), then read and download the final report. Stages 1b, 2b and 3b are research the owner runs. Each stage is a view on the same page, and new research never replaces an earlier one.
 - Submitting stores a log and starts nothing. Research continues only when `/proofprobe` is run.
 - The cost shown on a page is treg data spend logged with `proofprobe cost`. Claude usage is not included.
 - Submissions are append-only. A database trigger blocks updates, and each log stores a SHA-256 so corruption is detectable.

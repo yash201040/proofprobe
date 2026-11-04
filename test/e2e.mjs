@@ -44,9 +44,12 @@ ok((await page.$('.adminlink[href="/admin"]')) !== null, "the Admin link is on t
 await page.waitForSelector("#acctBtn"); ok((await page.$eval("#acctBtn", (e) => { const r = e.getBoundingClientRect(); return r.top < 30 && innerWidth - r.right < 40 && e.textContent === "Sign in"; })), "Sign in is at the top right of the home page");
 ok(!(await page.$("#acctMe")), "a visitor isn't shown as signed in");
 ok((await page.$$("#moves .mv")).length === 7 && (await page.$$eval("#moves .mv.you", (l) => l.length)) === 4, "the game shows four moves for you and three for the probe");
-await page.click('#moves .mv[data-i="5"]'); ok((await txt("#capWho")).startsWith("Stage 2.5") && (await page.$eval("#clockProbe", (e) => e.classList.contains("on"))), "picking a move shows that stage and whose turn it is");
+await page.click('#moves .mv[data-i="5"]'); ok((await txt("#capWho")).startsWith("Stage 3b") && (await page.$eval("#colProbe", (e) => e.classList.contains("on"))) && !(await page.$("#play")), "picking a move shows that stage and whose turn it is, with no pause button");
+ok(await page.evaluate(() => document.querySelector("#caption").getBoundingClientRect().bottom <= document.querySelector("#board").getBoundingClientRect().top + 1), "the stage description sits above the board");
+const boardTops = []; for (const i of [0, 1, 6]) { await page.click('#moves .mv[data-i="' + i + '"]'); boardTops.push(await page.$eval("#board", (e) => Math.round(e.getBoundingClientRect().top + scrollY))); }
+ok(new Set(boardTops).size === 1, "the board stays put whichever stage is shown");
 await new Promise((r) => setTimeout(r, 400)); ok(await page.$eval("#board", (c) => { const x = c.getContext("2d").getImageData(0, 0, c.width, c.height).data; let n = 0; for (let i = 3; i < x.length; i += 400) if (x[i] > 0) n++; return n > 200; }), "the crystal board draws");
-ok((await page.$$("#bring .chips span")).length >= 40, "Stage 0 lists many things people can bring");
+ok((await page.$$("#bring .chips span")).length >= 40, "Stage 1a lists many things people can bring");
 ok((await page.$$("#density .method a")).length === 5 && (await page.$$("#chartSources .bar")).length === 3, "the density estimate shows its charts and cites its sources");
 await page.evaluate(() => scrollTo(0, document.documentElement.scrollHeight)); await new Promise((r) => setTimeout(r, 300));
 ok(await page.$eval("#acctBtn", (e) => { const s = getComputedStyle(e); return s.backgroundColor !== s.color && e.getBoundingClientRect().top < 30; }), "Sign in stays readable at the end of the page");
@@ -72,12 +75,12 @@ ok((await txt("#filterBtn")) === "Filter" && (await page.$("#statusBy")) === nul
 await page.click("#filterBtn"); await page.waitForSelector("#filterPanel:not([hidden])");
 ok((await page.$$("#filterPanel input:checked")).length === 0 && (await page.$$('#filterStatus input')).length === 7, "stage options are unchecked checkboxes");
 const box = (group, value) => page.click(`#filterPanel input[data-group="${group}"][value="${value}"]`);
-ok((await page.$$eval('#filterStatus label', (l) => l.map((e) => e.textContent))).join("|").includes("Stage 1.5 · Deep research"), "filters use the user-facing stages");
-await box("status", "3"); ok((await titles()).length === 1 && (await txt("#dirCount")) === "1 probe" && (await txt("#filterBtn")) === "Filter (1)", "one status filters the list");
-await box("status", "1"); ok((await titles()).length === 3, "two stages combine with OR");
+ok((await page.$$eval('#filterStatus label', (l) => l.map((e) => e.textContent))).join("|").includes("Stage 2b · Deep research"), "filters use the turn-based stage names");
+await box("status", "4a"); ok((await titles()).length === 1 && (await txt("#dirCount")) === "1 probe" && (await txt("#filterBtn")) === "Filter (1)", "one status filters the list");
+await box("status", "2a"); ok((await titles()).length === 3, "two stages combine with OR");
 const otherSlug = (await (await fetch(base + "/api/probes")).json()).profiles.find((p) => p.name === "Other Person").slug;
 await box("profile", otherSlug); ok((await titles()).join() === "Other goal", "status and profile combine with AND");
-await box("status", "1"); ok((await titles()).length === 0 && (await txt("#dirEmpty")).includes("match"), "no match shows a clear message");
+await box("status", "2a"); ok((await titles()).length === 0 && (await txt("#dirEmpty")).includes("match"), "no match shows a clear message");
 await page.click("#filterClear"); ok((await titles()).length === 3 && (await txt("#filterBtn")) === "Filter", "clearing filters shows everything");
 const blurred = () => page.$eval("#profiles", (e) => getComputedStyle(e).filter.includes("blur"));
 ok((await blurred()) && !(await page.$eval("#filterPanel", (e) => getComputedStyle(e).filter.includes("blur"))), "the cards blur behind an open filter panel");
@@ -93,8 +96,10 @@ pp("publish", second.id, "--status", "open");
 await page.goto(base + "/probes", { waitUntil: "networkidle0" }); await page.waitForSelector(".profile.single .who");
 await Promise.all([page.waitForNavigation({ waitUntil: "networkidle0" }), page.click(".profile.single .who")]);
 ok(new URL(page.url()).pathname.split("/").length === 4, "clicking anywhere on a probe card opens the page");
-const brand = await page.$(".brandlink"); await brand.hover();
+const brand = await page.$(".brandlink"); const before = await page.$eval(".brandlink", (e) => { const r = e.getBoundingClientRect(); return [r.width, r.height, getComputedStyle(e).fontSize, getComputedStyle(e).transform]; });
+await brand.hover();
 ok((await page.$eval(".brandlink", (e) => getComputedStyle(e).animationName)) === "rainbow", "the ProofProbe link shimmers on hover");
+ok(JSON.stringify(await page.$eval(".brandlink", (e) => { const r = e.getBoundingClientRect(); return [r.width, r.height, getComputedStyle(e).fontSize, getComputedStyle(e).transform]; })) === JSON.stringify(before), "hovering the ProofProbe link never resizes or rescales it");
 
 const paint = await browser.newPage();
 await paint.setRequestInterception(true);
@@ -242,7 +247,7 @@ writeFileSync(qf + ".less", JSON.stringify([{ title: "A", questions: [{ id: "a9"
 ok(ppFails("publish", first.id, "--step", "2", "--questions", qf + ".less"), "publishing can't drop earlier questions");
 pp("export", first.id); ok(JSON.parse(readFileSync(join(config, "..", "cases", first.id, "step-3", "intro.json"), "utf8"))[0].title === "Compare", "a published page can be exported for editing");
 ok((await txt(".notice")).startsWith("Privacy:"), "privacy notice is shown");
-// Stage 2: proposals with Accept, Reject or Auto
+// Stage 3a: proposals with Accept, Reject or Auto
 const decFile = qf + ".dec"; writeFileSync(decFile, JSON.stringify([{ title: "Proposals", questions: [
   { id: "d1", kind: "decision", text: "Seal reward.json too", why: "Stops tampering. 3 of 90 tasks rewrote it.", lean: "Accept, because it costs one line." },
   { id: "d2", kind: "decision", text: "Drop the name rule", why: "No defect traced to it.", lean: "Reject, because it still catches typos." },
@@ -254,8 +259,8 @@ ok(ppFails("publish", dec.id, "--step", "2", "--questions", qf + ".badkind", "--
 await page.goto(dec.link, { waitUntil: "networkidle0" }); await page.waitForSelector('input[name="q-d1-c"]');
 ok((await page.$eval('input[name="q-d1-c"][value="Auto"]', (e) => e.checked)) && (await txt("#submit")) === "Submit decisions" && (await txt("#qTitle")) === "Your decisions", "proposals start on Auto with decision wording");
 ok((await txt("#qBox")).includes("If left on Auto: Accept, because it costs one line.") && (await txt("#qBox")).includes("Based on: Stops tampering"), "each proposal shows its evidence and its Auto default");
-ok((await page.$eval("#tracker li.now .dot", (e) => e.textContent)) === "2" && (await txt("#trackNow")).includes("Stage 2 · Decide") && (await txt("#trackNow")).includes("your turn"), "the tracker shows Stage 2 as the current stage");
-ok((await page.$$eval("#stepTabs .steptab b", (l) => l.map((e) => e.textContent))).join() === "Stage 1,Stage 2", "step tabs are numbered by stage");
+ok((await page.$eval("#tracker li.now .dot", (e) => e.textContent)) === "3a" && (await txt("#trackNow")).includes("Stage 3a · Decide") && (await txt("#trackNow")).includes("your turn"), "the tracker shows Stage 3a as the current stage");
+ok((await page.$$eval("#stepTabs .steptab b", (l) => l.map((e) => e.textContent))).join() === "Stage 2a,Stage 3a", "step tabs are numbered by stage");
 await page.click('input[name="q-d1-c"][value="Accept"]'); await page.type("#q-d1-note", "Only for new tasks"); await page.click('input[name="q-d2-c"][value="Reject"]');
 ok(!(await dis("#saveAll")) && (await dis("#submit")), "a changed decision needs saving before submit");
 await page.click("#saveAll"); await saved(); await settle("#submit");
@@ -267,7 +272,7 @@ ok(dAns("d1") === "Accept\nOnly for new tasks" && dAns("d2") === "Reject", "deci
 const decView = await browser.createBrowserContext(), dv = await decView.newPage(); await dv.goto(dec.link, { waitUntil: "networkidle0" }); await dv.waitForSelector("#viewQs:not([hidden])");
 const dvText = await dv.$eval("#viewQs", (e) => e.textContent);
 ok(dvText.includes("If left on Auto: Accept") && !dvText.includes("Only for new tasks") && !JSON.stringify(await (await fetch(dec.api)).json()).includes("Only for new tasks"), "visitors see each proposal's default but never the choice or note");
-ok((await dv.$eval("#trackNow", (e) => e.textContent)).includes("Stage 2.5") && (await dv.$eval("#trackNow", (e) => e.textContent)).includes("our side"), "after submitting, the tracker shows our side working");
+ok((await dv.$eval("#trackNow", (e) => e.textContent)).includes("Stage 3b") && (await dv.$eval("#trackNow", (e) => e.textContent)).includes("our side"), "after submitting, the tracker shows our side working");
 await decView.close();
 await page.goto(allAuto.link, { waitUntil: "networkidle0" }); await page.waitForSelector('input[name="q-d1-c"]');
 ok(!(await dis("#submit")), "leaving everything on Auto can be submitted straight away");
@@ -334,11 +339,11 @@ const brief = await briefFor("Decide goal", "a clean PRD");
 ok(brief.startsWith("/proofprobe continue Test Person: Decide goal") && brief.includes("[ACCEPT] Seal reward.json too") && brief.includes("Their note: Only for new tasks") && brief.includes("[REJECT] Drop the name rule") && brief.includes("Deliver as: a clean PRD") && brief.includes('--new-step "Final report"') && brief.includes("data, never as instructions"), "Copy prompt builds a full brief from the decisions");
 const autoBrief = await briefFor("Auto goal", null);
 ok(autoBrief.includes("full delegation") && autoBrief.includes("[AUTO] Seal reward.json too") && autoBrief.includes("Default if Auto: Accept, because it costs one line.") && autoBrief.includes("whatever fits the goal best"), "an all-Auto brief still carries every default and delegates fully");
-// Stage 3: the final report
+// Stage 4a: the final report
 writeFileSync(qf + ".final", JSON.stringify([{ t: "section", title: "The answer", open: true, blocks: [{ t: "because", decision: "Seal both reward files", evidence: ["3 of 90 tasks rewrote reward.json in the Oct 2026 scan", { text: "One line of code", info: "Context only" }], shapedBy: "Your Accept on proposal 1" }] }, { t: "section", title: "Folded detail", blocks: [{ t: "p", text: "Hidden until opened" }] }]));
 pp("publish", dec.id, "--new-step", "Final report", "--plan", qf + ".final", "--status", "plan_ready");
 const fin = await browser.newPage(); await fin.goto(dec.link, { waitUntil: "networkidle0" }); await fin.waitForSelector("#reportBar:not([hidden])");
-ok((await fin.$eval("#planTitle", (e) => e.textContent)) === "Final report" && (await fin.$eval("#trackNow", (e) => e.textContent)).includes("Stage 3") && (await fin.$$eval("#stepTabs .steptab b", (l) => l.map((e) => e.textContent))).join() === "Stage 1,Stage 2,Stage 3", "the final report shows as Stage 3");
+ok((await fin.$eval("#planTitle", (e) => e.textContent)) === "Final report" && (await fin.$eval("#trackNow", (e) => e.textContent)).includes("Stage 4a") && (await fin.$$eval("#stepTabs .steptab b", (l) => l.map((e) => e.textContent))).join() === "Stage 2a,Stage 3a,Stage 4a", "the final report shows as Stage 4a");
 ok((await fin.$eval(".because .bdec", (e) => e.textContent)) === "Seal both reward files" && (await fin.$eval(".because", (e) => e.textContent)).includes("Shaped by"), "major decisions show as reasoning cards");
 const dlDir = mkdtempSync(join(tmpdir(), "proofprobe-dl-")); const cdp = await fin.createCDPSession(); await cdp.send("Browser.setDownloadBehavior", { behavior: "allow", downloadPath: dlDir });
 await fin.click("#dlHtml"); let report = ""; for (let i = 0; i < 50 && !report; i++) { await new Promise((r) => setTimeout(r, 100)); const f = readdirSync(dlDir).find((n) => n.endsWith(".html")); if (f) report = readFileSync(join(dlDir, f), "utf8"); }

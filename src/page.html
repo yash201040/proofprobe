@@ -91,9 +91,14 @@ dialog{width:min(420px,calc(100vw - 32px));padding:22px;border:1px solid var(--l
 .dirtools{display:flex;flex-wrap:wrap;align-items:flex-end;gap:12px;margin-bottom:16px}.dirtools label{display:grid;gap:4px;font-size:14px;font-weight:600;color:var(--muted)}.dirtools select{min-height:42px;min-width:170px;padding:8px 34px 8px 11px;font:600 16px var(--body);color:var(--ink);background:var(--surface);border:1px solid var(--line);border-radius:6px;cursor:pointer}.dirtools select:hover{border-color:var(--accent)}#sortDir{min-height:42px;min-width:136px}.dircount{margin-left:auto;font-size:15px;color:var(--muted)}
 .profile .who{font:500 12.5px var(--mono);text-transform:uppercase;letter-spacing:.05em;color:var(--accent);margin-bottom:2px}.profile.single .pagelink{border-top:0;margin-top:0;padding-top:4px}
 @media (max-width:640px){#sortDir{flex:1 1 120px}.dirtools label{flex:1 1 150px}.dirtools select{width:100%;min-width:0}.dircount{margin-left:0;flex-basis:100%}}
-@keyframes rainbow{to{background-position:200% 50%}}
-.brandlink{display:inline-block;transition:transform .2s ease}.brandlink:hover,.brandlink:focus-visible{background:linear-gradient(90deg,#FF5E7E,#FFB454,#7BE495,#5FC6C9,#7C8CFF,#D478FF,#FF5E7E);background-size:200% auto;-webkit-background-clip:text;background-clip:text;color:transparent;animation:rainbow 1.4s linear infinite;transform:translateY(-1px) scale(1.03)}.brandlink:active{transform:scale(.97)}
-@media (prefers-reduced-motion:reduce){.brandlink:hover,.brandlink:focus-visible{animation:none;transform:none}}
+/* The name is always drawn as clipped text and never scaled, so hovering can't re-render the glyphs. An ink layer wipes away to show the rainbow. */
+.brandlink{display:inline-block;color:var(--ink);text-decoration:none}
+@supports ((-webkit-background-clip:text) or (background-clip:text)){
+.brandlink{color:transparent;-webkit-background-clip:text;background-clip:text;background-image:linear-gradient(var(--ink),var(--ink)),linear-gradient(90deg,#FF5E7E,#FFB454,#7BE495,#5FC6C9,#7C8CFF,#D478FF,#FF5E7E);background-size:100% 100%,200% 100%;background-repeat:no-repeat;background-position:0 0,0 50%;transition:background-size .35s ease}
+.brandlink:hover,.brandlink:focus-visible{background-size:0% 100%,200% 100%;animation:rainbow 1.4s linear infinite}
+}
+@keyframes rainbow{to{background-position:0 0,200% 50%}}
+@media (prefers-reduced-motion:reduce){.brandlink:hover,.brandlink:focus-visible{animation:none}.brandlink{transition:none}}
 .profile{position:relative;overflow:hidden;transition:transform .22s cubic-bezier(.2,1.2,.4,1),border-color .2s ease,box-shadow .22s ease}
 .profile.single{cursor:pointer}.profile.single .pagelink::after{content:"";position:absolute;inset:0;z-index:1}
 .profile.single::before,.pagelink.row::before{content:"";position:absolute;top:0;bottom:0;left:-60%;width:45%;background:linear-gradient(100deg,transparent,color-mix(in srgb,var(--accent) 26%,transparent),transparent);transform:skewX(-18deg);opacity:0;pointer-events:none}
@@ -370,17 +375,17 @@ $("form").addEventListener("submit",e=>e.preventDefault());
 let formReady=false;
 function loaded(){const b=$("loadbar"),s=$("skel");if(s)s.remove();if(!b||b.classList.contains("done"))return;b.classList.add("done");setTimeout(()=>b.remove(),280)}
 const money=n=>"$"+Number(n).toFixed(n>0&&n<1?3:2);
-// People act at stages 0 to 3. The half stages are research on the owner's side.
-const STAGES=[["0","Goal","you","Goal set"],["0.5","Research","us","Researching"],["1","Answer","you","Answer questions"],["1.5","Deep research","us","Deep research"],["2","Decide","you","Decide"],["2.5","Build","us","Building the final report"],["3","Final report","you","Final report"]];
-const STAGE_TONE={"0.5":"info","1":"warn","1.5":"info","2":"warn","2.5":"info","3":"good",closed:"bad"};
+// Stages follow the turns: in turn N, "a" is the person's move and "b" is research on the owner's side.
+const STAGES=[["1a","Goal","you","Goal set"],["1b","Research","us","Researching"],["2a","Answer","you","Answer questions"],["2b","Deep research","us","Deep research"],["3a","Decide","you","Decide"],["3b","Build","us","Building the final report"],["4a","Final report","you","Final report"]];
+const STAGE_TONE={"1b":"info","2a":"warn","2b":"info","3a":"warn","3b":"info","4a":"good",closed:"bad"};
 const kindOf=s=>s.sections.some(x=>x.questions.some(q=>q.kind==="decision"))?"decisions":s.sections.length?"questions":"final";
-const STAGE_OF_KIND={questions:"1",decisions:"2",final:"3"};
+const STAGE_OF_KIND={questions:"2a",decisions:"3a",final:"4a"};
 function stageNow(status,rerouting,lastKind){
   if(status==="closed")return "closed";
-  if(rerouting||status==="draft")return "0.5";
-  if(status==="plan_ready"||lastKind==="final")return "3";
-  if(lastKind==="decisions")return status==="submitted"?"2.5":"2";
-  return status==="submitted"?"1.5":"1";
+  if(rerouting||status==="draft")return "1b";
+  if(status==="plan_ready"||lastKind==="final")return "4a";
+  if(lastKind==="decisions")return status==="submitted"?"3b":"3a";
+  return status==="submitted"?"2b":"2a";
 }
 const stageName=k=>k==="closed"?"Closed":"Stage "+k+" · "+STAGES.find(x=>x[0]===k)[3];
 function fail(m){$("fatalText").textContent=m;$("fatal").hidden=false}
@@ -438,7 +443,7 @@ function renderTracker(d){
     li.append(el("span",k,"dot"),el("span",label,"lbl"));l.appendChild(li)});
   const cur=STAGES[at],p=$("trackNow");p.textContent="";
   if(now==="closed")p.textContent="This probe is closed.";
-  else{p.append(el("strong","Now: "+stageName(now)+". "),cur[2]==="us"?"This part happens on our side, so there's nothing for you to do yet.":now==="3"?"Nothing left to do. Read the final report below, or download it.":"It's your turn. "+(d.editable?"":"Only the profile's owner can respond, after signing in."))}
+  else{p.append(el("strong","Now: "+stageName(now)+". "),cur[2]==="us"?"This part happens on our side, so there's nothing for you to do yet.":now==="4a"?"Nothing left to do. Read the final report below, or download it.":"It's your turn. "+(d.editable?"":"Only the profile's owner can respond, after signing in."))}
   $("tracker").hidden=false;
 }
 // The take-home report: everything open, info notes written out, and no buttons.
@@ -500,7 +505,7 @@ function pageLink(p,g){
 }
 const SORTS={created:["Newest first","Oldest first","desc"],updated:["Latest first","Earliest first","desc"],profile:["A to Z","Z to A","asc"],cost:["Highest first","Lowest first","desc"]};
 let sortDir="desc",sortField="created";const SORT_NAMES={created:"Date created",updated:"Last updated",profile:"Profile",cost:"Cost"};const picked={status:new Set(),profile:new Set()};
-const STATUS_FILTERS=["0.5","1","1.5","2","2.5","3","closed"];
+const STATUS_FILTERS=["1b","2a","2b","3a","3b","4a","closed"];
 function filterBox(group,value,label){
   const l=el("label"),c=el("input");c.type="checkbox";c.dataset.group=group;c.value=value;c.checked=picked[group].has(value);
   c.addEventListener("change",()=>{if(c.checked)picked[group].add(value);else picked[group].delete(value);renderDirectory()});

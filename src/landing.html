@@ -4,7 +4,7 @@
 <meta name="description" content="Every human, a researcher. You make the moves only you can make. The probe researches between them. One proven path.">
 <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,800&family=Instrument+Sans:wght@400;500;600&family=JetBrains+Mono:wght@500&display=swap" onload="this.onload=null;this.rel='stylesheet'">
 <style>
-/* Concept: research as a game of crystal chess. You move at whole stages, the probe answers at the half stages. */
+/* Concept: research as a game of crystal chess over four turns. You make each "a" move, and the probe answers with each "b" move. */
 :root{--bg:#060A12;--bg2:#0B1220;--ink:#EEF5F7;--muted:#9DB0BA;--faint:#62737D;--line:rgba(160,220,235,.16);
 --you:#8FE6F2;--probe:#FFB454;--good:#6FD09D;--bad:#F0978C;--info:#8FC1F0;
 --accent:#5FC6C9;--surface:#111A27;--accent-soft:rgba(95,198,201,.14);--stop:#F0978C;
@@ -33,26 +33,27 @@ h1 em{font-style:normal;background:linear-gradient(100deg,var(--you),#E8FBFF 45%
 .game{position:relative;display:grid;gap:14px}
 .boardwrap{position:relative;aspect-ratio:1/.86;width:100%}
 #board{position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:pan-y}
-.clocks{display:flex;gap:10px;flex-wrap:wrap}
-.clock{display:inline-flex;align-items:center;gap:9px;min-height:40px;padding:8px 14px;border-radius:999px;border:1px solid var(--line);font:600 15px var(--body);color:var(--muted);background:rgba(255,255,255,.02);transition:all .3s ease}
-.clock i{width:10px;height:10px;border-radius:50%;background:currentColor;opacity:.5}
-.clock.on.you{color:var(--you);border-color:var(--you);background:rgba(143,230,242,.08)}.clock.on.probe{color:var(--probe);border-color:var(--probe);background:rgba(255,180,84,.08)}
-.clock.on i{opacity:1;box-shadow:0 0 0 4px rgba(255,255,255,.06);animation:tick 1s ease-in-out infinite}
+.movebox{display:grid;gap:6px}
+.colheads{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.colhead{display:flex;align-items:center;gap:9px;min-height:38px;padding:6px 12px;border-bottom:1px solid var(--line);font:600 13px var(--mono);letter-spacing:.14em;text-transform:uppercase;color:var(--faint);transition:color .3s ease,border-color .3s ease}
+.colhead i{width:9px;height:9px;border-radius:50%;background:currentColor;opacity:.5}
+.colhead.on.you{color:var(--you);border-color:var(--you)}.colhead.on.probe{color:var(--probe);border-color:var(--probe)}
+.colhead.on i{opacity:1;box-shadow:0 0 0 4px rgba(255,255,255,.06);animation:tick 1s ease-in-out infinite}
 @keyframes tick{50%{transform:scale(1.35)}}
-.playbtn{margin-left:auto;min-height:40px;min-width:40px;padding:8px 14px;border-radius:999px;border:1px solid var(--line);background:transparent;color:var(--ink);font:600 15px var(--body);cursor:pointer}
-.caption{min-height:136px;padding:16px 18px;border:1px solid var(--line);border-radius:14px;background:linear-gradient(180deg,rgba(255,255,255,.035),rgba(255,255,255,.01))}
-.caption .who{font:500 12.5px var(--mono);letter-spacing:.12em;text-transform:uppercase}
+.caption{display:grid;padding:16px 18px;border:1px solid var(--line);border-radius:14px;background:linear-gradient(180deg,rgba(255,255,255,.035),rgba(255,255,255,.01))}
+.caption .who{font:500 12.5px var(--mono);letter-spacing:.12em;text-transform:uppercase}.caption .who .code{text-transform:none}
+/* Invisible copies of every caption share one grid cell, so the box always fits the longest and the board never jumps. */
+.caption>.cap{grid-area:1/1;min-width:0}.caption>.ghost{visibility:hidden}
 .caption.you .who{color:var(--you)}.caption.probe .who{color:var(--probe)}
 .caption h3{font:700 22px/1.2 var(--display);margin:4px 0 6px}
 .caption p{margin:0;color:var(--muted);font-size:16.5px}
-.moves{display:grid;grid-template-columns:34px 1fr 1fr;gap:4px 8px;font:500 15px var(--body);margin:0;padding:0;list-style:none}
-.moves .no{color:var(--faint);font:500 14px var(--mono);align-self:center;text-align:right}
+.moves{display:grid;grid-template-columns:1fr 1fr;gap:4px 8px;font:500 15px var(--body);margin:0;padding:0;list-style:none}
 .mv{display:flex;align-items:center;gap:8px;min-height:40px;padding:6px 10px;border-radius:8px;border:1px solid transparent;background:transparent;color:var(--muted);font:inherit;text-align:left;cursor:pointer;transition:background .2s ease,color .2s ease,border-color .2s ease}
 .mv b{font:500 13px var(--mono);color:var(--faint);min-width:2.2em}
 .mv.you.now{color:var(--you);border-color:rgba(143,230,242,.5);background:rgba(143,230,242,.08)}.mv.probe.now{color:var(--probe);border-color:rgba(255,180,84,.5);background:rgba(255,180,84,.08)}
 .mv.done{color:var(--ink)}
 @media (hover:hover){.mv:hover{background:rgba(255,255,255,.05)}}
-.mv:focus-visible,.playbtn:focus-visible,.cta:focus-visible{outline:2px solid var(--you);outline-offset:2px}
+.mv:focus-visible,.cta:focus-visible{outline:2px solid var(--you);outline-offset:2px}
 /* sections */
 .eyebrow{font:500 13px var(--mono);letter-spacing:.14em;text-transform:uppercase;color:var(--you);margin:0 0 10px}
 h2{font:800 clamp(32px,4vw,52px)/1.02 var(--display);letter-spacing:-.025em;margin:0 0 14px}
@@ -91,8 +92,8 @@ h2{font:800 clamp(32px,4vw,52px)/1.02 var(--display);letter-spacing:-.025em;marg
 .adminlink .ico{width:15px;height:15px}.adminlink:hover{opacity:1}
 .endwrap{position:relative}
 @media (max-width:980px){.hero{grid-template-columns:1fr;gap:28px;padding-top:88px;min-height:auto}.boardwrap{aspect-ratio:1/.9}}
-@media (max-width:560px){section{padding-block:52px}.bar{grid-template-columns:minmax(0,104px) minmax(0,1fr) 54px;gap:8px}.moves{grid-template-columns:24px 1fr 1fr}.mv{padding:6px 7px;font-size:14px}.caption{min-height:170px}}
-@media (prefers-reduced-motion:reduce){.cta,.mv,.clock,.fill{transition:none}.clock.on i{animation:none}}
+@media (max-width:560px){section{padding-block:52px}.bar{grid-template-columns:minmax(0,104px) minmax(0,1fr) 54px;gap:8px}.mv{padding:6px 7px;font-size:14px}}
+@media (prefers-reduced-motion:reduce){.cta,.mv,.colhead,.fill{transition:none}.colhead.on i{animation:none}}
 </style></head><body>
 <div class="top"><span class="brand">ProofProbe</span></div>
 <main>
@@ -104,15 +105,14 @@ h2{font:800 clamp(32px,4vw,52px)/1.02 var(--display);letter-spacing:-.025em;marg
     <div class="actions"><a class="cta" href="/probes">See the probes <span class="arrow" aria-hidden="true">→</span></a><a class="cta alt" href="/request">Request a probe</a></div>
   </div>
   <div class="game" id="game">
-    <div class="clocks"><span class="clock you" id="clockYou"><i></i>You</span><span class="clock probe" id="clockProbe"><i></i>Probe</span><button type="button" class="playbtn" id="play" aria-label="Pause the game">Pause</button></div>
+    <div class="caption you" id="caption" aria-live="polite"><div class="cap"><div class="who" id="capWho"></div><h3 id="capTitle"></h3><p id="capText"></p></div></div>
     <div class="boardwrap"><canvas id="board" role="img" aria-label="A crystal chessboard where you and the probe take turns, ending in one lit path to the goal."></canvas></div>
-    <div class="caption you" id="caption" aria-live="polite"><div class="who" id="capWho"></div><h3 id="capTitle"></h3><p id="capText"></p></div>
-    <ol class="moves" id="moves" aria-label="Moves"></ol>
+    <div class="movebox"><div class="colheads" aria-hidden="true"><span class="colhead you" id="colYou"><i></i>You</span><span class="colhead probe" id="colProbe"><i></i>Probe</span></div><ol class="moves" id="moves" aria-label="Moves. Pick one to jump to it."></ol></div>
   </div>
 </section>
 
 <section id="bring">
-  <p class="eyebrow">Stage 0 · Your opening move</p>
+  <p class="eyebrow">Stage 1a · Your opening move</p>
   <h2>Bring anything.</h2>
   <p class="intro">Start with whatever you have. One line of a question is enough, and every extra file sharpens the research. Attach files to your request, and paste links in the description.</p>
   <div class="groups">
@@ -152,7 +152,7 @@ h2{font:800 clamp(32px,4vw,52px)/1.02 var(--display);letter-spacing:-.025em;marg
 </section>
 
 <section class="end endwrap">
-  <p class="eyebrow">Stage 3 · Checkmate</p>
+  <p class="eyebrow">Stage 4a · Checkmate</p>
   <h2>Your move.</h2>
   <p class="intro">Request a probe with any goal, or see how others played theirs.</p>
   <div class="actions"><a class="cta" href="/probes">See the probes <span class="arrow" aria-hidden="true">→</span></a><a class="cta alt" href="/request">Request a probe</a><a class="cta alt" href="https://github.com/yash201040/proofprobe" target="_blank" rel="noopener noreferrer"><svg class="ico" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2a10 10 0 0 0-3.16 19.49c.5.09.68-.22.68-.48v-1.7c-2.78.6-3.37-1.34-3.37-1.34-.45-1.16-1.11-1.47-1.11-1.47-.91-.62.07-.61.07-.61 1 .07 1.53 1.03 1.53 1.03.89 1.53 2.34 1.09 2.91.83.09-.65.35-1.09.63-1.34-2.22-.25-4.55-1.11-4.55-4.94 0-1.09.39-1.98 1.03-2.68-.1-.25-.45-1.27.1-2.65 0 0 .84-.27 2.75 1.02A9.6 9.6 0 0 1 12 6.84c.85 0 1.7.11 2.5.34 1.91-1.29 2.75-1.02 2.75-1.02.55 1.38.2 2.4.1 2.65.64.7 1.03 1.59 1.03 2.68 0 3.84-2.34 4.68-4.57 4.93.36.31.68.92.68 1.85v2.74c0 .27.18.58.69.48A10 10 0 0 0 12 2z"/></svg>GitHub</a></div>
@@ -164,19 +164,19 @@ h2{font:800 clamp(32px,4vw,52px)/1.02 var(--display);letter-spacing:-.025em;marg
 <script>
 const still=matchMedia("(prefers-reduced-motion:reduce)").matches;
 const $=id=>document.getElementById(id);
-// The seven moves. Whole stages are yours, half stages are the probe's.
+// The seven moves over four turns: "a" is your move, "b" is the probe's.
 const MOVES=[
- {k:"0",who:"you",name:"Goal",t:"Set the goal.",d:"Open with what you want and what you have: a CV, a job post, a pitch deck, a code repository, or one line of a question.",dur:3.8},
- {k:"0.5",who:"probe",name:"Probe wide",t:"The probe reads the whole board.",d:"Demand, pay, competitors, rules, and what blocks each option. Hundreds of sources, key numbers checked at the source. It ends in the questions only you can answer.",dur:4.4},
- {k:"1",who:"you",name:"Answer",t:"Answer what only you know.",d:"Each answer fences in the problem: your time, money, limits and wants. Skip what you'd rather not say, or point the probe somewhere new.",dur:3.8},
- {k:"1.5",who:"probe",name:"Probe deep",t:"The probe goes deep inside your fence.",d:"Every option is tested against your answers, and what fails is ruled out. It comes back with proposals, each with its evidence and a default.",dur:4.4},
- {k:"2",who:"you",name:"Decide",t:"Make the calls.",d:"Accept, reject, or leave a proposal on Auto and let the probe decide. Submitting with everything on Auto is a valid move.",dur:4.2},
- {k:"2.5",who:"probe",name:"Build",t:"The probe builds the answer.",d:"A path, a product spec, a build plan, a rulebook or a straight answer, whichever your goal needs. Every major call is checked again as it's built.",dur:4},
- {k:"3",who:"you",name:"Final report",t:"Checkmate: one proven path.",d:"A clean final report, with the evidence behind every decision. Read it online, or take it home as a file.",dur:5.2},
+ {k:"1a",who:"you",name:"Goal",t:"Set the goal.",d:"Open with what you want and what you have: a CV, a job post, a pitch deck, a code repository, or one line of a question.",dur:3.8},
+ {k:"1b",who:"probe",name:"Probe wide",t:"The probe reads the whole board.",d:"Demand, pay, competitors, rules, and what blocks each option. Hundreds of sources, key numbers checked at the source. It ends in the questions only you can answer.",dur:4.4},
+ {k:"2a",who:"you",name:"Answer",t:"Answer what only you know.",d:"Each answer fences in the problem: your time, money, limits and wants. Skip what you'd rather not say, or point the probe somewhere new.",dur:3.8},
+ {k:"2b",who:"probe",name:"Probe deep",t:"The probe goes deep inside your fence.",d:"Every option is tested against your answers, and what fails is ruled out. It comes back with proposals, each with its evidence and a default.",dur:4.4},
+ {k:"3a",who:"you",name:"Decide",t:"Make the calls.",d:"Accept, reject, or leave a proposal on Auto and let the probe decide. Submitting with everything on Auto is a valid move.",dur:4.2},
+ {k:"3b",who:"probe",name:"Build",t:"The probe builds the answer.",d:"A path, a product spec, a build plan, a rulebook or a straight answer, whichever your goal needs. Every major call is checked again as it's built.",dur:4},
+ {k:"4a",who:"you",name:"Final report",t:"Checkmate: one proven path.",d:"A clean final report, with the evidence behind every decision. Read it online, or take it home as a file.",dur:5.2},
 ];
+MOVES.forEach(m=>{const g=document.createElement("div");g.className="cap ghost";g.setAttribute("aria-hidden","true");const w=document.createElement("div");w.className="who";w.textContent="Stage "+m.k+" · The probe's move";const h=document.createElement("h3");h.textContent=m.t;const d=document.createElement("p");d.textContent=m.d;g.append(w,h,d);$("caption").appendChild(g)});
 const mv=$("moves");
 for(let r=0;r<4;r++){
-  const no=document.createElement("li");no.className="no";no.textContent=(r+1)+".";mv.appendChild(no);
   [MOVES[r*2],MOVES[r*2+1]].forEach((m,j)=>{const li=document.createElement("li");if(!m){mv.appendChild(li);return}
     const b=document.createElement("button");b.type="button";b.className="mv "+m.who;b.dataset.i=r*2+j;const s=document.createElement("b");s.textContent=m.k;b.append(s,m.name);
     b.addEventListener("click",()=>{jump(r*2+j);});li.appendChild(b);mv.appendChild(li)});
@@ -299,20 +299,18 @@ function draw(i,p,now){
   ps.sort((a,b)=>b[1][1]-a[1][1]).forEach(([k,pos,a,l])=>piece(pos[0],pos[1],k,a,l,now));
 }
 // Playback
-let cur=0,t0=performance.now(),playing=!still,visible=true,raf=0,pausedAt=0;
-function setUi(i){const m=MOVES[i];$("caption").className="caption "+m.who;$("capWho").textContent="Stage "+m.k+" · "+(m.who==="you"?"Your move":"The probe's move");$("capTitle").textContent=m.t;$("capText").textContent=m.d;
-  $("clockYou").classList.toggle("on",m.who==="you");$("clockProbe").classList.toggle("on",m.who==="probe");
+let cur=0,t0=performance.now(),playing=!still,visible=true,raf=0;
+function setUi(i){const m=MOVES[i];$("caption").className="caption "+m.who;const cw=$("capWho"),code=document.createElement("span");code.className="code";code.textContent=m.k;cw.textContent="";cw.append("Stage ",code," · "+(m.who==="you"?"Your move":"The probe's move"));$("capTitle").textContent=m.t;$("capText").textContent=m.d;
+  $("colYou").classList.toggle("on",m.who==="you");$("colProbe").classList.toggle("on",m.who==="probe");
   document.querySelectorAll(".mv").forEach(b=>{const k=+b.dataset.i;b.classList.toggle("now",k===i);b.classList.toggle("done",k<i);b.setAttribute("aria-current",k===i?"step":"false")})}
 function jump(i){cur=i;t0=performance.now()-(still?MOVES[i].dur*1000:0);setUi(i);if(still)render(performance.now());else kick()}
 function render(now){const m=MOVES[cur],p=still?1:cl((now-t0)/(m.dur*1000));draw(cur,p,now);return p}
 function loop(now){raf=0;if(!visible)return;
   const p=render(now);
   if(playing&&p>=1){if(cur<MOVES.length-1){cur++;t0=now;setUi(cur)}else if(now-t0>MOVES[cur].dur*1000+2600){cur=0;t0=now;setUi(0)}}
-  if(!playing&&p>=1){/* hold the frame but keep the glints moving */}
   raf=requestAnimationFrame(loop)}
 function kick(){if(!raf&&visible&&!still)raf=requestAnimationFrame(loop)}
-$("play").addEventListener("click",()=>{playing=!playing;$("play").textContent=playing?"Pause":"Play";$("play").setAttribute("aria-label",playing?"Pause the game":"Play the game");if(playing){t0=performance.now()-(pausedAt||0)}else pausedAt=performance.now()-t0;kick()});
-if(still){playing=false;$("play").textContent="Play";$("play").hidden=true}
+if(still)playing=false;
 new IntersectionObserver(es=>es.forEach(e=>{visible=e.isIntersecting;if(visible){kick();if(still)render(performance.now())}}),{threshold:.05}).observe($("game"));
 document.addEventListener("visibilitychange",()=>{visible=!document.hidden;kick()});
 cv.addEventListener("pointermove",e=>{if(still||e.pointerType!=="mouse")return;const r=cv.getBoundingClientRect();yawT=((e.clientX-r.left)/r.width-.5)*.2});
@@ -321,7 +319,7 @@ new ResizeObserver(()=>{size();render(performance.now())}).observe(cv);
 size();setUi(0);if(still){cur=MOVES.length-1;setUi(cur);render(performance.now())}else kick();
 // Density charts: one unit per chart, comparators in grey and ProofProbe in the accent.
 const SOURCES_DATA=[{l:"A chat answer",v:19.48,lo:0.07,txt:"0–19",tip:"Range across four leading assistants with web search on, from two 2026 studies of 960 and 1,000 answers."},{l:"Best deep-research agent",v:111.21,txt:"111",tip:"Average effective citations per report, best of four agents on 100 PhD-level tasks (DeepResearch Bench, 2025)."},{l:"ProofProbe probe",v:229,txt:"229",us:1,tip:"Unique sources recorded in the notes of our deepest probe so far, RL Audits, from 60 domains."}];
-const STEERS_DATA=[{l:"A chat answer",v:1,txt:"1",tip:"The prompt you type. Follow-ups are up to you."},{l:"ProofProbe, product audit",v:32,txt:"32",us:1,tip:"10 answers at Stage 1 and 22 decisions at Stage 2 (RL Audits)."},{l:"ProofProbe, career probe",v:40,txt:"40",us:1,tip:"40 questions answered at Stage 1."}];
+const STEERS_DATA=[{l:"A chat answer",v:1,txt:"1",tip:"The prompt you type. Follow-ups are up to you."},{l:"ProofProbe, product audit",v:32,txt:"32",us:1,tip:"10 answers at Stage 2a and 22 decisions at Stage 3a (RL Audits)."},{l:"ProofProbe, career probe",v:40,txt:"40",us:1,tip:"40 questions answered at Stage 2a."}];
 function bars(host,data){const max=Math.max(...data.map(d=>d.v));data.forEach(d=>{const row=document.createElement("div");row.className="bar"+(d.us?" us":"");row.dataset.tip=d.tip;
   const l=document.createElement("span");l.className="lbl";l.textContent=d.l;const tr=document.createElement("span");tr.className="track";const f=document.createElement("span");f.className="fill"+(d.lo!==undefined?" range":"");f.style.width=Math.max(1.2,d.v/max*100)+"%";if(d.lo!==undefined){f.style.left=d.lo/max*100+"%";f.style.width=Math.max(1.2,(d.v-d.lo)/max*100)+"%"}tr.appendChild(f);
   const v=document.createElement("span");v.className="val";v.textContent=d.txt;row.append(l,tr,v);row.setAttribute("aria-label",d.l+": "+d.txt+". "+d.tip);host.appendChild(row)})}
