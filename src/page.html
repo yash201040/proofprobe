@@ -192,13 +192,15 @@ body{background:#fff}#acct,.topbar,.tracker,#stepTabs,#reportBar,#notice,#loadba
 .lockstate{min-height:22px;margin-top:10px;color:var(--muted);font-size:15.5px}.lockrow{display:flex;justify-content:flex-end;gap:8px;margin-top:10px}
 .lockedbox{display:grid;gap:10px;justify-items:start;padding:20px;margin-block:18px;border:1px solid var(--stop);background:color-mix(in srgb,var(--stop) 8%,var(--surface))}
 .viewerbar{margin-top:10px;padding:8px 12px;border-left:3px solid var(--accent);background:var(--accent-soft);font-size:15.5px}
+.tracker ol{padding-top:10px}.loopmark{position:absolute;top:-8px;left:calc(50% + 8px);white-space:nowrap;z-index:2;padding:0 5px;border-radius:999px;background:var(--wait-soft,#F6E7C8);color:var(--wait,#8A5A00);font:700 11.5px/1.5 var(--mono)}
+.trackround{margin:6px 0 0;padding:8px 12px;border-left:3px solid var(--wait,#8A5A00);background:var(--wait-soft,#F6E7C8);font-size:15.5px}
 </style></head><body><div id="loadbar" role="progressbar" aria-label="Loading"></div><div class="wrap">
 <div class="topbar"><a class="brandlink" href="/">ProofProbe</a></div>
 <header><div class="eyebrow" id="eyebrow"></div><h1 id="title"></h1><p class="viewerbar" id="viewerBar" hidden></p>
   <p class="cost" id="cost" hidden></p>
   <p class="callout" id="rerouteInfo" hidden></p>
 </header>
-<nav class="tracker" id="tracker" aria-label="Progress" hidden><ol id="trackList"></ol><p id="trackNow"></p></nav>
+<nav class="tracker" id="tracker" aria-label="Progress" hidden><ol id="trackList"></ol><p id="trackNow"></p><p class="trackround" id="trackRound" hidden></p></nav>
 <nav class="steptabs" id="stepTabs" aria-label="Research steps" hidden></nav>
 <div id="unlockfx" hidden aria-hidden="true"><div class="fxring"></div><svg viewBox="0 0 120 120" fill="none" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"><path class="fxsh" d="M38 56V38a22 22 0 0 1 44 0v18"/><rect class="fxbody" x="24" y="56" width="72" height="52" rx="12"/><path class="fxtick" d="M46 82l10 10 19-20"/></svg></div>
 <div class="skel" id="skel" aria-hidden="true"><i></i><i></i><i></i></div>
@@ -452,10 +454,15 @@ function renderStep(n){
 function renderTracker(d){
   const now=stageNow(d.status,d.rerouting||!!d.reroute,kindOf(d.steps[d.steps.length-1])),at=STAGES.findIndex(x=>x[0]===now),l=$("trackList");l.textContent="";
   STAGES.forEach(([k,label,who],i)=>{const li=el("li",null,who+(now==="closed"||i<at?" done":i===at?" now":""));if(i===at)li.setAttribute("aria-current","step");
-    li.append(el("span",k,"dot"),el("span",label,"lbl"));l.appendChild(li)});
+    li.append(el("span",k,"dot"),el("span",label,"lbl"));
+    // From round 2 on, 1a carries a loop mark: a new direction revised the goal and the turns began again.
+    if(k==="1a"&&d.round>1){const r=el("span","↺"+d.round,"loopmark");r.title="Round "+d.round+": the goal was revised by a new direction";li.appendChild(r)}
+    l.appendChild(li)});
   const cur=STAGES[at],p=$("trackNow");p.textContent="";
   if(now==="closed")p.textContent="This probe is closed.";
   else{p.append(el("strong","Now: "+stageName(now)+". "),cur[2]==="us"?"This part happens on our side, so there's nothing for you to do yet.":now==="4a"?"Nothing left to do. Read the final report below, or download it.":"It's your turn. "+(d.editable?"":"Only the profile's owner can respond, after signing in."))}
+  const rv=$("trackRound");rv.textContent="";rv.hidden=!(d.round>1);
+  if(d.round>1){rv.append(el("strong","Round "+d.round+". "),d.revision?"The goal was revised by a new direction on "+day(d.revision.at)+": "+d.revision.message:"The goal was revised by a new direction.")}
   $("tracker").hidden=false;
 }
 // The take-home report: everything open, info notes written out, and no buttons.

@@ -17,7 +17,7 @@ Staged research that ends in a clear, data-backed final report. Stages follow fo
 | 3b | You | Builds the deliverable from the decisions | step with only `plan.json` |
 | 4a | Person | Reads and downloads the final report. Nothing left to do | |
 
-The website numbers each page step by stage from its content, so always publish in this shape. Submitting never starts anything. Run a "b" stage only when the user asks.
+The website numbers each page step by stage from its content, so always publish in this shape. Stages only move forward, and the helper refuses a new step that isn't a later stage. Going back after a new direction is a new round (`--new-round`), never an extra step. Submitting never starts anything. Run a "b" stage only when the user asks.
 
 **This applies to every track.** On any page with questions, the person can skip answering and send a new direction. When the user asks you to continue, always check for that first, because it sends the work back to Stage 1b. See "Changing direction".
 
@@ -77,7 +77,7 @@ This works the same for jobs, side income, startups and any other goal. Someone 
 1. Treat the message as the new goal. It outranks the old analysis and any answers on the page.
 2. Run Stage 1b again, reusing whatever earlier research still applies. Tell the user the budget first.
 3. Keep any existing answers that still matter by reusing their question ids.
-4. Log the cost, then publish a new step: `proofprobe publish <id> --new-step "New direction" --intro <file> --questions <file> --status open`. That closes the request and opens a new view. Earlier steps stay readable, and earlier submissions stay in the logs but no longer count.
+4. Log the cost, then publish a new round: `proofprobe publish <id> --new-round --intro <file> --questions <file>`. This loops back to Stage 1a with the direction as the revised goal: the questions step (2a) is rewritten in place, any later steps (3a, 4a) are archived and removed, and the probe reopens. A probe never has more than the 2a, 3a and 4a steps. Earlier rounds stay in the archive on Admin, and submissions from them no longer count.
 
 ## Updating an existing page
 

@@ -289,6 +289,10 @@ async function loadDetail(id){
   pvRow.append(pvLab,pvT,pvSave,pvMsg);pv.appendChild(pvRow);
   if(d.access.length){const t=el("table","", "cards"),tb=el("tbody");t.style.marginTop="12px";d.access.forEach(a=>{const tr=el("tr"),act=el("td");act.className="act";act.appendChild(accessButtons(id,a.viewer_id,a.status,()=>loadDetail(id)));tr.append(el("td",a.viewer),el("td",null),el("td",a.note||""),el("td",fmt(a.requested_at)),act);tr.children[1].appendChild(accessChip(a.status));tb.appendChild(tr)});t.appendChild(tb);pv.appendChild(t)}
   box.appendChild(pv);
+  // Earlier rounds: what the page looked like before each new direction.
+  if(d.archive&&d.archive.length){const ar=el("details",null,"fold");ar.appendChild(el("summary","Earlier rounds ("+(d.round-1)+"). This is round "+d.round+"."));
+    d.archive.forEach(x=>{const w=el("div",null,"qa");w.style.marginTop="10px";w.appendChild(el("b","Round "+x.round+", step "+x.n+": "+x.title+" (archived "+fmt(x.archivedAt)+")"));
+      const qs=x.sections.flatMap(s=>s.questions);if(qs.length){const ol=el("ol");qs.forEach(q=>ol.appendChild(el("li",q.text)));w.appendChild(ol)}else if(x.hasPlan)w.appendChild(el("p","Final report","muted"));ar.appendChild(w)});box.appendChild(ar)}
   if(d.reroute)box.appendChild(el("p","New direction requested "+fmt(d.reroute.at)+": "+d.reroute.message,"chip warn"));
 
   const seenQ=new Set(),qs=d.steps.flatMap(s=>s.sections.flatMap(x=>x.questions)).filter(q=>!seenQ.has(q.id)&&seenQ.add(q.id));
@@ -307,7 +311,7 @@ async function loadDetail(id){
   const logs=el("details",null,"fold");logs.appendChild(el("summary","Submission logs ("+d.submissions.length+")"));
   if(!d.submissions.length)logs.appendChild(el("p","Nothing submitted yet.","muted"));
   d.submissions.slice().reverse().forEach(s=>{
-    const one=el("details",null,"fold"),h=el("summary","Submission "+s.seq+" (Stage "+(()=>{const st=d.steps.find(x=>x.n===s.stepN);return st?kindOfStep(st):"?"})()+", step "+s.stepN+"), "+fmt(s.submittedAt)+", "+s.answered+" of "+s.total+" answers"+(s.intact?"":" (failed integrity check)"));one.appendChild(h);
+    const one=el("details",null,"fold"),h=el("summary","Submission "+s.seq+(s.round&&d.round>1?" (round "+s.round+")":"")+" (Stage "+(()=>{const st=d.steps.find(x=>x.n===s.stepN);return st?kindOfStep(st):"?"})()+", step "+s.stepN+"), "+fmt(s.submittedAt)+", "+s.answered+" of "+s.total+" answers"+(s.intact?"":" (failed integrity check)"));one.appendChild(h);
     const inner=el("div",null,"grid2");inner.style.marginTop="10px";(s.items||[]).forEach((q,i)=>{const w=el("div",null,"qa");w.append(el("b",(i+1)+". "+q.question),el("p",q.answer||"Not answered"));inner.appendChild(w)});one.appendChild(inner);logs.appendChild(one);
   });
   box.appendChild(logs);

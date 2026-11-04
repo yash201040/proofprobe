@@ -16,7 +16,7 @@ const ADMIN_DAYS = 90;
 const ADMIN_MAX_FAILS = 6;
 const ADMIN_LOCK_MINUTES = 15;
 const ADMIN_SESSION = "__admin";
-const SCHEMA_VERSION = "7";
+const SCHEMA_VERSION = "8";
 const MAX_PENDING_PROFILES = 100;
 const SIGNIN_MAX_MISSES = 20, SIGNIN_WINDOW_MS = 15 * 60_000;
 // Spam limits. Everything here runs on the free tier, so caps are per device or per profile, plus a few global ceilings.
@@ -72,7 +72,7 @@ interface Section { title: string; note?: string; first?: boolean; questions: Qu
 interface CaseRow {
   id: string; title: string; first_name: string; status: string;
   created_at: string; updated_at: string; profile_id: string | null; slug: string | null;
-  p_name: string; p_slug: string; private: number; teaser: string | null;
+  p_name: string; p_slug: string; private: number; teaser: string | null; round: number;
 }
 interface Step { n: number; title: string; intro: unknown[]; sections: Section[]; plan: unknown[]; createdAt: string }
 interface ProfileRow { id: string; slug: string; name: string; status: string; reason: string | null; password_hash: string | null; password_salt: string | null; password_enc: string | null; password_iv: string | null; pw_version: number }
@@ -117,6 +117,10 @@ async function migrate(env: Env) {
   const ccols = new Set((await env.DB.prepare("SELECT name FROM pragma_table_info('cases')").all()).results.map((r: any) => r.name as string));
   if (!ccols.has("private")) await env.DB.prepare("ALTER TABLE cases ADD COLUMN private INTEGER NOT NULL DEFAULT 0").run();
   if (!ccols.has("teaser")) await env.DB.prepare("ALTER TABLE cases ADD COLUMN teaser TEXT").run();
+  // A new direction starts a new round: the questions step is rewritten in place, so a probe never grows past 4a.
+  if (!ccols.has("round")) await env.DB.prepare("ALTER TABLE cases ADD COLUMN round INTEGER NOT NULL DEFAULT 1").run();
+  const scols = new Set((await env.DB.prepare("SELECT name FROM pragma_table_info('submissions')").all()).results.map((r: any) => r.name as string));
+  if (!scols.has("round")) await env.DB.prepare("ALTER TABLE submissions ADD COLUMN round INTEGER NOT NULL DEFAULT 1").run();
   const subs = new Set((await env.DB.prepare("SELECT name FROM pragma_table_info('submissions')").all()).results.map((r: any) => r.name as string));
   if (!subs.has("step_n")) await env.DB.prepare("ALTER TABLE submissions ADD COLUMN step_n INTEGER NOT NULL DEFAULT 1").run();
   const cols = new Set((await env.DB.prepare("SELECT name FROM pragma_table_info('cases')").all()).results.map((r: any) => r.name as string));
@@ -269,6 +273,7 @@ async function deleteCase(env: Env, id: string, ray: string) {
     env.DB.prepare("DELETE FROM reroutes WHERE case_id = ?").bind(id),
     env.DB.prepare("DELETE FROM steps WHERE case_id = ?").bind(id),
     env.DB.prepare("DELETE FROM access WHERE case_id = ?").bind(id),
+    env.DB.prepare("DELETE FROM step_archive WHERE case_id = ?").bind(id),
     env.DB.prepare("DELETE FROM cases WHERE id = ?").bind(id),
     audit(env, null, "admin", "page_deleted", id, ray),
   ]);
@@ -284,8 +289,8 @@ async function summaries(env: Env, caseId: string) {
   return r.results.map((x: any) => ({ seq: x.seq, submittedAt: x.submitted_at, answered: x.answered, total: x.total, changed: parse(x.changed_json, []) }));
 }
 async function summariesWithStep(env: Env, caseId: string) {
-  const r = await env.DB.prepare("SELECT seq, step_n, submitted_at, answered, total, changed_json FROM submissions WHERE case_id = ? ORDER BY seq").bind(caseId).all<any>();
-  return r.results.map((x) => ({ seq: x.seq, stepN: x.step_n, submittedAt: x.submitted_at, answered: x.answered, total: x.total, changed: parse(x.changed_json, []) }));
+  const r = await env.DB.prepare("SELECT seq, step_n, round, submitted_at, answered, total, changed_json FROM submissions WHERE case_id = ? ORDER BY seq").bind(caseId).all<any>();
+  return r.results.map((x) => ({ seq: x.seq, stepN: x.step_n, round: x.round, submittedAt: x.submitted_at, answered: x.answered, total: x.total, changed: parse(x.changed_json, []) }));
 }
 async function currentAnswers(env: Env, caseId: string) {
   const r = await env.DB.prepare("SELECT question_id, text, updated_at FROM answers WHERE case_id = ?").bind(caseId).all();
@@ -415,17 +420,17 @@ async function submit(env: Env, row: CaseRow, key: string, ray: string) {
   const answered = items.filter((i) => i.answer.trim()).length;
   if (!answered) return json({ error: "no_saved_answers" }, 409);
 
-  const prev = await env.DB.prepare("SELECT seq, step_n, payload FROM submissions WHERE case_id = ? ORDER BY seq DESC LIMIT 1").bind(row.id).first<any>();
+  const prev = await env.DB.prepare("SELECT seq, step_n, payload, round FROM submissions WHERE case_id = ? ORDER BY seq DESC LIMIT 1").bind(row.id).first<any>();
   const before = new Map(parse<{ id: string; answer: string }[]>(prev?.payload ?? "[]", []).map((i) => [i.id, i.answer]));
-  const changed = prev && prev.step_n === step.n ? items.filter((i) => (before.get(i.id) ?? "") !== i.answer).map((i) => i.id) : [];
+  const changed = prev && prev.step_n === step.n && prev.round === (row.round ?? 1) ? items.filter((i) => (before.get(i.id) ?? "") !== i.answer).map((i) => i.id) : [];
   const payload = JSON.stringify(items);
   const hash = await sha256(payload);
   const seq = (prev?.seq ?? 0) + 1;
   const at = new Date().toISOString();
   try {
     await env.DB.batch([
-      env.DB.prepare("INSERT INTO submissions(case_id, seq, step_n, idem_key, submitted_at, answered, total, changed_json, payload, sha256) VALUES (?,?,?,?,?,?,?,?,?,?)")
-        .bind(row.id, seq, step.n, key, at, answered, items.length, JSON.stringify(changed), payload, hash),
+      env.DB.prepare("INSERT INTO submissions(case_id, seq, step_n, idem_key, submitted_at, answered, total, changed_json, payload, sha256, round) VALUES (?,?,?,?,?,?,?,?,?,?,?)")
+        .bind(row.id, seq, step.n, key, at, answered, items.length, JSON.stringify(changed), payload, hash, row.round ?? 1),
       env.DB.prepare("UPDATE cases SET status = CASE WHEN status = 'open' THEN 'submitted' ELSE status END, updated_at = ? WHERE id = ?").bind(at, row.id),
       audit(env, row.id, "editor", "submit", `seq=${seq} answered=${answered}`, ray),
     ]);
@@ -577,8 +582,10 @@ async function pageApi(request: Request, env: Env, row: CaseRow, rest: string, r
     const steps: Step[] = (stepR.results as any[]).map((x) => ({ n: x.n, title: x.title, intro: parse(x.intro_json, []), sections: parse<Section[]>(x.questions_json, []), plan: parse(x.plan_json, []), createdAt: x.created_at }));
     const open = answerStep(steps);
     // Anyone who can open the page reads every stage, its submitted answers and any requested new direction. Saved drafts and the submission list stay with the owner, approved viewers and the site owner.
-    const pub = { title: row.title, name: row.p_name, profileSlug: row.p_slug, status: row.status, costUsd: ((costR.results[0] as any)?.micro ?? 0) / 1_000_000, editable, seeAnswers: acc.seeAnswers, viewer: !editable && acc.seeAnswers, asAdmin: acc.admin && !editable && !acc.viewer, private: !!row.private, caseId: row.id, steps, openStep: open?.n ?? null, rerouting: !!rerouteR.results[0] };
-    const subs = await env.DB.prepare("SELECT seq, step_n, submitted_at, payload FROM submissions WHERE case_id = ? ORDER BY seq").bind(row.id).all<any>();
+    const subs = await env.DB.prepare("SELECT seq, step_n, submitted_at, payload FROM submissions WHERE case_id = ? AND round = ? ORDER BY seq").bind(row.id, row.round ?? 1).all<any>();
+    // From round 2 on, the latest handled direction is the revised goal, shown as a loop back to 1a.
+    const revision = (row.round ?? 1) > 1 ? await env.DB.prepare("SELECT message, at FROM reroutes WHERE case_id = ? AND handled_at IS NOT NULL ORDER BY id DESC LIMIT 1").bind(row.id).first<{ message: string; at: string }>() : null;
+    const pub = { title: row.title, name: row.p_name, profileSlug: row.p_slug, status: row.status, costUsd: ((costR.results[0] as any)?.micro ?? 0) / 1_000_000, editable, seeAnswers: acc.seeAnswers, round: row.round ?? 1, revision, viewer: !editable && acc.seeAnswers, asAdmin: acc.admin && !editable && !acc.viewer, private: !!row.private, caseId: row.id, steps, openStep: open?.n ?? null, rerouting: !!rerouteR.results[0] };
     const logs: Record<string, unknown> = {};
     for (const x of subs.results) logs[x.step_n] = { seq: x.seq, submittedAt: x.submitted_at, items: parse(x.payload, []) };
     if (!acc.seeAnswers) return json({ ...pub, logs, reroute: rerouteR.results[0] ?? null });
@@ -827,6 +834,7 @@ async function adminSite(request: Request, env: Env, parts: string[], ray: strin
     const costs = await env.DB.prepare("SELECT usd_micro, label, at FROM cost_entries WHERE case_id = ? ORDER BY id").bind(id).all<any>();
     return json({
       title: row.title, profile: p?.name, status: row.status, private: !!(row as any).private, teaser: (row as any).teaser ?? "", steps: await loadSteps(env, id), answers: await currentAnswers(env, id),
+      round: (row as any).round ?? 1, archive: (await env.DB.prepare("SELECT round, n, title, questions_json, plan_json, archived_at FROM step_archive WHERE case_id = ? ORDER BY round, n").bind(id).all<any>()).results.map((x) => ({ round: x.round, n: x.n, title: x.title, sections: parse<Section[]>(x.questions_json, []), hasPlan: parse<unknown[]>(x.plan_json, []).length > 0, archivedAt: x.archived_at })),
       access: (await env.DB.prepare("SELECT a.viewer_id, a.status, a.note, a.requested_at, a.decided_at, a.decided_by, v.name AS viewer FROM access a JOIN profiles v ON v.id = a.viewer_id WHERE a.case_id = ? ORDER BY a.requested_at DESC").bind(id).all()).results,
       reroute: await openReroute(env, id), costUsd: await costUsd(env, id), audit: auditRows.results,
       costs: costs.results.map((c) => ({ usd: c.usd_micro / 1_000_000, label: c.label, at: c.at })),
@@ -913,10 +921,10 @@ async function admin(request: Request, env: Env, parts: string[], ray: string) {
   if (!sub && request.method === "GET") {
     const p = await env.DB.prepare("SELECT slug, name FROM profiles WHERE id = ?").bind(row.profile_id).first<any>();
     const steps = await loadSteps(env, id), open = answerStep(steps), submissions = await summariesWithStep(env, id), last = submissions[submissions.length - 1];
-    return json({ id: row.id, title: row.title, profile: p?.name, path: `/probes/${p?.slug}/${row.slug}`, status: row.status, hasPassword: !!(await profileOf(env, row.profile_id))?.password_hash, costUsd: await costUsd(env, id), reroute: await openReroute(env, id), steps, openStep: open?.n ?? null, sections: open?.sections ?? [], submissionCurrent: !!last && !!open && last.stepN === open.n, answers: await currentAnswers(env, id), submissions });
+    return json({ id: row.id, title: row.title, profile: p?.name, path: `/probes/${p?.slug}/${row.slug}`, status: row.status, hasPassword: !!(await profileOf(env, row.profile_id))?.password_hash, costUsd: await costUsd(env, id), reroute: await openReroute(env, id), steps, openStep: open?.n ?? null, sections: open?.sections ?? [], round: (row as any).round ?? 1, archivedRounds: ((await env.DB.prepare("SELECT COUNT(DISTINCT round) AS n FROM step_archive WHERE case_id = ?").bind(id).first<{ n: number }>())?.n ?? 0), submissionCurrent: !!last && !!open && last.stepN === open.n && last.round === ((row as any).round ?? 1), answers: await currentAnswers(env, id), submissions });
   }
   if (!sub && request.method === "PATCH") {
-    const b = await request.json().catch(() => null) as { intro?: unknown; questions?: unknown; plan?: unknown; status?: string; newStep?: unknown; step?: unknown; stepTitle?: unknown; private?: unknown; teaser?: unknown } | null;
+    const b = await request.json().catch(() => null) as { intro?: unknown; questions?: unknown; plan?: unknown; status?: string; newStep?: unknown; step?: unknown; stepTitle?: unknown; private?: unknown; teaser?: unknown; newRound?: unknown } | null;
     if (!b) return json({ error: "bad_request" }, 400);
     if (b.questions !== undefined && !validSections(b.questions)) return json({ error: "invalid_questions" }, 400);
     if (b.intro !== undefined && !validBlocks(b.intro)) return json({ error: "invalid_intro" }, 400);
@@ -931,12 +939,25 @@ async function admin(request: Request, env: Env, parts: string[], ray: string) {
     const writes: D1PreparedStatement[] = [];
     if (typeof b.private === "boolean") writes.push(env.DB.prepare("UPDATE cases SET private = ? WHERE id = ?").bind(b.private ? 1 : 0, id));
     if (typeof b.teaser === "string") writes.push(env.DB.prepare("UPDATE cases SET teaser = ? WHERE id = ?").bind(cleanTeaser(b.teaser) || null, id));
-    if (typeof b.stepTitle === "string") {
+    if (typeof b.stepTitle === "string" && b.newRound !== true) {
       const target = b.step === undefined ? latest : steps.find((x) => x.n === b.step);
       if (!target) return json({ error: "unknown_step" }, 404);
       writes.push(env.DB.prepare("UPDATE steps SET title = ? WHERE case_id = ? AND n = ?").bind(b.stepTitle.trim(), id, target.n));
     }
-    if (typeof b.newStep === "string") {
+    // Stages only move forward: 2a questions, then 3a decisions, then the 4a report. Going back means a new round.
+    const rank = (secs: Section[] | undefined, plan: unknown) => (secs ?? []).some((x) => x.questions.some((q) => q.kind === "decision")) ? 2 : (secs ?? []).length ? 1 : Array.isArray(plan) && plan.length ? 3 : 0;
+    if (b.newRound !== undefined && (b.newRound !== true || typeof b.newStep === "string" || b.step !== undefined)) return json({ error: "bad_request" }, 400);
+    if (typeof b.newStep === "string" && rank(b.questions as Section[], b.plan) <= Math.max(...steps.map((x) => rank(x.sections, x.plan)))) return json({ error: rerouted ? "use_new_round" : "stage_order" }, 409);
+    if (b.newRound === true) {
+      if (!validSections(b.questions) || !b.questions.length || b.questions.some((x) => x.questions.some((q) => q.kind === "decision"))) return json({ error: "new_round_needs_questions" }, 400);
+      const target = steps.find((x) => rank(x.sections, x.plan) === 1) ?? steps[0], round = row.round ?? 1;
+      for (const x of steps.filter((x) => x.n >= target.n))
+        writes.push(env.DB.prepare("INSERT INTO step_archive(case_id, round, n, title, intro_json, questions_json, plan_json, archived_at) VALUES (?,?,?,?,?,?,?,?)").bind(id, round, x.n, x.title, JSON.stringify(x.intro), JSON.stringify(x.sections), JSON.stringify(x.plan), now));
+      writes.push(env.DB.prepare("DELETE FROM steps WHERE case_id = ? AND n > ?").bind(id, target.n));
+      writes.push(env.DB.prepare("UPDATE steps SET title = ?, intro_json = ?, questions_json = ?, plan_json = '[]', created_at = ? WHERE case_id = ? AND n = ?")
+        .bind(typeof b.stepTitle === "string" && b.stepTitle.trim() ? b.stepTitle.trim() : target.title, JSON.stringify(b.intro ?? []), JSON.stringify(b.questions), now, id, target.n));
+      writes.push(env.DB.prepare("UPDATE cases SET round = round + 1 WHERE id = ?").bind(id));
+    } else if (typeof b.newStep === "string") {
       writes.push(env.DB.prepare("INSERT INTO steps(case_id, n, title, intro_json, questions_json, plan_json, created_at) VALUES (?,?,?,?,?,?,?)")
         .bind(id, latest.n + 1, b.newStep.trim(), JSON.stringify(b.intro ?? []), JSON.stringify(b.questions ?? []), JSON.stringify(b.plan ?? []), now));
     } else if (changesContent) {
@@ -948,11 +969,11 @@ async function admin(request: Request, env: Env, parts: string[], ray: string) {
       writes.push(env.DB.prepare("UPDATE steps SET intro_json = ?, questions_json = ?, plan_json = ? WHERE case_id = ? AND n = ?")
         .bind(JSON.stringify(b.intro ?? target.intro), JSON.stringify(b.questions ?? target.sections), JSON.stringify(b.plan ?? target.plan), id, target.n));
     }
-    const closesReroute = !!rerouted && (typeof b.newStep === "string" || b.questions !== undefined);
+    const closesReroute = !!rerouted && (typeof b.newStep === "string" || b.questions !== undefined || b.newRound === true);
     if (closesReroute) writes.push(env.DB.prepare("UPDATE reroutes SET handled_at = ? WHERE case_id = ? AND handled_at IS NULL").bind(now, id));
     await env.DB.batch([
       ...writes,
-      env.DB.prepare("UPDATE cases SET status = ?, updated_at = ? WHERE id = ?").bind(b.status ?? (closesReroute || (typeof b.newStep === "string" && validSections(b.questions) && b.questions.length) ? "open" : row.status), now, id),
+      env.DB.prepare("UPDATE cases SET status = ?, updated_at = ? WHERE id = ?").bind(b.status ?? (closesReroute || b.newRound === true || (typeof b.newStep === "string" && validSections(b.questions) && b.questions.length) ? "open" : row.status), now, id),
       audit(env, id, "admin", "update", Object.keys(b).join(","), ray),
     ]);
     if (b.private === true) await applyPrivateSlug(env, id);
