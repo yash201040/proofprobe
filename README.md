@@ -2,7 +2,7 @@
 
 Live: https://proofprobe.forested-wolfberry.workers.dev
 
-Two-step research that turns any starting point into a clear, data-backed path: a job or interview to prepare for, a search for side income, a startup idea, or another goal.
+Staged research that turns any starting point into a clear, data-backed final report: a job or interview to prepare for, a search for side income, a startup idea, or another goal.
 
 1. **Broad probing:** research the goal, then publish exhaustive personalised questions.
 2. **In-depth research:** when asked, read the latest submission and publish the path on the same page, as one recommendation or up to three alternatives.
@@ -33,7 +33,7 @@ Local test: put `ADMIN_TOKEN_SHA256=<hash>` and `PASSWORD_KEY=<base64 key>` in `
 ## Data rules
 
 - Anyone can read each page's research, questions, status and cost, and a notice says so. Answers stay private to the signed-in profile and the owner. People apply for a profile, the owner approves it, and signing in unlocks that profile's pages and no others. People can change their own password once signed in.
-- Each research stage is a step, shown as a view on the same page. New research adds a step and never replaces one.
+- People act at Stages 0 to 3: set a goal, answer questions, decide on proposals (Accept, Reject or Auto), then read and download the final report. The half stages in between are research the owner runs. Each stage is a view on the same page, and new research never replaces an earlier one.
 - Submitting stores a log and starts nothing. Research continues only when `/proofprobe` is run.
 - The cost shown on a page is treg data spend logged with `proofprobe cost`. Claude usage is not included.
 - Submissions are append-only. A database trigger blocks updates, and each log stores a SHA-256 so corruption is detectable.
@@ -43,7 +43,7 @@ Local test: put `ADMIN_TOKEN_SHA256=<hash>` and `PASSWORD_KEY=<base64 key>` in `
 
 ## Design choices
 
-This is a small free-tier app: one Cloudflare Worker and a D1 database, with no user accounts. D1 can be moved to Postgres later with pgloader if the tool outgrows it. The schema is applied on first request, so there is no separate migration step.
+This is a small free-tier app: one Cloudflare Worker and a D1 database, with owner-approved profiles instead of a full account system. D1 can be moved to Postgres later with pgloader if the tool outgrows it. The schema is applied on first request, so there is no separate migration step.
 
 ## Open source and access
 

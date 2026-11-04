@@ -1,14 +1,20 @@
 # ProofProbe
 
-ProofProbe turns any starting point into a clear, data-backed path through two-step research. It covers job or interview prep, side income, startup ideas and any other goal. It is goal-agnostic, so keep its pages, code and docs free of wording tied to one use case.
+ProofProbe turns any starting point into a clear, data-backed path through staged research. It covers job or interview prep, side income, startup ideas and any other goal. It is goal-agnostic, so keep its pages, code and docs free of wording tied to one use case.
 
 ## The flow the owner expects
 
-1. **Step 1, broad probing.** Spend treg credits on real analysis, split into a few research tracks. Each track ends with the facts that would change its conclusions.
-2. **Questions.** Turn those facts into exhaustive, personalised questions, gate questions first, and end with an open "anything we missed?". Publish them with the findings so far to that person or team's own page.
-3. **They answer in their own time.** Submitting only stores a log. It never starts a job. They can instead send a new direction and skip the questions, which restarts Step 1 when the owner asks.
-4. **Step 2, in-depth research.** Run this only when the owner asks. Read the latest submission and finish the research. Follow-up questions are rare, one round at most.
-5. **The path.** Publish one deterministic recommendation, or up to three alternatives with what decides between them, at the top of the same page. It must be data-backed and motivating, and say exactly what to do next.
+People act at whole-numbered stages. The owner runs each half stage by asking for it, and nothing on the site starts research.
+
+0. **Goal.** A signed-in profile sends a goal request, or the owner starts a page.
+0.5. **Broad probing.** Spend treg credits on real analysis, split into a few research tracks, then turn the facts into exhaustive, personalised questions, gate questions first, ending with an open "anything we missed?".
+1. **Answers.** They answer in their own time, or send a new direction, which sends the work back to 0.5. Submitting only stores a log.
+1.5. **Deep research.** Treat the answers as a fence, finish the research, and publish proposals as decision items, each with its evidence and an Auto default.
+2. **Decisions.** They set each proposal to Accept, Reject or Auto. Leaving everything on Auto must still produce a strong result.
+2.5. **Build.** Resolve every decision, build the deliverable (a deterministic path, PRD, build plan, rulebook or direct answer), and calibrate it while building.
+3. **Final report.** A read-only view with reasoning cards for each major call, downloadable as offline HTML or PDF.
+
+The page tracker, step tabs and Probes filters derive the stage from each step's content, so publish steps in this shape. The Admin page's Copy prompt for decisions builds a full Stage 2.5 brief.
 
 The full procedure is in `skills/proofprobe/SKILL.md`, available in any Claude Code chat as `/proofprobe`. Follow it rather than improvising. Its section "Moving existing research in" covers work that started in another chat.
 

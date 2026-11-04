@@ -50,6 +50,7 @@ switch (cmd) {
     const body = {}, newStep = flag(a, "new-step"), step = flag(a, "step");
     if (newStep) body.newStep = newStep;
     if (step) body.step = Number(step);
+    if (flag(a, "title")) body.stepTitle = flag(a, "title");
     if (flag(a, "intro")) body.intro = readJson(flag(a, "intro"));
     if (flag(a, "plan")) body.plan = readJson(flag(a, "plan"));
     if (flag(a, "status")) body.status = flag(a, "status");
@@ -138,5 +139,5 @@ switch (cmd) {
     break;
   }
   case "purge": out(await api("DELETE", "/cases/" + a[0])); break;
-  default: console.log("proofprobe init [--url U] | new --profile NAME --title T [--new-profile] | profiles | pending | approve-profile NAME | reject-profile NAME | requests | request ID | approve ID | reject ID | request-started ID --case CASE | export ID | import ID --answers F | cost ID USD [label] | password ID [--set P] | admin-setup | publish ID [--intro F] [--questions F] [--plan F] [--status S] [--new-step TITLE | --step N] [--allow-drop] | list | link ID | status ID | fetch ID [--seq N] [--out F] | purge ID");
+  default: console.log("proofprobe init [--url U] | new --profile NAME --title T [--new-profile] | profiles | pending | approve-profile NAME | reject-profile NAME | requests | request ID | approve ID | reject ID | request-started ID --case CASE | export ID | import ID --answers F | cost ID USD [label] | password ID [--set P] | admin-setup | publish ID [--intro F] [--questions F] [--plan F] [--status S] [--new-step TITLE | --step N [--title T]] [--allow-drop] | list | link ID | status ID | fetch ID [--seq N] [--out F] | purge ID");
 }

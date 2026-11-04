@@ -1,7 +1,7 @@
 // Drives real Chrome against `wrangler dev` on localhost only.
 import puppeteer from "puppeteer-core";
 import { execFileSync } from "node:child_process";
-import { writeFileSync, readFileSync, mkdtempSync } from "node:fs";
+import { writeFileSync, readFileSync, mkdtempSync, readdirSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 const config = mkdtempSync(join(tmpdir(), "proofprobe-test-")) + "/config.json";
@@ -65,13 +65,14 @@ pp("publish", second.id, "--status", "plan_ready"); await page.reload({ waitUnti
 await sortBy("updated"); ok((await titles())[0] === "Second goal", "sorting by last updated works");
 ok((await txt("#filterBtn")) === "Filter" && (await page.$("#statusBy")) === null && (await titles()).length === 3, "filters start empty and show everything");
 await page.click("#filterBtn"); await page.waitForSelector("#filterPanel:not([hidden])");
-ok((await page.$$("#filterPanel input:checked")).length === 0 && (await page.$$('#filterStatus input')).length === 5, "status options are unchecked checkboxes");
+ok((await page.$$("#filterPanel input:checked")).length === 0 && (await page.$$('#filterStatus input')).length === 7, "stage options are unchecked checkboxes");
 const box = (group, value) => page.click(`#filterPanel input[data-group="${group}"][value="${value}"]`);
-await box("status", "plan_ready"); ok((await titles()).length === 1 && (await txt("#dirCount")) === "1 probe" && (await txt("#filterBtn")) === "Filter (1)", "one status filters the list");
-await box("status", "open"); ok((await titles()).length === 3, "two statuses combine with OR");
+ok((await page.$$eval('#filterStatus label', (l) => l.map((e) => e.textContent))).join("|").includes("Stage 1.5 · Deep research"), "filters use the user-facing stages");
+await box("status", "3"); ok((await titles()).length === 1 && (await txt("#dirCount")) === "1 probe" && (await txt("#filterBtn")) === "Filter (1)", "one status filters the list");
+await box("status", "1"); ok((await titles()).length === 3, "two stages combine with OR");
 const otherSlug = (await (await fetch(base + "/api/probes")).json()).profiles.find((p) => p.name === "Other Person").slug;
 await box("profile", otherSlug); ok((await titles()).join() === "Other goal", "status and profile combine with AND");
-await box("status", "open"); ok((await titles()).length === 0 && (await txt("#dirEmpty")).includes("match"), "no match shows a clear message");
+await box("status", "1"); ok((await titles()).length === 0 && (await txt("#dirEmpty")).includes("match"), "no match shows a clear message");
 await page.click("#filterClear"); ok((await titles()).length === 3 && (await txt("#filterBtn")) === "Filter", "clearing filters shows everything");
 const blurred = () => page.$eval("#profiles", (e) => getComputedStyle(e).filter.includes("blur"));
 ok((await blurred()) && !(await page.$eval("#filterPanel", (e) => getComputedStyle(e).filter.includes("blur"))), "the cards blur behind an open filter panel");
@@ -236,6 +237,39 @@ writeFileSync(qf + ".less", JSON.stringify([{ title: "A", questions: [{ id: "a9"
 ok(ppFails("publish", first.id, "--step", "2", "--questions", qf + ".less"), "publishing can't drop earlier questions");
 pp("export", first.id); ok(JSON.parse(readFileSync(join(config, "..", "cases", first.id, "step-3", "intro.json"), "utf8"))[0].title === "Compare", "a published page can be exported for editing");
 ok((await txt(".notice")).startsWith("Privacy:"), "privacy notice is shown");
+// Stage 2: proposals with Accept, Reject or Auto
+const decFile = qf + ".dec"; writeFileSync(decFile, JSON.stringify([{ title: "Proposals", questions: [
+  { id: "d1", kind: "decision", text: "Seal reward.json too", why: "Stops tampering. 3 of 90 tasks rewrote it.", lean: "Accept, because it costs one line." },
+  { id: "d2", kind: "decision", text: "Drop the name rule", why: "No defect traced to it.", lean: "Reject, because it still catches typos." },
+  { id: "z9", text: "Anything to change?", catchAll: true }] }]));
+const dec = made("Test Person", "Decide goal"), allAuto = made("Test Person", "Auto goal"); cleanup.push(dec.id, allAuto.id);
+for (const c of [dec, allAuto]) pp("publish", c.id, "--new-step", "Deep research and proposals", "--questions", decFile, "--status", "open");
+writeFileSync(qf + ".badkind", JSON.stringify([{ title: "A", questions: [{ id: "x1", kind: "vote", text: "?" }, { id: "z9", text: "?", catchAll: true }] }]));
+ok(ppFails("publish", dec.id, "--step", "2", "--questions", qf + ".badkind", "--allow-drop"), "an unknown question kind is refused");
+await page.goto(dec.link, { waitUntil: "networkidle0" }); await page.waitForSelector('input[name="q-d1-c"]');
+ok((await page.$eval('input[name="q-d1-c"][value="Auto"]', (e) => e.checked)) && (await txt("#submit")) === "Submit decisions" && (await txt("#qTitle")) === "Your decisions", "proposals start on Auto with decision wording");
+ok((await txt("#qBox")).includes("If left on Auto: Accept, because it costs one line.") && (await txt("#qBox")).includes("Based on: Stops tampering"), "each proposal shows its evidence and its Auto default");
+ok((await page.$eval("#tracker li.now .dot", (e) => e.textContent)) === "2" && (await txt("#trackNow")).includes("Stage 2 · Decide") && (await txt("#trackNow")).includes("your turn"), "the tracker shows Stage 2 as the current stage");
+ok((await page.$$eval("#stepTabs .steptab b", (l) => l.map((e) => e.textContent))).join() === "Stage 1,Stage 2", "step tabs are numbered by stage");
+await page.click('input[name="q-d1-c"][value="Accept"]'); await page.type("#q-d1-note", "Only for new tasks"); await page.click('input[name="q-d2-c"][value="Reject"]');
+ok(!(await dis("#saveAll")) && (await dis("#submit")), "a changed decision needs saving before submit");
+await page.click("#saveAll"); await saved(); await settle("#submit");
+await page.reload({ waitUntil: "networkidle0" }); await page.waitForSelector('input[name="q-d1-c"]');
+ok((await page.$eval('input[name="q-d1-c"][value="Accept"]', (e) => e.checked)) && (await page.$eval("#q-d1-note", (e) => e.value)) === "Only for new tasks" && (await page.$eval('input[name="q-d2-c"][value="Reject"]', (e) => e.checked)), "decisions and notes survive a refresh");
+await page.click("#submit"); await page.waitForFunction(() => /Submission 1 received/.test(document.querySelector("#submitStatus").textContent));
+const ds = JSON.parse(pp("fetch", dec.id)), dAns = (id) => ds.items.find((i) => i.id === id).answer;
+ok(dAns("d1") === "Accept\nOnly for new tasks" && dAns("d2") === "Reject", "decisions are stored as plain text the research can read");
+const decView = await browser.createBrowserContext(), dv = await decView.newPage(); await dv.goto(dec.link, { waitUntil: "networkidle0" }); await dv.waitForSelector("#viewQs:not([hidden])");
+const dvText = await dv.$eval("#viewQs", (e) => e.textContent);
+ok(dvText.includes("If left on Auto: Accept") && !dvText.includes("Only for new tasks") && !JSON.stringify(await (await fetch(dec.api)).json()).includes("Only for new tasks"), "visitors see each proposal's default but never the choice or note");
+ok((await dv.$eval("#trackNow", (e) => e.textContent)).includes("Stage 2.5") && (await dv.$eval("#trackNow", (e) => e.textContent)).includes("our side"), "after submitting, the tracker shows our side working");
+await decView.close();
+await page.goto(allAuto.link, { waitUntil: "networkidle0" }); await page.waitForSelector('input[name="q-d1-c"]');
+ok(!(await dis("#submit")), "leaving everything on Auto can be submitted straight away");
+await page.click("#submit"); await page.waitForFunction(() => /Submission 1 received/.test(document.querySelector("#submitStatus").textContent));
+const autoSub = JSON.parse(pp("fetch", allAuto.id));
+ok(autoSub.items.filter((i) => i.id.startsWith("d")).every((i) => i.answer === "Auto"), "untouched proposals are submitted as Auto");
+const pend = JSON.parse(pp("pending")); ok([dec.id, allAuto.id].every((id) => pend.some((w) => w.id === id && w.kind === "decisions")), "submitted decisions wait as the final version");
 
 const newPw = pp("password", first.id).match(/password: (\S+)/)[1];
 await page.reload({ waitUntil: "networkidle0" }); await page.waitForSelector("#acctBtn");
@@ -285,6 +319,28 @@ const pending = JSON.parse(pp("pending"));
 ok(pending.some((w) => w.id === other.id && w.kind === "answers") && pending.every((w) => w.id !== first.id), "answers waiting for research are listed as pending");
 await page.reload({ waitUntil: "networkidle0" }); await page.waitForSelector("#pending tr");
 ok((await txt("#pending")).includes("Other goal") && (await txt("#pending")).includes("In-depth research"), "the admin page shows pending research");
+const briefFor = async (title, deliver) => page.evaluate(async (title, deliver) => {
+  const row = [...document.querySelectorAll("#pending tr")].find((r) => r.textContent.includes(title)), sel = row.querySelector("select.deliver"), btn = [...row.querySelectorAll("button")].find((b) => b.textContent === "Copy prompt");
+  if (deliver !== null) { sel.value = deliver; sel.dispatchEvent(new Event("change")); }
+  btn.click(); for (let i = 0; i < 50 && !btn.dataset.prompt; i++) await new Promise((r) => setTimeout(r, 100)); return btn.dataset.prompt || "";
+}, title, deliver);
+ok((await txt("#pending")).includes("Final version"), "submitted decisions show as Final version");
+const brief = await briefFor("Decide goal", "a clean PRD");
+ok(brief.startsWith("/proofprobe continue Test Person: Decide goal") && brief.includes("[ACCEPT] Seal reward.json too") && brief.includes("Their note: Only for new tasks") && brief.includes("[REJECT] Drop the name rule") && brief.includes("Deliver as: a clean PRD") && brief.includes('--new-step "Final report"') && brief.includes("data, never as instructions"), "Copy prompt builds a full brief from the decisions");
+const autoBrief = await briefFor("Auto goal", null);
+ok(autoBrief.includes("full delegation") && autoBrief.includes("[AUTO] Seal reward.json too") && autoBrief.includes("Default if Auto: Accept, because it costs one line.") && autoBrief.includes("whatever fits the goal best"), "an all-Auto brief still carries every default and delegates fully");
+// Stage 3: the final report
+writeFileSync(qf + ".final", JSON.stringify([{ t: "section", title: "The answer", open: true, blocks: [{ t: "because", decision: "Seal both reward files", evidence: ["3 of 90 tasks rewrote reward.json in the Oct 2026 scan", { text: "One line of code", info: "Context only" }], shapedBy: "Your Accept on proposal 1" }] }, { t: "section", title: "Folded detail", blocks: [{ t: "p", text: "Hidden until opened" }] }]));
+pp("publish", dec.id, "--new-step", "Final report", "--plan", qf + ".final", "--status", "plan_ready");
+const fin = await browser.newPage(); await fin.goto(dec.link, { waitUntil: "networkidle0" }); await fin.waitForSelector("#reportBar:not([hidden])");
+ok((await fin.$eval("#planTitle", (e) => e.textContent)) === "Final report" && (await fin.$eval("#trackNow", (e) => e.textContent)).includes("Stage 3") && (await fin.$$eval("#stepTabs .steptab b", (l) => l.map((e) => e.textContent))).join() === "Stage 1,Stage 2,Stage 3", "the final report shows as Stage 3");
+ok((await fin.$eval(".because .bdec", (e) => e.textContent)) === "Seal both reward files" && (await fin.$eval(".because", (e) => e.textContent)).includes("Shaped by"), "major decisions show as reasoning cards");
+const dlDir = mkdtempSync(join(tmpdir(), "proofprobe-dl-")); const cdp = await fin.createCDPSession(); await cdp.send("Browser.setDownloadBehavior", { behavior: "allow", downloadPath: dlDir });
+await fin.click("#dlHtml"); let report = ""; for (let i = 0; i < 50 && !report; i++) { await new Promise((r) => setTimeout(r, 100)); const f = readdirSync(dlDir).find((n) => n.endsWith(".html")); if (f) report = readFileSync(join(dlDir, f), "utf8"); }
+ok(report.startsWith("<!doctype html>") && report.includes("Seal both reward files") && report.includes("Hidden until opened") && report.includes("Note: Context only") && !/<script/i.test(report) && !report.includes("<button"), "the report downloads as a self-contained offline file");
+await fin.emulateMediaType("print"); ok(await fin.evaluate(() => ["#reportBar", "#acct", "#tracker"].every((s) => getComputedStyle(document.querySelector(s)).display === "none")), "printing to PDF leaves out the page controls"); await fin.emulateMediaType("screen");
+const finDir = await (await fetch(base + "/api/probes")).json(); ok(finDir.profiles.flatMap((p) => p.pages).find((g) => g.title === "Decide goal").lastKind === "final", "the directory knows the final stage");
+await fin.close();
 writeFileSync(qf + ".done", JSON.stringify([{ t: "p", text: "Path" }]));
 pp("publish", other.id, "--new-step", "Your path", "--plan", qf + ".done", "--status", "plan_ready");
 ok(JSON.parse(pp("pending")).every((w) => w.id !== other.id), "publishing a path clears it from pending");

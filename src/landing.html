@@ -53,18 +53,23 @@ body.day .ticks i.on{background:#A85E00}
 @media (prefers-reduced-motion:reduce){.reveal{opacity:1;transform:none;transition:none}.word>span{transform:none;transition:none}.cue{animation:none}.cta,.cta .arrow,.cta .ico{transition:none}}
 @media (hover:none){.cta:hover{box-shadow:0 8px 22px rgba(12,28,36,.2)}.cta:hover::before{opacity:0}.cta:hover .arrow,.cta:hover .ico{transform:none}.adminlink:hover{opacity:.55;transform:none}}
 @media (max-width:360px){#rulerLabel{display:none}}
+.panel p{max-width:560px;font-size:19px;line-height:1.55;color:var(--muted)}.panel.right p{margin-left:auto}.panel.center p{margin-inline:auto}
+.hero .sub{max-width:620px;margin-top:22px}.endnote{margin-bottom:8px}
+@media (max-width:640px){.panel p{font-size:17px}}
 </style></head><body>
 <canvas id="c" aria-hidden="true"></canvas>
 <div class="top"><span class="brand">ProofProbe</span></div>
-<div class="ruler" aria-hidden="true"><span class="ticks" id="ticks"><i></i><i></i><i></i><i></i><i></i></span><span id="rulerLabel">Goal</span></div>
+<div class="ruler" aria-hidden="true"><span class="ticks" id="ticks"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span><span id="rulerLabel">Start</span></div>
 <main>
-  <section class="panel hero"><h1 class="reveal">Any goal.<br>One proven path.</h1><div class="cue"></div></section>
-  <section class="panel"><div class="reveal"><div class="step">Start anywhere</div><h2>Bring what<br>you have.</h2>
+  <section class="panel hero"><h1 class="reveal">Any goal.<br>One proven path.</h1><p class="sub reveal">Tell us where you want to get. We research the field, ask only what you can answer, let you steer the big calls, and hand you one path backed by evidence. Whole-numbered stages are yours. Half stages happen on our side.</p><div class="cue"></div></section>
+  <section class="panel"><div class="reveal"><div class="step">Stage 0 · Your goal</div><h2>Bring what<br>you have.</h2><p>Sign in, request a probe and describe the goal: a new job, side income, a startup, or any open question. Attach a CV, a job post or a product document if you have one.</p>
     <div class="tags"><span class="tag">CV</span><span class="tag">LinkedIn</span><span class="tag">Job post</span><span class="tag">Startup idea</span><span class="tag">An open question</span></div></div></section>
-  <section class="panel right"><div class="reveal"><div class="step">Step one</div><h2>Probe wide.</h2><p>Live market data, checked at the source.</p></div></section>
-  <section class="panel"><div class="reveal"><div class="step">Your turn</div><h2>Answer what<br>only you know.</h2></div></section>
-  <section class="panel right"><div class="reveal"><div class="step">Step two</div><h2>Probe deep.</h2><p>Every option tested against your answers.</p></div></section>
-  <section class="panel center"><div class="reveal"><h2>One path.<br>Backed by proof.</h2><div class="actions"><a class="cta" href="/probes">See the probes <span class="arrow" aria-hidden="true">→</span></a><a class="cta alt" href="/request">Request a probe</a><a class="cta alt" href="https://github.com/yash201040/proofprobe" target="_blank" rel="noopener noreferrer"><svg class="ico" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2a10 10 0 0 0-3.16 19.49c.5.09.68-.22.68-.48v-1.7c-2.78.6-3.37-1.34-3.37-1.34-.45-1.16-1.11-1.47-1.11-1.47-.91-.62.07-.61.07-.61 1 .07 1.53 1.03 1.53 1.03.89 1.53 2.34 1.09 2.91.83.09-.65.35-1.09.63-1.34-2.22-.25-4.55-1.11-4.55-4.94 0-1.09.39-1.98 1.03-2.68-.1-.25-.45-1.27.1-2.65 0 0 .84-.27 2.75 1.02A9.6 9.6 0 0 1 12 6.84c.85 0 1.7.11 2.5.34 1.91-1.29 2.75-1.02 2.75-1.02.55 1.38.2 2.4.1 2.65.64.7 1.03 1.59 1.03 2.68 0 3.84-2.34 4.68-4.57 4.93.36.31.68.92.68 1.85v2.74c0 .27.18.58.69.48A10 10 0 0 0 12 2z"/></svg>GitHub</a></div></div></section>
+  <section class="panel right"><div class="reveal"><div class="step">Stage 0.5 · Our side</div><h2>Probe wide.</h2><p>We map the whole field before asking you anything: demand, pay, competitors, rules, and what blocks each option. Key numbers are checked at their source. You get the findings, and the questions only you can answer.</p></div></section>
+  <section class="panel"><div class="reveal"><div class="step">Stage 1 · Your turn</div><h2>Answer what<br>only you know.</h2><p>Each question closes an open end: your time, money, limits and wants. Skip any you'd rather not answer, or send a new direction instead. Save as you go, and submit when you're ready.</p></div></section>
+  <section class="panel right"><div class="reveal"><div class="step">Stage 1.5 · Our side</div><h2>Probe deep.</h2><p>Your answers fence in the problem. We test every option against them, rule out what fails, and dig into what's left.</p></div></section>
+  <section class="panel"><div class="reveal"><div class="step">Stage 2 · Your turn</div><h2>Decide what<br>matters.</h2><p>You get the proposals that shape the result, each with its evidence and what we'd do by default. Everything starts on Auto, so you can submit without changing a thing. Accept or reject only where you feel strongly.</p></div></section>
+  <section class="panel right"><div class="reveal"><div class="step">Stage 2.5 · Our side</div><h2>Build it.</h2><p>We turn your decisions into what the goal needs: a step-by-step path, a product spec, a build plan, a rulebook or a straight answer. Every major call is checked again as it's built.</p></div></section>
+  <section class="panel center"><div class="reveal"><div class="step">Stage 3 · Yours to keep</div><h2>One path.<br>Backed by proof.</h2><p class="endnote">A clean final report. Each big decision shows the evidence behind it and the choice that shaped it. Read it online, or download it to keep.</p><div class="actions"><a class="cta" href="/probes">See the probes <span class="arrow" aria-hidden="true">→</span></a><a class="cta alt" href="/request">Request a probe</a><a class="cta alt" href="https://github.com/yash201040/proofprobe" target="_blank" rel="noopener noreferrer"><svg class="ico" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2a10 10 0 0 0-3.16 19.49c.5.09.68-.22.68-.48v-1.7c-2.78.6-3.37-1.34-3.37-1.34-.45-1.16-1.11-1.47-1.11-1.47-.91-.62.07-.61.07-.61 1 .07 1.53 1.03 1.53 1.03.89 1.53 2.34 1.09 2.91.83.09-.65.35-1.09.63-1.34-2.22-.25-4.55-1.11-4.55-4.94 0-1.09.39-1.98 1.03-2.68-.1-.25-.45-1.27.1-2.65 0 0 .84-.27 2.75 1.02A9.6 9.6 0 0 1 12 6.84c.85 0 1.7.11 2.5.34 1.91-1.29 2.75-1.02 2.75-1.02.55 1.38.2 2.4.1 2.65.64.7 1.03 1.59 1.03 2.68 0 3.84-2.34 4.68-4.57 4.93.36.31.68.92.68 1.85v2.74c0 .27.18.58.69.48A10 10 0 0 0 12 2z"/></svg>GitHub</a></div></div></section>
   <a class="adminlink" href="/admin"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>Admin</a>
 </main>
 <script src="/assets/account.js"></script>
@@ -72,7 +77,7 @@ body.day .ticks i.on{background:#A85E00}
 const canvas=document.getElementById("c"),ctx=canvas.getContext("2d");
 const still=matchMedia("(prefers-reduced-motion:reduce)").matches;
 let W=0,H=0,dpr=1,P=[];
-const STATES=6,NIGHT=[7,16,25],DAY=[238,242,234];
+const STATES=8,NIGHT=[7,16,25],DAY=[238,242,234];
 const ease=t=>t*t*(3-2*t),mix=(a,b,t)=>a+(b-a)*t;
 function rand(i,s){const x=Math.sin(i*127.1+s*311.7)*43758.5453;return x-Math.floor(x)}
 function layout(){
@@ -92,17 +97,20 @@ function layout(){
     const funnel=[W*.72-fd*Math.cos(fa),cy+fd*Math.sin(fa)];
     const x=u*W*1.1-W*.05,jit=(rand(i,9)-.5)*2.5;
     const path=[x,cy+Math.sin(u*Math.PI*2.1)*m*.14*(1-u*.2)+jit];
-    return {s:[scatter,cluster,sonar,grid,funnel,path],d:rand(i,10)*.28,z:1+rand(i,11)*1.7,w:rand(i,12)*6.28};
+    // Stage 2: proposals branch out. Stage 2.5: they settle into the lines of a report.
+    const br=i%4,bu=Math.pow(rand(i,13),.8),fork=[W*.44+bu*W*.5,cy+(br-1.5)*m*.2*bu+(rand(i,14)-.5)*6];
+    const row=i%15,len=.45+.55*rand(row,15),report=[W*.08+rand(i,16)*len*W*.34,H*.2+row*H*.042+(rand(i,17)-.5)*3];
+    return {s:[scatter,cluster,sonar,grid,funnel,fork,report,path],d:rand(i,10)*.28,z:1+rand(i,11)*1.7,w:rand(i,12)*6.28};
   });
 }
 let target=0,now=0,raf=0,px=-999,py=-999,pxs=-999,pys=-999;
-const LABELS=["Goal","Inputs","Probe wide","Your answers","Probe deep","One path"],ticks=[...document.querySelectorAll("#ticks i")],rulerLabel=document.getElementById("rulerLabel");
+const LABELS=["Start","Your goal","Probe wide","Your answers","Probe deep","Your decisions","Build","Final report"],ticks=[...document.querySelectorAll("#ticks i")],rulerLabel=document.getElementById("rulerLabel");
 let lastLabel=-1;
 addEventListener("pointermove",e=>{if(e.pointerType==="mouse"){px=e.clientX;py=e.clientY}},{passive:true});
 document.addEventListener("pointerleave",()=>{px=py=-999});
 function read(){const max=document.documentElement.scrollHeight-innerHeight;target=max>0?scrollY/max:0}
 function draw(p,time){
-  const pos=p*(STATES-1),day=ease(Math.min(1,Math.max(0,(pos-3.9)/1)));
+  const pos=p*(STATES-1),day=ease(Math.min(1,Math.max(0,(pos-(STATES-2.1))/1)));
   const bg=NIGHT.map((v,i)=>Math.round(mix(v,DAY[i],day)));
   document.body.style.background=canvas.style.background=`rgb(${bg})`;
   document.body.classList.toggle("day",day>.55);
@@ -112,12 +120,12 @@ function draw(p,time){
   const sweep=time*.0009;
   pxs+=(px-pxs)*.12;pys+=(py-pys)*.12;
   const push=still?0:1,reach=130;
-  const label=Math.min(5,Math.round(pos));
+  const label=Math.min(STATES-1,Math.round(pos));
   if(label!==lastLabel){lastLabel=label;rulerLabel.textContent=LABELS[label];ticks.forEach((t,i)=>t.classList.toggle("on",i<label))}
   for(const q of P){
     const local=Math.min(STATES-1,Math.max(0,pos+q.d-.14));
     const i=Math.min(STATES-2,Math.floor(local)),t=ease(local-i),a=q.s[i],b=q.s[i+1];
-    const wob=(1-Math.min(1,pos/4.4))*5;
+    const wob=(1-Math.min(1,pos/(STATES-1.6)))*5;
     let x=mix(a[0],b[0],t)+Math.cos(time*.0006+q.w)*wob,y=mix(a[1],b[1],t)+Math.sin(time*.0007+q.w)*wob;
     if(push){const dx=x-pxs,dy=y-pys,d2=dx*dx+dy*dy;if(d2<reach*reach&&d2>1){const d=Math.sqrt(d2),f=(1-d/reach);x+=dx/d*f*f*46;y+=dy/d*f*f*46}}
     ctx.fillRect(x,y,q.z,q.z);
@@ -127,8 +135,8 @@ function draw(p,time){
     ctx.save();ctx.strokeStyle=`rgba(255,180,84,${.75*o})`;ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(cx,cy);ctx.lineTo(cx+Math.cos(sweep)*R,cy+Math.sin(sweep)*R);ctx.stroke();
     ctx.fillStyle=`rgba(255,180,84,${o})`;ctx.beginPath();ctx.arc(cx,cy,4,0,7);ctx.fill();ctx.restore();
   }
-  if(pos>4.2){ // the proven path lights up from left to right
-    const o=Math.min(1,(pos-4.2)/.7),m=Math.min(W,H);
+  if(pos>STATES-1.8){ // the proven path lights up from left to right
+    const o=Math.min(1,(pos-(STATES-1.8))/.7),m=Math.min(W,H);
     ctx.save();ctx.strokeStyle=`rgba(216,120,10,${o})`;ctx.lineWidth=3;ctx.lineCap="round";ctx.beginPath();
     for(let u=0;u<=o;u+=.01){const x=u*W*1.1-W*.05,y=H/2+Math.sin(u*Math.PI*2.1)*m*.14*(1-u*.2);u?ctx.lineTo(x,y):ctx.moveTo(x,y)}
     ctx.stroke();ctx.restore();

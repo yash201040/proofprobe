@@ -61,7 +61,7 @@ function log(env: Env, ray: string, level: string, msg: string, extra: Record<st
   console.log(JSON.stringify({ app: "proofprobe", version: env.APP_VERSION, ray_id: ray, level, msg, ...extra }));
 }
 
-interface Question { id: string; text: string; why?: string }
+interface Question { id: string; text: string; why?: string; kind?: "decision"; lean?: string }
 interface Section { title: string; note?: string; first?: boolean; questions: Question[] }
 interface CaseRow {
   id: string; title: string; first_name: string; status: string;
@@ -136,6 +136,9 @@ function validSections(v: unknown): v is Section[] {
     if (typeof s?.title !== "string" || !Array.isArray(s.questions)) return false;
     for (const q of s.questions) {
       if (typeof q?.id !== "string" || !/^[\w-]{1,40}$/.test(q.id) || typeof q.text !== "string" || ids.has(q.id)) return false;
+      // A proposal is answered Accept, Reject or Auto, and Auto leaves the choice to the final research.
+      if (q.kind !== undefined && q.kind !== "decision") return false;
+      if (q.lean !== undefined && (typeof q.lean !== "string" || q.lean.length > 400)) return false;
       ids.add(q.id);
     }
   }
@@ -151,6 +154,7 @@ function validBlock(b: any): boolean {
   if (b?.t === "ul" || b?.t === "ol") return isStrings(b.items);
   if (b?.t === "bars") return typeof b.title === "string" && isScore(b.max) && Array.isArray(b.items) && b.items.every((i: any) => typeof i?.label === "string" && typeof i.value === "number" && isScore(i.value) && isInfo(i.info));
   if (b?.t === "table") return isStrings(b.head) && Array.isArray(b.rows) && b.rows.every((r: unknown) => Array.isArray(r) && r.every(isCell));
+  if (b?.t === "because") return typeof b.decision === "string" && (b.evidence === undefined || (Array.isArray(b.evidence) && b.evidence.every((e: any) => typeof e === "string" || (typeof e?.text === "string" && isInfo(e.info))))) && (b.shapedBy === undefined || typeof b.shapedBy === "string");
   if (b?.t === "links") return Array.isArray(b.links) && b.links.every((k: any) => typeof k?.url === "string");
   return false;
 }
@@ -162,14 +166,17 @@ async function pendingWork(env: Env) {
     (SELECT message FROM reroutes x WHERE x.case_id = c.id AND x.handled_at IS NULL ORDER BY x.id DESC LIMIT 1) AS reroute,
     (SELECT at FROM reroutes x WHERE x.case_id = c.id AND x.handled_at IS NULL ORDER BY x.id DESC LIMIT 1) AS reroute_at,
     (SELECT MAX(submitted_at) FROM submissions s WHERE s.case_id = c.id) AS last_submitted,
-    (SELECT MAX(created_at) FROM steps t WHERE t.case_id = c.id) AS latest_step
+    (SELECT MAX(created_at) FROM steps t WHERE t.case_id = c.id) AS latest_step,
+    (SELECT questions_json FROM steps t WHERE t.case_id = c.id AND questions_json != '[]' ORDER BY n DESC LIMIT 1) AS open_questions
     FROM cases c JOIN profiles p ON p.id = c.profile_id WHERE c.status NOT IN ('draft', 'closed') ORDER BY c.created_at`).all<any>();
   const approved = await env.DB.prepare("SELECT id, name, title, decided_at FROM requests WHERE status = 'approved' ORDER BY decided_at").all<any>();
   const queued = approved.results.map((q) => ({ id: q.id, profile: q.name, title: q.title, path: null, prompt: `/proofprobe start request ${q.id}`, kind: "request", since: q.decided_at, detail: null }));
   return [...queued, ...r.results.flatMap((c) => {
     const base = { id: c.id, profile: c.profile, title: c.title, path: `/probes/${c.profile_slug}/${c.slug}`, prompt: `/proofprobe continue ${c.profile}: ${c.title}` };
     if (c.reroute) return [{ ...base, kind: "reroute", since: c.reroute_at, detail: c.reroute }];
-    return c.last_submitted && c.last_submitted > c.latest_step ? [{ ...base, kind: "answers", since: c.last_submitted, detail: null }] : [];
+    // Decisions on proposals lead to the final version, while plain answers lead to in-depth research.
+    const decided = parse<Section[]>(c.open_questions, []).some((x) => x.questions.some((q) => q.kind === "decision"));
+    return c.last_submitted && c.last_submitted > c.latest_step ? [{ ...base, kind: decided ? "decisions" : "answers", since: c.last_submitted, detail: null }] : [];
   })];
 }
 async function setProfileStatus(env: Env, id: string, status: string, ray: string) {
@@ -368,7 +375,12 @@ async function submit(env: Env, row: CaseRow, key: string, ray: string) {
   const step = answerStep(await loadSteps(env, row.id));
   if (!step) return json({ error: "no_questions" }, 409);
   const current = await currentAnswers(env, row.id);
-  const items = flatten(step.sections).map((q) => ({ ...q, answer: current[q.id]?.text ?? "", updatedAt: current[q.id]?.updatedAt ?? null }));
+  // A proposal left untouched is a choice: Auto, which hands the decision to the final research.
+  const decisions = new Set(step.sections.flatMap((x) => x.questions.filter((q) => q.kind === "decision").map((q) => q.id)));
+  const items = flatten(step.sections).map((q) => {
+    const text = current[q.id]?.text ?? "";
+    return { ...q, answer: decisions.has(q.id) && !text.trim() ? "Auto" : text, updatedAt: current[q.id]?.updatedAt ?? null };
+  });
   const answered = items.filter((i) => i.answer.trim()).length;
   if (!answered) return json({ error: "no_saved_answers" }, 409);
 
@@ -398,11 +410,13 @@ async function directory(env: Env) {
   const profiles = await env.DB.prepare("SELECT id, slug, name FROM profiles WHERE status = 'active' ORDER BY created_at").all<any>();
   const pages = await env.DB.prepare(`SELECT c.profile_id, c.slug, c.title, c.status, c.created_at, c.updated_at,
     (SELECT COALESCE(SUM(e.usd_micro), 0) FROM cost_entries e WHERE e.case_id = c.id) AS micro,
-    EXISTS (SELECT 1 FROM reroutes r WHERE r.case_id = c.id AND r.handled_at IS NULL) AS rerouting
+    EXISTS (SELECT 1 FROM reroutes r WHERE r.case_id = c.id AND r.handled_at IS NULL) AS rerouting,
+    (SELECT questions_json FROM steps t WHERE t.case_id = c.id ORDER BY n DESC LIMIT 1) AS last_q
     FROM cases c WHERE c.status != 'draft' ORDER BY c.created_at`).all<any>();
+  const kind = (q: string | null) => { const secs = parse<Section[]>(q ?? "[]", []); return secs.some((x) => x.questions.some((y) => y.kind === "decision")) ? "decisions" : secs.length ? "questions" : "final"; };
   return profiles.results.map((p) => ({
     slug: p.slug, name: p.name,
-    pages: pages.results.filter((c) => c.profile_id === p.id).map((c) => ({ slug: c.slug, title: c.title, status: c.status, createdAt: c.created_at, updatedAt: c.updated_at, costUsd: c.micro / 1_000_000, rerouting: !!c.rerouting })),
+    pages: pages.results.filter((c) => c.profile_id === p.id).map((c) => ({ slug: c.slug, title: c.title, status: c.status, createdAt: c.created_at, updatedAt: c.updated_at, costUsd: c.micro / 1_000_000, rerouting: !!c.rerouting, lastKind: kind(c.last_q) })),
   })).filter((p) => p.pages.length);
 }
 
@@ -713,18 +727,24 @@ async function admin(request: Request, env: Env, parts: string[], ray: string) {
     return json({ id: row.id, title: row.title, profile: p?.name, path: `/probes/${p?.slug}/${row.slug}`, status: row.status, hasPassword: !!(await profileOf(env, row.profile_id))?.password_hash, costUsd: await costUsd(env, id), reroute: await openReroute(env, id), steps, openStep: open?.n ?? null, sections: open?.sections ?? [], submissionCurrent: !!last && !!open && last.stepN === open.n, answers: await currentAnswers(env, id), submissions });
   }
   if (!sub && request.method === "PATCH") {
-    const b = await request.json().catch(() => null) as { intro?: unknown; questions?: unknown; plan?: unknown; status?: string; newStep?: unknown; step?: unknown } | null;
+    const b = await request.json().catch(() => null) as { intro?: unknown; questions?: unknown; plan?: unknown; status?: string; newStep?: unknown; step?: unknown; stepTitle?: unknown } | null;
     if (!b) return json({ error: "bad_request" }, 400);
     if (b.questions !== undefined && !validSections(b.questions)) return json({ error: "invalid_questions" }, 400);
     if (b.intro !== undefined && !validBlocks(b.intro)) return json({ error: "invalid_intro" }, 400);
     if (b.plan !== undefined && !validBlocks(b.plan)) return json({ error: "invalid_plan" }, 400);
     if (b.status !== undefined && !STATUSES.includes(b.status)) return json({ error: "invalid_status" }, 400);
     if (b.newStep !== undefined && (typeof b.newStep !== "string" || !b.newStep.trim())) return json({ error: "invalid_step_title" }, 400);
+    if (b.stepTitle !== undefined && (typeof b.stepTitle !== "string" || !b.stepTitle.trim() || b.stepTitle.length > 80 || b.newStep !== undefined)) return json({ error: "invalid_step_title" }, 400);
     const steps = await loadSteps(env, id), latest = steps[steps.length - 1], changesContent = b.intro !== undefined || b.questions !== undefined || b.plan !== undefined;
     const rerouted = await openReroute(env, id);
     const size = (x: unknown) => JSON.stringify(x ?? []).length;
     if (size(b.intro) + size(b.questions) + size(b.plan) > MAX_DOC) return json({ error: "too_large" }, 413);
     const writes: D1PreparedStatement[] = [];
+    if (typeof b.stepTitle === "string") {
+      const target = b.step === undefined ? latest : steps.find((x) => x.n === b.step);
+      if (!target) return json({ error: "unknown_step" }, 404);
+      writes.push(env.DB.prepare("UPDATE steps SET title = ? WHERE case_id = ? AND n = ?").bind(b.stepTitle.trim(), id, target.n));
+    }
     if (typeof b.newStep === "string") {
       writes.push(env.DB.prepare("INSERT INTO steps(case_id, n, title, intro_json, questions_json, plan_json, created_at) VALUES (?,?,?,?,?,?,?)")
         .bind(id, latest.n + 1, b.newStep.trim(), JSON.stringify(b.intro ?? []), JSON.stringify(b.questions ?? []), JSON.stringify(b.plan ?? []), now));

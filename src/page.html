@@ -145,27 +145,62 @@ th{overflow-wrap:normal}
 #profiles,#dirEmpty{transition:filter .18s ease}
 #dirBox:has(.filterpanel:not([hidden])) #profiles,#dirBox:has(.filterpanel:not([hidden])) #dirEmpty{filter:blur(4px);pointer-events:none;user-select:none}
 @media (prefers-reduced-motion:reduce){#profiles,#dirEmpty{transition:none}}
+.dtext{font-weight:600}.lean{font-style:italic}.qa p.lean{font-style:italic}
+.decide{grid-column:2;display:grid;grid-template-columns:minmax(0,1fr);gap:8px;margin-top:9px}.choices{display:flex;flex-wrap:wrap;align-items:center;gap:8px}.q .choice{display:inline-flex}
+.choice{display:inline-flex;align-items:center;gap:7px;min-height:42px;padding:8px 14px;border:1px solid var(--line);border-radius:999px;cursor:pointer;font-weight:600;background:var(--surface);transition:background .15s ease,border-color .15s ease}
+.choice input{margin:0;accent-color:var(--accent)}
+.choice.good:has(input:checked){background:var(--go-soft);border-color:var(--go);color:var(--go)}.choice.bad:has(input:checked){background:var(--stop-soft);border-color:var(--stop);color:var(--stop)}.choice.info:has(input:checked){background:var(--info-soft);border-color:var(--info);color:var(--info)}
+.choice:has(input:focus-visible){outline:2px solid var(--accent);outline-offset:2px}.choice:has(input:disabled){cursor:default;opacity:.7}
+.decide textarea.dnote{grid-column:1;min-height:48px;margin-top:0}
+.qa p.decided{display:flex;flex-wrap:wrap;gap:4px 8px;align-items:baseline}
+.because{border-left:4px solid var(--accent);background:var(--surface);padding:14px 16px;margin-block:12px;display:grid;gap:6px}
+.because .bdec{font:700 18px/1.35 var(--display);margin:0}.because .blabel{font:600 13px var(--mono,var(--body));letter-spacing:.06em;text-transform:uppercase;color:var(--accent)}
+.because .bev{margin:0;padding-left:20px;columns:auto;column-count:auto;display:block}.because .bev li{margin-block:3px}.because .bev li::marker{content:"→  ";color:var(--accent)}
+.because .bshape{margin:4px 0 0;color:var(--muted)}.because .bshape .blabel{margin-right:4px}
+@media (prefers-reduced-motion:reduce){.choice{transition:none}}
+.tracker{margin-block:4px 18px}
+.tracker ol{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(7,minmax(0,1fr));position:relative}
+.tracker li{display:grid;justify-items:center;gap:6px;text-align:center;position:relative;min-width:0}
+.tracker li::before{content:"";position:absolute;top:17px;left:-50%;width:100%;height:2px;background:var(--line);z-index:0}.tracker li:first-child::before{display:none}
+.tracker li.done::before,.tracker li.now::before{background:var(--accent)}
+.tracker .dot{position:relative;z-index:1;display:grid;place-items:center;width:36px;height:36px;border-radius:50%;border:2px solid var(--line);background:var(--bg);font:700 15px var(--display);color:var(--muted)}
+.tracker li.us .dot{width:26px;height:26px;margin-top:5px;font:600 11px var(--mono);border-style:dashed}
+.tracker li.done .dot{border-color:var(--accent);color:var(--accent)}
+.tracker li.now .dot{background:var(--accent);border-color:var(--accent);color:var(--surface);box-shadow:0 0 0 5px var(--accent-soft)}
+.tracker .lbl{font-size:14px;color:var(--muted);line-height:1.2;overflow-wrap:anywhere}.tracker li.now .lbl{color:var(--ink);font-weight:600}.tracker li.us .lbl{font-size:13px}
+#trackNow{margin:14px 0 0;color:var(--muted)}#trackNow strong{color:var(--ink)}
+@media (max-width:640px){.tracker li.us .lbl{display:none}.tracker .lbl{font-size:12.5px}.tracker .dot{width:30px;height:30px;font-size:13px}.tracker li::before{top:14px}.tracker li.us .dot{width:12px;height:12px;margin-top:9px;font-size:0;border-width:2px}}
+.reportbar{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px 16px;padding:14px 16px;background:var(--go-soft);margin-bottom:6px}.reportbar .row{display:flex;flex-wrap:wrap;gap:8px}
+.infonote{display:block;font-size:14px;color:var(--muted);font-style:italic;margin-top:3px}
+@media print{
+:root{--bg:#EDF1EF;--surface:#FBFCFB;--ink:#15242B;--muted:#50626A;--line:#C8D3D0;--accent:#0A6670;--accent-soft:#D5E8E7;--go:#1B7249;--go-soft:#D9EEE2;--wait:#8F5B00;--wait-soft:#F5E8CC;--stop:#A8352B;--stop-soft:#F6DDD9;--info:#1F5F99;--info-soft:#DBE8F5;--zebra:#F1F5F3;
+--display:"Familjen Grotesk","Segoe UI",system-ui,sans-serif;--body:"Source Sans 3","Segoe UI",system-ui,sans-serif;--mono:"JetBrains Mono",ui-monospace,Menlo,monospace}
+body{background:#fff}#acct,.topbar,.tracker,#stepTabs,#reportBar,#notice,#loadbar,#qBox,#viewQs,#tip,#unlockfx,.infobtn,#rerouteInfo{display:none!important}
+*{-webkit-print-color-adjust:exact;print-color-adjust:exact}details>summary::before{display:none}.fold{break-inside:avoid-page}
+}
+.chip{white-space:nowrap}
 </style></head><body><div id="loadbar" role="progressbar" aria-label="Loading"></div><div class="wrap">
 <div class="topbar"><a class="brandlink" href="/">ProofProbe</a></div>
 <header><div class="eyebrow" id="eyebrow"></div><h1 id="title"></h1>
   <p class="cost" id="cost" hidden></p>
   <p class="callout" id="rerouteInfo" hidden></p>
 </header>
+<nav class="tracker" id="tracker" aria-label="Progress" hidden><ol id="trackList"></ol><p id="trackNow"></p></nav>
 <nav class="steptabs" id="stepTabs" aria-label="Research steps" hidden></nav>
 <div id="unlockfx" hidden aria-hidden="true"><div class="fxring"></div><svg viewBox="0 0 120 120" fill="none" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"><path class="fxsh" d="M38 56V38a22 22 0 0 1 44 0v18"/><rect class="fxbody" x="24" y="56" width="72" height="52" rx="12"/><path class="fxtick" d="M46 82l10 10 19-20"/></svg></div>
 <div class="skel" id="skel" aria-hidden="true"><i></i><i></i><i></i></div>
 <div id="tip" role="tooltip" hidden></div>
 <div id="fatal" class="alert" hidden><p id="fatalText"></p><p style="margin-top:9px"><button type="button" id="retry">Try again</button></p></div>
 <section id="dirBox" hidden><div class="dirtools"><div class="filterwrap"><button type="button" id="sortBtn" class="ghost" aria-expanded="false" aria-controls="sortPanel"></button><div class="filterpanel sortpanel" id="sortPanel" hidden><fieldset><legend>Sort by</legend><label><input type="radio" name="sortField" value="created">Date created</label><label><input type="radio" name="sortField" value="updated">Last updated</label><label><input type="radio" name="sortField" value="profile">Profile</label><label><input type="radio" name="sortField" value="cost">Cost</label></fieldset></div></div><button type="button" id="sortDir" class="ghost" aria-label="Change sort direction"></button><div class="filterwrap"><button type="button" id="filterBtn" class="ghost" aria-expanded="false" aria-controls="filterPanel">Filter</button><div class="filterpanel" id="filterPanel" hidden><fieldset id="filterStatus"><legend>Status</legend></fieldset><fieldset id="filterProfile"><legend>Profile</legend></fieldset><button type="button" class="ghost" id="filterClear">Clear filters</button></div></div><span class="dircount" id="dirCount" role="status"></span><a class="reqlink" href="/request">Request a probe</a></div><div id="profiles" class="profiles"></div><p id="dirEmpty" hidden></p></section>
-<section id="planBox" hidden><div class="stack"><h2>Recommended path</h2><div id="plan" class="blocks"></div></div></section>
+<section id="planBox" hidden><div class="stack"><h2 id="planTitle">Recommended path</h2><div class="reportbar" id="reportBar" hidden><span>Nothing left to do here. Take the report with you:</span><div class="row"><button type="button" id="dlHtml">Download report (HTML)</button><button type="button" class="ghost" id="dlPdf">Save as PDF</button></div></div><div id="plan" class="blocks"></div></div></section>
 <section id="introBox" hidden><div id="intro" class="blocks"></div></section>
-<section id="viewQs" hidden><div class="stack"><h2>Questions and answers</h2><p id="viewNote"></p><div id="viewList" class="stack"></div></div></section>
+<section id="viewQs" hidden><div class="stack"><h2 id="viewTitle">Questions and answers</h2><p id="viewNote"></p><div id="viewList" class="stack"></div></div></section>
 <section id="qBox" hidden><div class="stack">
   <h2 id="qTitle">Questions</h2>
   <div class="reroute"><label for="rerouteText">Not the right direction? <small>Optional. Tell us what you want instead, and you can skip the questions below. We'll redo the research around it.</small></label>
     <textarea id="rerouteText" maxlength="5000" placeholder="Example: Focus on a move into product management, not part-time work."></textarea>
     <div class="saverow"><button type="button" id="rerouteSend" disabled>Send new direction</button><span class="state" id="rerouteState" role="status"></span></div></div>
-  <p><strong>How this works:</strong> Save all changes lights up when you type. Press it to store your answers, then come back any time on any device by signing in. When you're done, press Submit answers at the end. You can edit and submit again, and every submission is kept. Skip any question you'd rather not answer: leave it blank, or add a short note saying why.</p>
+  <p id="howTo"><strong>How this works:</strong> Save all changes lights up when you type. Press it to store your answers, then come back any time on any device by signing in. When you're done, press Submit answers at the end. You can edit and submit again, and every submission is kept. Skip any question you'd rather not answer: leave it blank, or add a short note saying why.</p>
   <div class="bar"><span class="count" id="count" role="status"></span><button type="button" id="saveAll" disabled>Save all changes</button></div>
   <form id="form" class="stack" autocomplete="off"></form>
   <div class="sec"><h3>Finished?<small>This sends your saved answers. You can come back, change anything and submit again.</small></h3>
@@ -231,12 +266,17 @@ function renderBlocks(host,list){
     else if(b.t==="h2"||b.t==="h3"||b.t==="p")host.appendChild(el(b.t,b.text));
     else if(b.t==="bars"){const box=el("div",null,"bars");box.appendChild(el("h3",b.title));const max=b.max||Math.max(...b.items.map(i=>i.value),1);b.items.forEach(i=>{const r=el("div",null,"barrow"),v=i.text||String(i.value);r.title=i.label+": "+v+(i.note?". "+i.note:"");const lab=el("span");lab.appendChild(i.info?withInfo(i.label,i.info):document.createTextNode(i.label));r.append(lab,track(i.value,max),el("span",v,"barval"));box.appendChild(r)});host.appendChild(box)}
     else if(b.t==="callout")host.appendChild(el("p",b.text,"callout"));
+    else if(b.t==="because"){const box=el("div",null,"because");box.appendChild(el("p",b.decision,"bdec"));
+      if(b.evidence&&b.evidence.length){box.appendChild(el("span","Because","blabel"));const l=el("ul",null,"bev");b.evidence.forEach(e=>{const li=el("li");fillCell(li,e);l.appendChild(li)});box.appendChild(l)}
+      if(b.shapedBy){const p=el("p",null,"bshape");p.append(el("span","Shaped by","blabel")," "+b.shapedBy);box.appendChild(p)}host.appendChild(box)}
     else if(b.t==="ul"||b.t==="ol"){const l=el(b.t);(b.items||[]).forEach(i=>l.appendChild(el("li",i)));host.appendChild(l)}
     else if(b.t==="links"){const l=el("ul");(b.links||[]).forEach(k=>{const u=safeUrl(k.url);const li=el("li");if(u){const a=el("a",k.label||u);a.href=u;a.target="_blank";a.rel="noopener noreferrer";li.appendChild(a)}else li.textContent=k.label||"";if(k.note)li.appendChild(document.createTextNode(" "+k.note));l.appendChild(li)});host.appendChild(l)}
     else if(b.t==="table"){const box=el("div",null,"tablebox"),t=el("table",null,(b.head||[]).length>2?"cards":null),th=el("tr");(b.head||[]).forEach(c=>th.appendChild(el("th",c)));const hd=el("thead");hd.appendChild(th);t.appendChild(hd);const bd=el("tbody");(b.rows||[]).forEach(r=>{const tr=el("tr");r.forEach((c,i)=>{const td=el("td");td.dataset.label=(b.head||[])[i]||"";fillCell(td,c);tr.appendChild(td)});bd.appendChild(tr)});t.appendChild(bd);box.appendChild(t);host.appendChild(box)}
   }catch(e){}});
 }
 function grow(t){t.style.height="auto";t.style.height=t.scrollHeight+2+"px"}
+const CHOICES=[["Accept","good","Accept"],["Reject","bad","Reject"],["Auto","info","Auto (default)"]];
+function readChoice(text){const [first,...rest]=(text||"").split("\n"),known=CHOICES.some(c=>c[0]===first.trim());return{choice:known?first.trim():"Auto",note:known?rest.join("\n"):text||""}}
 function renderForm(sections){
   const form=$("form");form.textContent="";ids=[];sectionCounts.length=0;let n=0;
   sections.forEach((s,si)=>{
@@ -247,12 +287,22 @@ function renderForm(sections){
     s.questions.forEach(q=>{
       n++;ids.push(q.id);const dom="q-"+q.id;
       const w=el("div",null,"q");const c=el("div");c.style.minWidth="0";
-      const l=el("label",q.text);l.htmlFor=dom;c.appendChild(l);if(q.why)c.appendChild(el("div","Why it matters: "+q.why,"why"));
-      const ta=el("textarea");ta.id=dom;ta.name=dom;ta.disabled=closed;
+      const dec=q.kind==="decision",ta=el("textarea");ta.id=dom;ta.name=dom;ta.disabled=closed;
+      let fromTa=null,ctl=null;
+      if(dec){
+        // The hidden box holds "Accept", "Reject" or "Auto", then any note, so saving and submitting work like any answer.
+        const head=el("p",q.text,"dtext");head.id=dom+"-t";c.appendChild(head);if(q.why)c.appendChild(el("div","Based on: "+q.why,"why"));if(q.lean)c.appendChild(el("div","If left on Auto: "+q.lean,"why lean"));
+        ctl=el("div",null,"decide");const opts=el("div",null,"choices"),radios={};opts.setAttribute("role","radiogroup");opts.setAttribute("aria-labelledby",dom+"-t");
+        const note=el("textarea",null,"dnote");note.id=dom+"-note";note.placeholder="Optional note: a condition or an edit";note.disabled=closed;note.setAttribute("aria-label","Note on proposal "+n);
+        const push=()=>{const ch=Object.keys(radios).find(k=>radios[k].checked)||"Auto",t=note.value.trim()?ch+"\n"+note.value:ch==="Auto"?"":ch;if(ta.value!==t){ta.value=t;ta.dispatchEvent(new Event("input"))}};
+        CHOICES.forEach(([v,tone,label])=>{const lab=el("label",null,"choice "+tone),r=el("input");r.type="radio";r.name=dom+"-c";r.value=v;r.disabled=closed;lab.append(r,el("span",label));opts.appendChild(lab);radios[v]=r;r.addEventListener("change",push)});
+        note.addEventListener("input",()=>{grow(note);push()});ctl.append(opts,note);ta.hidden=true;
+        fromTa=()=>{const p=readChoice(ta.value);radios[p.choice].checked=true;note.value=p.note;requestAnimationFrame(()=>grow(note))};
+      }else{const l=el("label",q.text);l.htmlFor=dom;c.appendChild(l);if(q.why)c.appendChild(el("div","Why it matters: "+q.why,"why"))}
       const row=el("div",null,"saverow"),st=el("span",null,"state"),restore=el("button","Use my draft instead");restore.type="button";restore.hidden=true;
-      restore.addEventListener("click",()=>{const b=blocks[q.id];ta.value=b.conflict;drafts[q.id]={text:b.conflict,base:b.savedAt};b.conflict=null;putDrafts();paint(q.id);bar()});
-      row.append(st,restore);w.append(el("div",String(n),"num"),c,ta,row);qs.appendChild(w);
-      blocks[q.id]={ta,st,restore,n,saved:"",savedAt:null,conflict:null};
+      restore.addEventListener("click",()=>{const b=blocks[q.id];ta.value=b.conflict;b.fromTa&&b.fromTa();drafts[q.id]={text:b.conflict,base:b.savedAt};b.conflict=null;putDrafts();paint(q.id);bar()});
+      row.append(st,restore);w.append(el("div",String(n),"num"),c);if(ctl)w.appendChild(ctl);w.append(ta,row);qs.appendChild(w);
+      blocks[q.id]={ta,st,restore,n,saved:"",savedAt:null,conflict:null,fromTa};
       ta.addEventListener("input",()=>grow(ta));
       ta.addEventListener("input",()=>{const b=blocks[q.id];saveError=null;submitKey=null;b.conflict=null;if(ta.value===b.saved)delete drafts[q.id];else drafts[q.id]={text:ta.value,base:b.savedAt};putDrafts();paint(q.id);bar()});
     });
@@ -269,10 +319,10 @@ function paint(id){
   else{b.st.textContent="";b.st.className="state"}
 }
 function bar(){
-  const answered=ids.filter(i=>blocks[i].saved.trim()).length,un=ids.filter(dirty).length;
-  $("count").textContent=saveError||(answered+" of "+ids.length+" saved"+(un?" · "+un+" unsaved":""));
+  const answered=ids.filter(i=>blocks[i].saved.trim()).length,un=ids.filter(dirty).length,dec=ids.filter(i=>blocks[i].fromTa),set=dec.filter(i=>!["","Auto"].includes(blocks[i].saved.split("\n")[0].trim())).length;
+  $("count").textContent=saveError||((dec.length?set+" of "+dec.length+" proposals set, the rest stay on Auto":answered+" of "+ids.length+" saved")+(un?" · "+un+" unsaved":""));
   $("count").style.color=saveError?"var(--stop)":"";
-  sectionCounts.forEach(x=>{x.sc.textContent=x.ids.filter(i=>blocks[i].saved.trim()).length+" of "+x.ids.length+" saved"});
+  sectionCounts.forEach(x=>{const d=x.ids.filter(i=>blocks[i].fromTa);x.sc.textContent=d.length===x.ids.length?d.filter(i=>!["","Auto"].includes(blocks[i].saved.split("\n")[0].trim())).length+" of "+d.length+" set":x.ids.filter(i=>blocks[i].saved.trim()).length+" of "+x.ids.length+" saved"});
   const s=$("saveAll");s.disabled=!un||busy||closed;s.textContent=busy&&un?"Saving...":un||!answered?"Save all changes":"All changes saved";
   $("submit").disabled=busy||closed||un>0;
   $("submitHint").textContent=un?"Press Save all changes first. Submit unlocks once everything is saved.":"";
@@ -303,7 +353,7 @@ function renderLog(list){const l=$("log");l.textContent="";list.slice().reverse(
 $("submit").addEventListener("click",async()=>{
   const st=$("submitStatus");
   if(ids.some(dirty))return;
-  if(!ids.some(i=>blocks[i].saved.trim())){st.textContent="Save at least one answer before submitting.";return}
+  if(!ids.some(i=>blocks[i].saved.trim()||blocks[i].fromTa)){st.textContent="Save at least one answer before submitting.";return}
   busy=true;bar();st.textContent="Submitting...";
   submitKey=submitKey||crypto.randomUUID();
   try{
@@ -320,8 +370,19 @@ $("form").addEventListener("submit",e=>e.preventDefault());
 let formReady=false;
 function loaded(){const b=$("loadbar"),s=$("skel");if(s)s.remove();if(!b||b.classList.contains("done"))return;b.classList.add("done");setTimeout(()=>b.remove(),280)}
 const money=n=>"$"+Number(n).toFixed(n>0&&n<1?3:2);
-const STAGE={draft:"Being prepared",open:"Answering questions",submitted:"Answers in",plan_ready:"Path ready",closed:"Closed"};
-const TONE={open:"warn",submitted:"info",plan_ready:"good",closed:"bad"};
+// People act at stages 0 to 3. The half stages are research on the owner's side.
+const STAGES=[["0","Goal","you","Goal set"],["0.5","Research","us","Researching"],["1","Answer","you","Answer questions"],["1.5","Deep research","us","Deep research"],["2","Decide","you","Decide"],["2.5","Build","us","Building the final report"],["3","Final report","you","Final report"]];
+const STAGE_TONE={"0.5":"info","1":"warn","1.5":"info","2":"warn","2.5":"info","3":"good",closed:"bad"};
+const kindOf=s=>s.sections.some(x=>x.questions.some(q=>q.kind==="decision"))?"decisions":s.sections.length?"questions":"final";
+const STAGE_OF_KIND={questions:"1",decisions:"2",final:"3"};
+function stageNow(status,rerouting,lastKind){
+  if(status==="closed")return "closed";
+  if(rerouting||status==="draft")return "0.5";
+  if(status==="plan_ready"||lastKind==="final")return "3";
+  if(lastKind==="decisions")return status==="submitted"?"2.5":"2";
+  return status==="submitted"?"1.5":"1";
+}
+const stageName=k=>k==="closed"?"Closed":"Stage "+k+" · "+STAGES.find(x=>x[0]===k)[3];
 function fail(m){$("fatalText").textContent=m;$("fatal").hidden=false}
 function notFound(){document.title="Page not found";$("title").textContent="Page not found";const e=$("eyebrow");e.textContent="";const a=el("a","Back to Probes");a.href="/probes";e.appendChild(a);const n=$("notice");if(n)n.hidden=true}
 function showRead(d,s){
@@ -329,7 +390,10 @@ function showRead(d,s){
   $("viewNote").textContent=!d.editable?"Answers are private to this profile.":!log&&isLocked()&&s.n===d.openStep?"Locked. Press Unlock to answer.":log?"Submission "+log.seq+", "+fmt(log.submittedAt)+". Read only.":"No answers were submitted for this step.";
   const l=$("viewList");l.textContent="";
   qs.forEach((q,i)=>{const w=el("div",null,"qa");w.appendChild(el("b",(i+1)+". "+q.text));
-    if(d.editable&&log){const it=log.items.find(x=>x.id===q.id),t=it?it.answer.trim():"";w.appendChild(el("p",t?it.answer:"Not answered",t?"has":""))}
+    if(q.kind==="decision"&&q.lean)w.appendChild(el("p","If left on Auto: "+q.lean,"lean"));
+    if(d.editable&&log){const it=log.items.find(x=>x.id===q.id),t=it?it.answer.trim():"";
+      if(q.kind==="decision"){const p=readChoice(t),c=CHOICES.find(x=>x[0]===p.choice),r=el("p",null,"has decided");r.appendChild(el("span",c[2],"chip "+c[1]));if(p.note.trim())r.append(" "+p.note.trim());w.appendChild(r)}
+      else w.appendChild(el("p",t?it.answer:"Not answered",t?"has":""))}
     l.appendChild(w)});
   $("viewQs").hidden=!qs.length;$("qBox").hidden=true;
 }
@@ -342,7 +406,7 @@ function showEdit(d,s){
       const dr=drafts[id];
       if(dr&&dr.text===b.saved)delete drafts[id];
       else if(dr&&dr.base!==b.savedAt){b.conflict=dr.text;delete drafts[id]}
-      b.ta.value=drafts[id]?drafts[id].text:b.saved;paint(id);if(dirty(id)||b.conflict)sectionCounts.forEach(x=>{if(x.ids.includes(id))x.box.open=true});
+      b.ta.value=drafts[id]?drafts[id].text:b.saved;if(b.fromTa)b.fromTa();paint(id);if(dirty(id)||b.conflict)sectionCounts.forEach(x=>{if(x.ids.includes(id))x.box.open=true});
     });
     putDrafts();renderLog(d.submissions);bar();ids.forEach(id=>{if(blocks[id].ta.value)requestAnimationFrame(()=>grow(blocks[id].ta))});
     const last=d.submissions[d.submissions.length-1];
@@ -357,11 +421,47 @@ let pageData=null,viewN=null;
 function renderStep(n){
   const d=pageData,s=d.steps.find(x=>x.n===n)||d.steps[d.steps.length-1];
   const t=$("stepTabs");t.hidden=d.steps.length<2;t.textContent="";
-  d.steps.forEach(x=>{const b=el("button",null,"steptab");b.type="button";b.dataset.step=x.n;b.setAttribute("aria-current",String(x.n===s.n));b.append(el("b","Step "+x.n),x.title);b.addEventListener("click",()=>{if(location.hash==="#step-"+x.n)renderStep(x.n);else location.hash="step-"+x.n});t.appendChild(b)});
+  d.steps.forEach(x=>{const b=el("button",null,"steptab");b.type="button";b.dataset.step=x.n;b.setAttribute("aria-current",String(x.n===s.n));b.append(el("b","Stage "+STAGE_OF_KIND[kindOf(x)]),x.title);b.addEventListener("click",()=>{if(location.hash==="#step-"+x.n)renderStep(x.n);else location.hash="step-"+x.n});t.appendChild(b)});
     $("planBox").hidden=!s.plan.length;if(s.plan.length)renderBlocks($("plan"),s.plan);
   $("introBox").hidden=!s.intro.length;if(s.intro.length)renderBlocks($("intro"),s.intro);
+  const kind=kindOf(s),final=kind==="final";
+  $("planTitle").textContent=final?"Final report":kind==="decisions"?"Proposed path":"Recommended path";$("reportBar").hidden=!final;
+  $("viewTitle").textContent=kind==="decisions"?"Proposals and decisions":"Questions and answers";
+  $("qTitle").textContent=kind==="decisions"?"Your decisions":"Questions";
+  const how=$("howTo");how.textContent="";how.append(el("strong","How this works: "),kind==="decisions"?"Every proposal starts on Auto, which means we decide it for you using the evidence above. Leaving them all on Auto is fine. Choose Accept or Reject only where you feel strongly, and add a note if it needs a condition. Press Save all changes, then Submit decisions. You can change and submit again, and every submission is kept.":"Save all changes lights up when you type. Press it to store your answers, then come back any time on any device by signing in. When you're done, press Submit answers at the end. You can edit and submit again, and every submission is kept. Skip any question you'd rather not answer: leave it blank, or add a short note saying why.");
+  $("submit").textContent=kind==="decisions"?"Submit decisions":"Submit answers";
   viewN=s.n;if(canEditNow(d)&&s.n===d.openStep)showEdit(d,s);else showRead(d,s);
 }
+function renderTracker(d){
+  const now=stageNow(d.status,d.rerouting||!!d.reroute,kindOf(d.steps[d.steps.length-1])),at=STAGES.findIndex(x=>x[0]===now),l=$("trackList");l.textContent="";
+  STAGES.forEach(([k,label,who],i)=>{const li=el("li",null,who+(now==="closed"||i<at?" done":i===at?" now":""));if(i===at)li.setAttribute("aria-current","step");
+    li.append(el("span",k,"dot"),el("span",label,"lbl"));l.appendChild(li)});
+  const cur=STAGES[at],p=$("trackNow");p.textContent="";
+  if(now==="closed")p.textContent="This probe is closed.";
+  else{p.append(el("strong","Now: "+stageName(now)+". "),cur[2]==="us"?"This part happens on our side, so there's nothing for you to do yet.":now==="3"?"Nothing left to do. Read the final report below, or download it.":"It's your turn. "+(d.editable?"":"Only the profile's owner can respond, after signing in."))}
+  $("tracker").hidden=false;
+}
+// The take-home report: everything open, info notes written out, and no buttons.
+function reportNodes(){
+  const parts=[$("introBox"),$("planBox")].filter(x=>!x.hidden).map(x=>x.cloneNode(true));
+  parts.forEach(p=>{p.querySelectorAll("details").forEach(x=>x.setAttribute("open",""));p.querySelectorAll(".infobtn").forEach(b=>{const n=el("span","Note: "+b.dataset.info,"infonote");b.replaceWith(n)});p.querySelectorAll("#reportBar,button,[id]").forEach(x=>{if(x.matches("#reportBar,button"))x.remove();else x.removeAttribute("id")})});
+  return parts;
+}
+$("dlHtml").addEventListener("click",()=>{
+  const d=pageData,doc=document.implementation.createHTMLDocument(d.title),m=doc.createElement("meta");m.setAttribute("charset","utf-8");doc.head.prepend(m);
+  const v=doc.createElement("meta");v.name="viewport";v.content="width=device-width,initial-scale=1";doc.head.appendChild(v);
+  document.querySelectorAll('link[rel="stylesheet"],style').forEach(x=>doc.head.appendChild(doc.importNode(x,true)));
+  const extra=doc.createElement("style");extra.textContent="body{padding:24px 16px}main{max-width:1100px;margin:0 auto}.infonote{display:block;font-size:14px;color:var(--muted);font-style:italic;margin-top:3px}section{display:block!important}";doc.head.appendChild(extra);
+  const main=doc.createElement("main"),eb=doc.createElement("div");eb.className="eyebrow";eb.textContent=d.name+" · Final report · "+day(new Date().toISOString());
+  const h1=doc.createElement("h1");h1.textContent=d.title;main.append(eb,h1);reportNodes().forEach(n=>main.appendChild(doc.importNode(n,true)));
+  const f=doc.createElement("p");f.className="notice";f.textContent="Saved from "+location.href.split("#")[0];main.appendChild(f);doc.body.appendChild(main);
+  const blob=new Blob(["<!doctype html>\n"+doc.documentElement.outerHTML],{type:"text/html"}),a=document.createElement("a");
+  a.href=URL.createObjectURL(blob);a.download=(d.title.replace(/[^\w -]+/g,"").trim().replace(/\s+/g,"-")||"report")+"-final-report.html";document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),4000);
+});
+let printOpen=[];
+addEventListener("beforeprint",()=>{printOpen=[...document.querySelectorAll("details:not([open])")];printOpen.forEach(x=>x.open=true);document.querySelectorAll(".infobtn").forEach(b=>b.after(el("span","Note: "+b.dataset.info,"infonote printonly")))});
+addEventListener("afterprint",()=>{printOpen.forEach(x=>x.open=false);printOpen=[];document.querySelectorAll(".printonly").forEach(x=>x.remove())});
+$("dlPdf").addEventListener("click",()=>print());
 const hashStep=()=>{const m=location.hash.match(/^#step-(\d+)$/);return m?Number(m[1]):null};
 async function showPage(){
   $("fatal").hidden=true;
@@ -373,6 +473,7 @@ async function showPage(){
   const ri=$("rerouteInfo");ri.textContent=d.reroute?"New direction requested: "+d.reroute.message:d.rerouting?"A new direction is being researched.":"";ri.hidden=!ri.textContent;
   PP.profileHint=d.name;
   renderLock(d);
+  renderTracker(d);
   renderStep(hashStep()??d.steps[d.steps.length-1].n);
   let fresh=false;try{fresh=sessionStorage.getItem("pp-just-signed-in")==="1";sessionStorage.removeItem("pp-just-signed-in")}catch(e){}
   if(fresh&&canEditNow(d))playUnlock();
@@ -390,17 +491,16 @@ function renderLock(d){
 }
 function playUnlock(){const f=$("unlockfx");f.hidden=false;f.style.animation="none";void f.offsetWidth;f.style.animation="";setTimeout(()=>{f.hidden=true},1300)}
 const day=iso=>new Date(iso).toLocaleDateString([],{dateStyle:"medium"});
-const stageOf=g=>g.rerouting?"rerouting":g.status;
-const STAGE_NAME=k=>k==="rerouting"?"Changing direction":STAGE[k]||k;
+const stageOf=g=>stageNow(g.status,g.rerouting,g.lastKind);
 let directory=[];
 function pageLink(p,g){
   const a=el("a",null,"pagelink"),k=stageOf(g);a.href="/probes/"+encodeURIComponent(p.slug)+"/"+encodeURIComponent(g.slug);
-  a.appendChild(el("b",g.title));a.appendChild(el("span",STAGE_NAME(k),"chip "+(k==="rerouting"?"warn":TONE[k]||"info")));
+  a.appendChild(el("b",g.title));a.appendChild(el("span",stageName(k),"chip "+(STAGE_TONE[k]||"info")));
   a.appendChild(el("small","Created "+day(g.createdAt)+" · Updated "+day(g.updatedAt)+" · Research cost "+money(g.costUsd)));return a;
 }
 const SORTS={created:["Newest first","Oldest first","desc"],updated:["Latest first","Earliest first","desc"],profile:["A to Z","Z to A","asc"],cost:["Highest first","Lowest first","desc"]};
 let sortDir="desc",sortField="created";const SORT_NAMES={created:"Date created",updated:"Last updated",profile:"Profile",cost:"Cost"};const picked={status:new Set(),profile:new Set()};
-const STATUS_FILTERS=["open","submitted","rerouting","plan_ready","closed"];
+const STATUS_FILTERS=["0.5","1","1.5","2","2.5","3","closed"];
 function filterBox(group,value,label){
   const l=el("label"),c=el("input");c.type="checkbox";c.dataset.group=group;c.value=value;c.checked=picked[group].has(value);
   c.addEventListener("change",()=>{if(c.checked)picked[group].add(value);else picked[group].delete(value);renderDirectory()});
@@ -408,12 +508,12 @@ function filterBox(group,value,label){
 }
 function buildFilters(){
   const s=$("filterStatus"),p=$("filterProfile");[...s.querySelectorAll("label"),...p.querySelectorAll("label")].forEach(x=>x.remove());
-  STATUS_FILTERS.forEach(k=>s.appendChild(filterBox("status",k,STAGE_NAME(k))));
+  STATUS_FILTERS.forEach(k=>s.appendChild(filterBox("status",k,stageName(k))));
   directory.slice().sort((x,y)=>x.name.localeCompare(y.name,undefined,{sensitivity:"base"})).forEach(x=>p.appendChild(filterBox("profile",x.slug,x.name)));
 }
 const VIEW_KEY="probes-view";
 function saveView(){try{sessionStorage.setItem(VIEW_KEY,JSON.stringify({sort:sortField,dir:sortDir,status:[...picked.status],profile:[...picked.profile],y:scrollY}))}catch(e){}}
-function loadView(){try{const v=JSON.parse(sessionStorage.getItem(VIEW_KEY)||"null");if(!v)return 0;sortField=SORTS[v.sort]?v.sort:"created";sortDir=v.dir==="asc"?"asc":"desc";picked.status=new Set(v.status);picked.profile=new Set(v.profile);return v.y||0}catch(e){return 0}}
+function loadView(){try{const v=JSON.parse(sessionStorage.getItem(VIEW_KEY)||"null");if(!v)return 0;sortField=SORTS[v.sort]?v.sort:"created";sortDir=v.dir==="asc"?"asc":"desc";picked.status=new Set((v.status||[]).filter(k=>STATUS_FILTERS.includes(k)));picked.profile=new Set(v.profile);return v.y||0}catch(e){return 0}}
 function placeFilter(){const f=$("filterPanel");f.style.left="";if(innerWidth>640){const r=f.getBoundingClientRect();if(r.right>innerWidth-12)f.style.left=(innerWidth-12-r.right)+"px"}}
 function closeFilter(){$("filterPanel").hidden=true;$("filterBtn").setAttribute("aria-expanded","false");$("sortPanel").hidden=true;$("sortBtn").setAttribute("aria-expanded","false")}
 function renderDirectory(){
