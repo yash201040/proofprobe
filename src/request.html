@@ -28,6 +28,7 @@ form{display:grid;gap:18px}.field{display:grid;gap:5px;min-width:0}label{font-we
 input[type=text],textarea{width:100%;padding:10px 12px;font:400 16px/1.5 var(--body);color:var(--ink);background:var(--surface);border:1px solid var(--line);border-radius:6px}
 textarea{min-height:240px;resize:vertical}input:focus,textarea:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px color-mix(in srgb,var(--accent) 20%,transparent)}
 .two{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,280px),1fr));gap:18px}
+.priv{border:1px solid var(--line);border-radius:8px;padding:14px 16px;margin:0;display:grid;gap:8px}.priv legend{font-weight:600;padding:0 4px}.check{display:flex;align-items:center;gap:8px;font-weight:600}.check input{width:18px;height:18px;accent-color:var(--accent)}.trap{position:absolute;left:-9999px;width:1px;height:1px;overflow:hidden}
 .gate{background:var(--surface);border:1px solid var(--line);padding:22px;display:grid;gap:10px}.gatebtns{display:flex;flex-wrap:wrap;gap:10px;margin-top:6px}.send.ghost{background:transparent;color:var(--accent)}.as{color:var(--muted)}
 .drop{display:grid;place-items:center;gap:4px;min-height:112px;padding:16px;text-align:center;border:1.5px dashed var(--line);border-radius:8px;background:var(--surface);cursor:pointer;transition:border-color .15s ease,background .15s ease}.drop.over{border-color:var(--accent);background:var(--accent-soft)}
 @media (hover:hover){.drop:hover{border-color:var(--accent)}}
@@ -60,10 +61,16 @@ button{font:600 16px var(--body);cursor:pointer}.rm{flex:none;min-height:34px;pa
     <div class="field"><label for="goalTitle">Your goal in one line</label><input id="goalTitle" type="text" maxlength="140" placeholder="Example: Move from support into product management"></div>
     <div class="field"><label for="body">Describe your goal</label><p class="hint">Write as much as you like. More detail now means better questions later.</p><textarea id="body" maxlength="20000"></textarea><p class="hint" id="chars" role="status">0 of 20,000 characters</p></div>
     <div class="field"><label for="files">Documents (optional)</label><input id="files" type="file" multiple accept=".pdf,.doc,.docx,.odt,.txt,.md,.rtf,.json,.ppt,.pptx,.odp,.key,.xls,.xlsx,.ods,.csv,.tsv,.png,.jpg,.jpeg,.webp,.gif,.heic"><div class="drop" id="drop"><b>Choose files</b><span class="hint">or drag them here. Up to 5 files, 10 MB in total. Larger uploads can't be accepted.</span></div><ul class="list" id="list"></ul></div>
+    <fieldset class="priv"><legend>Who can see the research</legend>
+      <label class="check"><input type="checkbox" id="private"> Keep this research private</label>
+      <p class="hint">Off by default, so it's public like the other probes. When private, Probes shows only a card with your teaser and stage. Others can ask for access, and you decide on your account page.</p>
+      <div class="field" id="teaserBox" hidden><label for="teaser">Teaser for the card (optional)</label><input id="teaser" type="text" maxlength="140" placeholder="Example: Moving into a new field within a year"><p class="hint">Shown to everyone. Leave out names, employers and other personal details.</p></div>
+    </fieldset>
+    <div class="trap" aria-hidden="true"><label for="website">Website</label><input id="website" type="text" tabindex="-1" autocomplete="off"></div>
     <button class="send" id="send" type="submit">Send request</button>
     <p class="err" id="err" role="alert"></p>
   </form>
-  <p class="notice">Your request and documents stay private. If it's accepted, the research page is public, but your answers aren't.</p>
+  <p class="notice">Your request and documents stay private to you and the owner. If it's accepted, the research page is public unless you chose private above, and your answers are never public.</p>
 </main>
 <section class="done" id="done" hidden><h2>Request received</h2><p>We'll review it and contact you with the outcome. Your reference is <strong id="ref"></strong>.</p><p><a href="/probes">See the probes</a></p></section>
 </div>
@@ -85,7 +92,8 @@ function add(list){
   }
   render();
 }
-PP.ready.then(me=>{if(me){$("form").hidden=false;$("asWho").textContent="Requesting as "+me.name}else $("gate").hidden=false});
+let opened=Date.now();$("private").addEventListener("change",e=>{$("teaserBox").hidden=!e.target.checked});
+PP.ready.then(me=>{if(me){opened=Date.now();$("form").hidden=false;$("asWho").textContent="Requesting as "+me.name}else $("gate").hidden=false});
 $("gateSign").addEventListener("click",()=>PP.open(""));$("gateApply").addEventListener("click",()=>PP.apply(""));
 $("files").addEventListener("change",e=>{add(e.target.files);e.target.value=""});
 const drop=$("drop");drop.addEventListener("click",()=>$("files").click());
@@ -98,14 +106,14 @@ $("form").addEventListener("submit",async e=>{
   const contact=$("contact").value.trim(),title=$("goalTitle").value.trim(),body=$("body").value.trim();
   if(!contact||!title)return fail("Please add your contact details and goal.");
   if(body.length<40)return fail("Please describe your goal in a little more detail.");
-  const d=new FormData();d.append("contact",contact);d.append("title",title);d.append("body",body);picked.forEach(f=>d.append("files",f));
+  const d=new FormData();d.append("contact",contact);d.append("title",title);d.append("body",body);d.append("private",$("private").checked?"1":"0");d.append("teaser",$("teaser").value);d.append("website",$("website").value);d.append("t",String(Date.now()-opened));picked.forEach(f=>d.append("files",f));
   const b=$("send");b.disabled=true;b.textContent="Sending...";
   try{
     const r=await fetch("/api/requests",{method:"POST",body:d}),j=await r.json().catch(()=>({}));
     if(!r.ok){const e=new Error("http");e.status=r.status;throw e}
     $("ref").textContent=j.ref;$("main").hidden=true;$("done").hidden=false;scrollTo(0,0);
   }catch(x){
-    fail(x.status===401?"Your session has ended. Please sign in again.":x.status===429?"Too many requests right now. Please try again later.":x.status===413?"Those files are too large.":x.status===400?"Please check the form and try again.":"That wasn't sent. Check your connection and try again.");
+    fail(x.status===401?"Your session has ended. Please sign in again.":x.status===507?"Uploads are full right now. Send it without files, or try again later.":x.status===429?"You've reached the request limit for now: up to 3 waiting at once and 10 a day. Please try again later.":x.status===413?"Those files are too large.":x.status===400?"Please check the form and try again.":"That wasn't sent. Check your connection and try again.");
     b.disabled=false;b.textContent="Send request";
   }
 });

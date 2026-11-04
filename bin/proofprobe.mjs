@@ -35,8 +35,9 @@ switch (cmd) {
   }
   case "new": {
     const c = cfg(), profile = flag(a, "profile");
-    const res = await fetch(c.baseUrl + "/admin/cases", { method: "POST", headers: { Authorization: "Bearer " + c.adminToken, "Content-Type": "application/json" }, body: JSON.stringify({ title: flag(a, "title"), profile, create: a.includes("--new-profile") }) });
+    const res = await fetch(c.baseUrl + "/admin/cases", { method: "POST", headers: { Authorization: "Bearer " + c.adminToken, "Content-Type": "application/json" }, body: JSON.stringify({ title: flag(a, "title"), profile, create: a.includes("--new-profile"), private: a.includes("--private"), teaser: flag(a, "teaser") ?? undefined, requestId: flag(a, "request") ?? undefined }) });
     const r = await res.json();
+    if (r.error === "request_mismatch") { console.error("That request belongs to a different profile, or doesn't exist. Check the request id and profile name."); process.exit(1); }
     if (res.status === 404 && r.error === "unknown_profile") {
       console.error(`No profile named "${profile}". Existing profiles: ${r.profiles.join(", ") || "none"}.\nUse one of those exact names, or add --new-profile if this is a new person.`);
       process.exit(1);
@@ -116,6 +117,13 @@ switch (cmd) {
   }
   case "approve": out(await api("POST", "/requests/" + a[0], { status: "approved" })); break;
   case "reject": out(await api("POST", "/requests/" + a[0], { status: "rejected" })); break;
+  case "privacy": {
+    const mode = a[1];
+    if (mode !== "private" && mode !== "public") throw new Error("usage: privacy ID private|public [--teaser T]");
+    const c = cfg(), res = await fetch(`${c.baseUrl}/admin/cases/${a[0]}`, { method: "PATCH", headers: { Authorization: "Bearer " + c.adminToken, "Content-Type": "application/json" }, body: JSON.stringify({ private: mode === "private", teaser: flag(a, "teaser") ?? undefined }) });
+    if (!res.ok) throw new Error(`privacy: ${res.status} ${await res.text()}`);
+    const done = await res.json(); out({ ok: true, id: a[0], private: mode === "private", link: done.path ? c.baseUrl + done.path : null }); break;
+  }
   case "request-started": out(await api("POST", "/requests/" + a[0], { status: "started", caseId: flag(a, "case") })); break;
   case "pending": out((await api("GET", "/pending")).pending); break;
   case "profiles": out(await api("GET", "/profiles")); break;
@@ -139,5 +147,5 @@ switch (cmd) {
     break;
   }
   case "purge": out(await api("DELETE", "/cases/" + a[0])); break;
-  default: console.log("proofprobe init [--url U] | new --profile NAME --title T [--new-profile] | profiles | pending | approve-profile NAME | reject-profile NAME | requests | request ID | approve ID | reject ID | request-started ID --case CASE | export ID | import ID --answers F | cost ID USD [label] | password ID [--set P] (sets the password of that page's whole profile and signs out its devices) | admin-setup | publish ID [--intro F] [--questions F] [--plan F] [--status S] [--new-step TITLE | --step N [--title T]] [--allow-drop] | list | link ID | status ID | fetch ID [--seq N] [--out F] | purge ID");
+  default: console.log("proofprobe init [--url U] | new --profile NAME --title T [--new-profile] [--request ID] [--private [--teaser T]] | privacy ID private|public [--teaser T] | profiles | pending | approve-profile NAME | reject-profile NAME | requests | request ID | approve ID | reject ID | request-started ID --case CASE | export ID | import ID --answers F | cost ID USD [label] | password ID [--set P] (sets the password of that page's whole profile and signs out its devices) | admin-setup | publish ID [--intro F] [--questions F] [--plan F] [--status S] [--new-step TITLE | --step N [--title T]] [--allow-drop] | list | link ID | status ID | fetch ID [--seq N] [--out F] | purge ID");
 }

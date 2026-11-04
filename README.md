@@ -14,7 +14,7 @@ Staged research that turns any starting point into a clear, data-backed final re
 | 4 | Read the final report, or download it as HTML or PDF | |
 
 - **`/proofprobe` skill** (`skills/proofprobe/SKILL.md`): runs in Claude Code. Opus does the thinking and treg does the live research, so the server needs no AI key.
-- **Worker** (`src/`): hosts the home page and the Probes directory, organised as profiles with one or more pages. Anyone can view a page, and signing in to the profile unlocks editing.
+- **Worker** (`src/`): hosts the home page and the Probes directory, organised as profiles with one or more pages. Pages are public by default, and signing in to the profile unlocks editing. A request can opt into private research: Probes then shows only a teaser card, and the owner decides who else may read it from their account page.
 - **`bin/proofprobe.mjs`**: admin helper to create, publish, check and fetch cases.
 
 ## For agents and other chats
@@ -46,6 +46,7 @@ Local test: put `ADMIN_TOKEN_SHA256=<hash>` and `PASSWORD_KEY=<base64 key>` in `
 - Page content is rendered as text only, so stored content cannot inject markup.
 - CVs and research notes stay in `.proofprobe/` on this machine, which git ignores. The server holds what the site needs: questions, research, costs, answers and decisions (private to the profile and owner), and goal requests with their files (private to the owner).
 - Answer text and tokens are never logged.
+- Spam limits run on the free tier: per-device and per-profile hourly and daily caps on profile applications, goal requests and access requests, a cap of 3 waiting requests per profile, a 500 MB ceiling on uploaded files, a 1 MB limit on other requests, a hidden honeypot field and a minimum fill time on forms, a pause after 20 wrong sign-ins from one device, and a check that writes come from this site.
 
 ## Design choices
 

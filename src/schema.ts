@@ -13,5 +13,6 @@ export const SCHEMA: string[] = [
   "CREATE TABLE IF NOT EXISTS steps (\n  case_id TEXT NOT NULL,\n  n INTEGER NOT NULL,\n  title TEXT NOT NULL,\n  intro_json TEXT NOT NULL DEFAULT '[]',\n  questions_json TEXT NOT NULL DEFAULT '[]',\n  plan_json TEXT NOT NULL DEFAULT '[]',\n  created_at TEXT NOT NULL,\n  PRIMARY KEY (case_id, n)\n);",
   "CREATE TABLE IF NOT EXISTS requests (\n  id TEXT PRIMARY KEY,\n  name TEXT NOT NULL,\n  profile_id TEXT,\n  contact TEXT NOT NULL,\n  title TEXT NOT NULL,\n  body TEXT NOT NULL,\n  status TEXT NOT NULL DEFAULT 'new',\n  ip_hash TEXT NOT NULL,\n  case_id TEXT,\n  created_at TEXT NOT NULL,\n  decided_at TEXT\n);",
   "CREATE TABLE IF NOT EXISTS request_files (\n  id TEXT PRIMARY KEY,\n  request_id TEXT NOT NULL,\n  name TEXT NOT NULL,\n  size INTEGER NOT NULL,\n  created_at TEXT NOT NULL\n);",
+  "CREATE TABLE IF NOT EXISTS access (\n  case_id TEXT NOT NULL,\n  viewer_id TEXT NOT NULL,\n  status TEXT NOT NULL,\n  note TEXT,\n  requested_at TEXT NOT NULL,\n  decided_at TEXT,\n  decided_by TEXT,\n  PRIMARY KEY (case_id, viewer_id)\n);",
   "CREATE TABLE IF NOT EXISTS file_chunks (\n  file_id TEXT NOT NULL,\n  i INTEGER NOT NULL,\n  data BLOB NOT NULL,\n  PRIMARY KEY (file_id, i)\n);"
 ];

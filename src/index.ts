@@ -2,6 +2,7 @@ import APP from "./page.html";
 import LANDING from "./landing.html";
 import ADMIN from "./admin.html";
 import REQUEST from "./request.html";
+import ACCOUNT_PAGE from "./accountpage.html";
 import ACCOUNT from "./account.txt";
 import { SCHEMA } from "./schema";
 
@@ -15,9 +16,13 @@ const ADMIN_DAYS = 90;
 const ADMIN_MAX_FAILS = 6;
 const ADMIN_LOCK_MINUTES = 15;
 const ADMIN_SESSION = "__admin";
-const SCHEMA_VERSION = "6";
+const SCHEMA_VERSION = "7";
 const MAX_PENDING_PROFILES = 100;
 const SIGNIN_MAX_MISSES = 20, SIGNIN_WINDOW_MS = 15 * 60_000;
+// Spam limits. Everything here runs on the free tier, so caps are per device or per profile, plus a few global ceilings.
+const APPLICATIONS_PER_DAY = 15, REQUESTS_PER_DAY = 10, OPEN_REQUESTS_PER_PROFILE = 3, MAX_STORED_FILE_BYTES = 500 * 1024 * 1024;
+const ACCESS_PER_DAY = 20, ACCESS_PENDING_MAX = 30, ACCESS_COOLDOWN_DAYS = 7, MIN_FILL_MS = 2500, MAX_JSON_BYTES = 1024 * 1024;
+const MAX_TEASER = 140;
 const APPLICATIONS_PER_HOUR = 5;
 const MAX_FILES = 5;
 const MAX_UPLOAD = 10 * 1024 * 1024;
@@ -67,7 +72,7 @@ interface Section { title: string; note?: string; first?: boolean; questions: Qu
 interface CaseRow {
   id: string; title: string; first_name: string; status: string;
   created_at: string; updated_at: string; profile_id: string | null; slug: string | null;
-  p_name: string; p_slug: string;
+  p_name: string; p_slug: string; private: number; teaser: string | null;
 }
 interface Step { n: number; title: string; intro: unknown[]; sections: Section[]; plan: unknown[]; createdAt: string }
 interface ProfileRow { id: string; slug: string; name: string; status: string; reason: string | null; password_hash: string | null; password_salt: string | null; password_enc: string | null; password_iv: string | null; pw_version: number }
@@ -107,6 +112,11 @@ async function migrate(env: Env) {
   if (!pcols.has("reason")) await env.DB.prepare("ALTER TABLE profiles ADD COLUMN reason TEXT").run();
   const rcols = new Set((await env.DB.prepare("SELECT name FROM pragma_table_info('requests')").all()).results.map((r: any) => r.name as string));
   if (!rcols.has("profile_id")) await env.DB.prepare("ALTER TABLE requests ADD COLUMN profile_id TEXT").run();
+  if (!rcols.has("private")) await env.DB.prepare("ALTER TABLE requests ADD COLUMN private INTEGER NOT NULL DEFAULT 0").run();
+  if (!rcols.has("teaser")) await env.DB.prepare("ALTER TABLE requests ADD COLUMN teaser TEXT").run();
+  const ccols = new Set((await env.DB.prepare("SELECT name FROM pragma_table_info('cases')").all()).results.map((r: any) => r.name as string));
+  if (!ccols.has("private")) await env.DB.prepare("ALTER TABLE cases ADD COLUMN private INTEGER NOT NULL DEFAULT 0").run();
+  if (!ccols.has("teaser")) await env.DB.prepare("ALTER TABLE cases ADD COLUMN teaser TEXT").run();
   const subs = new Set((await env.DB.prepare("SELECT name FROM pragma_table_info('submissions')").all()).results.map((r: any) => r.name as string));
   if (!subs.has("step_n")) await env.DB.prepare("ALTER TABLE submissions ADD COLUMN step_n INTEGER NOT NULL DEFAULT 1").run();
   const cols = new Set((await env.DB.prepare("SELECT name FROM pragma_table_info('cases')").all()).results.map((r: any) => r.name as string));
@@ -183,7 +193,8 @@ async function pendingWork(env: Env) {
 async function setProfileStatus(env: Env, id: string, status: string, ray: string) {
   await env.DB.batch([
     env.DB.prepare("UPDATE profiles SET status = ? WHERE id = ?").bind(status, id),
-    ...(status === "active" ? [] : [env.DB.prepare("DELETE FROM sessions WHERE case_id = ?").bind(id)]),
+    // A profile that is no longer active loses its sessions and any access it was given or was waiting for.
+    ...(status === "active" ? [] : [env.DB.prepare("DELETE FROM sessions WHERE case_id = ?").bind(id), env.DB.prepare("UPDATE access SET status = 'revoked', decided_at = ?, decided_by = 'admin' WHERE viewer_id = ? AND status IN ('pending','approved')").bind(new Date().toISOString(), id)]),
     audit(env, null, "admin", "profile_" + status, "profile=" + id, ray),
   ]);
 }
@@ -194,17 +205,23 @@ async function createRequest(request: Request, env: Env, ray: string) {
   if (!form) return json({ error: "bad_request" }, 400);
   const text = (k: string) => { const v = form.get(k); return typeof v === "string" ? v.trim() : ""; };
   const name = me.name, contact = text("contact"), title = text("title"), body = text("body");
+  if (text("website") || !(Number(text("t")) >= MIN_FILL_MS)) return json({ error: "bad_request" }, 400);
   if (!contact || !title || body.length < 40 || contact.length > 160 || title.length > 140 || body.length > MAX_REQUEST_BODY) return json({ error: "bad_request" }, 400);
+  const isPrivate = text("private") === "1", teaser = cleanTeaser(text("teaser"));
   const files = form.getAll("files").filter((f): f is File => typeof f !== "string" && f.size > 0);
   if (files.length > MAX_FILES || files.reduce((a, f) => a + f.size, 0) > MAX_UPLOAD) return json({ error: "too_large" }, 413);
   const ip = await sha256("profile:" + me.id), hourAgo = new Date(Date.now() - 3_600_000).toISOString();
-  const [recent, open] = await env.DB.batch([
+  const [recent, open, daily, mineOpen, stored] = await env.DB.batch([
     env.DB.prepare("SELECT COUNT(*) AS n FROM requests WHERE ip_hash = ? AND created_at > ?").bind(ip, hourAgo),
     env.DB.prepare("SELECT COUNT(*) AS n FROM requests WHERE status = 'new'"),
+    env.DB.prepare("SELECT COUNT(*) AS n FROM requests WHERE ip_hash = ? AND created_at > ?").bind(ip, new Date(Date.now() - 86_400_000).toISOString()),
+    env.DB.prepare("SELECT COUNT(*) AS n FROM requests WHERE profile_id = ? AND status IN ('new','approved')").bind(me.id),
+    env.DB.prepare("SELECT COALESCE(SUM(size), 0) AS n FROM request_files"),
   ]);
-  if ((recent.results[0] as any).n >= REQUESTS_PER_HOUR || (open.results[0] as any).n >= MAX_OPEN_REQUESTS) return json({ error: "rate_limited" }, 429);
+  if ((recent.results[0] as any).n >= REQUESTS_PER_HOUR || (daily.results[0] as any).n >= REQUESTS_PER_DAY || (mineOpen.results[0] as any).n >= OPEN_REQUESTS_PER_PROFILE || (open.results[0] as any).n >= MAX_OPEN_REQUESTS) return json({ error: "rate_limited" }, 429);
+  if ((stored.results[0] as any).n + files.reduce((a, f) => a + f.size, 0) > MAX_STORED_FILE_BYTES) return json({ error: "storage_full" }, 507);
   const id = crypto.randomUUID().slice(0, 8), now = new Date().toISOString();
-  const writes = [env.DB.prepare("INSERT INTO requests(id, profile_id, name, contact, title, body, ip_hash, created_at) VALUES (?,?,?,?,?,?,?,?)").bind(id, me.id, name, contact, title, body, ip, now)];
+  const writes = [env.DB.prepare("INSERT INTO requests(id, profile_id, name, contact, title, body, ip_hash, created_at, private, teaser) VALUES (?,?,?,?,?,?,?,?,?,?)").bind(id, me.id, name, contact, title, body, ip, now, isPrivate ? 1 : 0, teaser || null)];
   for (const f of files) {
     const fid = crypto.randomUUID().slice(0, 12), bytes = new Uint8Array(await f.arrayBuffer());
     writes.push(env.DB.prepare("INSERT INTO request_files(id, request_id, name, size, created_at) VALUES (?,?,?,?,?)").bind(fid, id, f.name.slice(0, 180) || "file", f.size, now));
@@ -215,7 +232,7 @@ async function createRequest(request: Request, env: Env, ray: string) {
   return json({ ref: "PP-" + id.toUpperCase() }, 201);
 }
 async function requestDetail(env: Env, id: string) {
-  const q = await env.DB.prepare("SELECT id, name AS profile, contact, title, body, status, case_id, created_at, decided_at FROM requests WHERE id = ?").bind(id).first<any>();
+  const q = await env.DB.prepare("SELECT id, name AS profile, contact, title, body, status, case_id, created_at, decided_at, private, teaser FROM requests WHERE id = ?").bind(id).first<any>();
   if (!q) return null;
   const f = await env.DB.prepare("SELECT id, name, size FROM request_files WHERE request_id = ? ORDER BY created_at, name").bind(id).all();
   return { ...q, files: f.results };
@@ -223,6 +240,8 @@ async function requestDetail(env: Env, id: string) {
 async function setRequestStatus(env: Env, id: string, status: string, caseId: string | null, ray: string) {
   await env.DB.batch([
     env.DB.prepare("UPDATE requests SET status = ?, case_id = COALESCE(?, case_id), decided_at = ? WHERE id = ?").bind(status, caseId, new Date().toISOString(), id),
+    // A private request makes its page private. A public one leaves the page as it is.
+    ...(caseId ? [env.DB.prepare("UPDATE cases SET private = MAX(private, (SELECT private FROM requests WHERE id = ?)), teaser = COALESCE(teaser, (SELECT teaser FROM requests WHERE id = ?)) WHERE id = ?").bind(id, id, caseId)] : []),
     audit(env, null, "admin", "request_" + status, "request=" + id, ray),
   ]);
 }
@@ -249,6 +268,7 @@ async function deleteCase(env: Env, id: string, ray: string) {
     env.DB.prepare("DELETE FROM submissions WHERE case_id = ?").bind(id),
     env.DB.prepare("DELETE FROM reroutes WHERE case_id = ?").bind(id),
     env.DB.prepare("DELETE FROM steps WHERE case_id = ?").bind(id),
+    env.DB.prepare("DELETE FROM access WHERE case_id = ?").bind(id),
     env.DB.prepare("DELETE FROM cases WHERE id = ?").bind(id),
     audit(env, null, "admin", "page_deleted", id, ray),
   ]);
@@ -358,15 +378,18 @@ async function signOut(request: Request, env: Env) {
   return json({ ok: true }, 200, { "Set-Cookie": "pp_session=; Path=/; Max-Age=0; HttpOnly; Secure; SameSite=Lax" });
 }
 async function applyForProfile(request: Request, env: Env, ray: string) {
-  const b = await request.json().catch(() => null) as { name?: unknown; password?: unknown; reason?: unknown } | null;
+  const b = await request.json().catch(() => null) as { name?: unknown; password?: unknown; reason?: unknown; website?: unknown; t?: unknown } | null;
+  // A hidden field people never fill, and a form filled faster than a person can type, both mark a bot.
+  if (b?.website || typeof b?.t !== "number" || b.t < MIN_FILL_MS) return json({ error: "bad_request" }, 400);
   const name = typeof b?.name === "string" ? tidyName(b.name) : "", reason = typeof b?.reason === "string" ? b.reason.trim() : "";
   if (name.length < 2 || name.length > 60 || typeof b?.password !== "string" || b.password.length < 8 || b.password.length > 200 || reason.length < 10 || reason.length > 500) return json({ error: "bad_request" }, 400);
   const ip = await sha256("apply:" + (request.headers.get("cf-connecting-ip") ?? "local")), hourAgo = new Date(Date.now() - 3_600_000).toISOString();
-  const [recent, pending] = await env.DB.batch([
+  const [recent, pending, daily] = await env.DB.batch([
     env.DB.prepare("SELECT COUNT(*) AS n FROM audit_log WHERE action = 'profile_applied' AND detail = ? AND at > ?").bind(ip, hourAgo),
     env.DB.prepare("SELECT COUNT(*) AS n FROM profiles WHERE status = 'pending'"),
+    env.DB.prepare("SELECT COUNT(*) AS n FROM audit_log WHERE action = 'profile_applied' AND detail = ? AND at > ?").bind(ip, new Date(Date.now() - 86_400_000).toISOString()),
   ]);
-  if ((recent.results[0] as any).n >= APPLICATIONS_PER_HOUR || (pending.results[0] as any).n >= MAX_PENDING_PROFILES) return json({ error: "rate_limited" }, 429);
+  if ((recent.results[0] as any).n >= APPLICATIONS_PER_HOUR || (daily.results[0] as any).n >= APPLICATIONS_PER_DAY || (pending.results[0] as any).n >= MAX_PENDING_PROFILES) return json({ error: "rate_limited" }, 429);
   if ((await findProfile(env, name)).match) return json({ error: "name_taken" }, 409);
   const id = crypto.randomUUID().slice(0, 8), now = new Date().toISOString(), slug = await freeSlug(env, "profiles", slugify(name)), salt = randomToken(), sealed = await seal(env, b.password);
   await env.DB.batch([
@@ -414,23 +437,138 @@ async function submit(env: Env, row: CaseRow, key: string, ray: string) {
   return json({ seq, submittedAt: at, answered, total: items.length, changed });
 }
 
-async function directory(env: Env) {
+async function directory(env: Env, request: Request) {
+  const me = await signedIn(request, env), admin = await adminLoggedIn(request, env);
+  const mineR = me ? await env.DB.prepare("SELECT case_id, status, decided_at FROM access WHERE viewer_id = ?").bind(me.id).all<{ case_id: string; status: string; decided_at: string | null }>() : { results: [] };
+  const mine = new Map(mineR.results.map((x) => [x.case_id, x]));
   const profiles = await env.DB.prepare("SELECT id, slug, name FROM profiles WHERE status = 'active' ORDER BY created_at").all<any>();
   const pages = await env.DB.prepare(`SELECT c.profile_id, c.slug, c.title, c.status, c.created_at, c.updated_at,
     (SELECT COALESCE(SUM(e.usd_micro), 0) FROM cost_entries e WHERE e.case_id = c.id) AS micro,
     EXISTS (SELECT 1 FROM reroutes r WHERE r.case_id = c.id AND r.handled_at IS NULL) AS rerouting,
-    (SELECT questions_json FROM steps t WHERE t.case_id = c.id ORDER BY n DESC LIMIT 1) AS last_q
+    (SELECT questions_json FROM steps t WHERE t.case_id = c.id ORDER BY n DESC LIMIT 1) AS last_q, c.id, c.private, c.teaser
     FROM cases c WHERE c.status != 'draft' ORDER BY c.created_at`).all<any>();
   const kind = (q: string | null) => { const secs = parse<Section[]>(q ?? "[]", []); return secs.some((x) => x.questions.some((y) => y.kind === "decision")) ? "decisions" : secs.length ? "questions" : "final"; };
   return profiles.results.map((p) => ({
     slug: p.slug, name: p.name,
-    pages: pages.results.filter((c) => c.profile_id === p.id).map((c) => ({ slug: c.slug, title: c.title, status: c.status, createdAt: c.created_at, updatedAt: c.updated_at, costUsd: c.micro / 1_000_000, rerouting: !!c.rerouting, lastKind: kind(c.last_q) })),
+    pages: pages.results.filter((c) => c.profile_id === p.id).map((c) => {
+      const base = { status: c.status, createdAt: c.created_at, updatedAt: c.updated_at, costUsd: c.micro / 1_000_000, rerouting: !!c.rerouting, lastKind: kind(c.last_q) };
+      if (!c.private) return { ...base, slug: c.slug, title: c.title };
+      const req = mine.get(c.id), open = admin || (me && me.id === p.id) || req?.status === "approved";
+      // A private card shows only the teaser and stage. Its title and address stay hidden from anyone without access.
+      return open ? { ...base, slug: c.slug, title: c.title, private: true, access: true, teaser: c.teaser ?? "" }
+        : { ...base, costUsd: 0, caseId: c.id, private: true, access: false, teaser: c.teaser ?? "", request: req ? { status: req.status, retryAt: req.status === "rejected" || req.status === "revoked" ? retryAt(req.decided_at) : null } : null };
+    }),
   })).filter((p) => p.pages.length);
 }
 
+// Private research: the owner, people the owner approved, and the site owner can open it. Nobody else sees more than the card.
+async function accessFor(request: Request, env: Env, row: { id: string; profile_id: string | null; private: number }) {
+  const me = await signedIn(request, env), owner = !!me && me.id === row.profile_id, admin = await adminLoggedIn(request, env);
+  let viewer = false;
+  if (row.private && me && !owner) viewer = !!(await env.DB.prepare("SELECT 1 FROM access WHERE case_id = ? AND viewer_id = ? AND status = 'approved'").bind(row.id, me.id).first());
+  return { me, owner, admin, viewer, canSee: !row.private || owner || viewer || admin, seeAnswers: owner || viewer || admin };
+}
+// A private page's address ends in a random suffix, so nobody can confirm a guessed title from its 403.
+const PRIVATE_SUFFIX = /-p[a-z0-9]{7}$/;
+const suffixToken = () => Array.from(crypto.getRandomValues(new Uint8Array(7)), (b) => "abcdefghijkmnpqrstuvwxyz23456789"[b % 32]).join("");
+async function applyPrivateSlug(env: Env, id: string) {
+  const c = await env.DB.prepare("SELECT slug, private FROM cases WHERE id = ?").bind(id).first<{ slug: string; private: number }>();
+  if (c?.private && !PRIVATE_SUFFIX.test(c.slug)) await env.DB.prepare("UPDATE cases SET slug = ? WHERE id = ?").bind(c.slug + "-p" + suffixToken(), id).run();
+}
+const cleanTeaser = (v: unknown) => (typeof v === "string" ? v.replace(/\s+/g, " ").trim().slice(0, MAX_TEASER) : "");
+const retryAt = (decidedAt: string | null) => new Date(new Date(decidedAt ?? 0).getTime() + ACCESS_COOLDOWN_DAYS * 86_400_000).toISOString();
+async function requestAccess(request: Request, env: Env, ray: string) {
+  const me = await signedIn(request, env);
+  if (!me) return json({ error: "sign_in_required" }, 401);
+  const b = await request.json().catch(() => null) as { caseId?: unknown; note?: unknown } | null;
+  if (typeof b?.caseId !== "string") return json({ error: "bad_request" }, 400);
+  const row = await env.DB.prepare("SELECT c.id, c.profile_id, c.private FROM cases c JOIN profiles p ON p.id = c.profile_id WHERE c.id = ? AND c.status != 'draft' AND p.status = 'active'").bind(b.caseId).first<{ id: string; profile_id: string; private: number }>();
+  if (!row) return json({ error: "not_found" }, 404);
+  if (!row.private) return json({ error: "not_private" }, 400);
+  if (row.profile_id === me.id) return json({ error: "own_research" }, 400);
+  const note = typeof b.note === "string" ? b.note.trim().slice(0, 300) : "";
+  const prev = await env.DB.prepare("SELECT status, decided_at FROM access WHERE case_id = ? AND viewer_id = ?").bind(row.id, me.id).first<{ status: string; decided_at: string | null }>();
+  if (prev?.status === "approved" || prev?.status === "pending") return json({ status: prev.status });
+  if (prev && retryAt(prev.decided_at) > new Date().toISOString()) return json({ error: "cooldown", status: prev.status, retryAt: retryAt(prev.decided_at) }, 429);
+  const dayAgo = new Date(Date.now() - 86_400_000).toISOString();
+  const [today, pending] = await env.DB.batch([
+    env.DB.prepare("SELECT COUNT(*) AS n FROM access WHERE viewer_id = ? AND requested_at > ?").bind(me.id, dayAgo),
+    // Only requests still waiting on a live private page count against the cap.
+    env.DB.prepare("SELECT COUNT(*) AS n FROM access a JOIN cases c ON c.id = a.case_id WHERE a.viewer_id = ? AND a.status = 'pending' AND c.private = 1 AND c.status != 'draft'").bind(me.id),
+  ]);
+  if ((today.results[0] as any).n >= ACCESS_PER_DAY || (pending.results[0] as any).n >= ACCESS_PENDING_MAX) return json({ error: "rate_limited" }, 429);
+  const now = new Date().toISOString();
+  // Only a fresh request or one that was declined becomes pending, so an approval made a moment ago is never undone.
+  const w = await env.DB.prepare(`INSERT INTO access(case_id, viewer_id, status, note, requested_at) VALUES (?,?,'pending',?,?)
+      ON CONFLICT(case_id, viewer_id) DO UPDATE SET status = 'pending', note = excluded.note, requested_at = excluded.requested_at, decided_at = NULL, decided_by = NULL
+      WHERE access.status IN ('rejected','revoked')`).bind(row.id, me.id, note, now).run();
+  if (!w.meta.changes) { const cur = await env.DB.prepare("SELECT status FROM access WHERE case_id = ? AND viewer_id = ?").bind(row.id, me.id).first<{ status: string }>(); return json({ status: cur?.status ?? "pending" }); }
+  await audit(env, row.id, "editor", "access_requested", "viewer=" + me.id, ray).run();
+  return json({ status: "pending" }, 201);
+}
+// The owner's side: who asked, who can see, and what they asked for themselves.
+async function accountApi(request: Request, env: Env, sub: string, ray: string) {
+  const me = await signedIn(request, env);
+  if (!me) return json({ error: "sign_in_required" }, 401);
+  if (!sub && request.method === "GET") {
+    const [mine, incoming, outgoing] = await env.DB.batch([
+      env.DB.prepare("SELECT c.id, c.title, c.slug, c.status, c.private, c.teaser FROM cases c WHERE c.profile_id = ? AND c.status != 'draft' ORDER BY c.created_at").bind(me.id),
+      env.DB.prepare(`SELECT a.case_id, a.viewer_id, a.status, a.note, a.requested_at, a.decided_at, c.title, v.name AS viewer FROM access a
+        JOIN cases c ON c.id = a.case_id JOIN profiles v ON v.id = a.viewer_id WHERE c.profile_id = ? AND a.status IN ('pending','approved') ORDER BY a.requested_at DESC`).bind(me.id),
+      env.DB.prepare(`SELECT a.case_id, a.status, a.requested_at, a.decided_at, c.private, c.teaser, c.title, c.slug, c.status AS page_status, o.name AS owner, o.slug AS owner_slug FROM access a
+        JOIN cases c ON c.id = a.case_id JOIN profiles o ON o.id = c.profile_id WHERE a.viewer_id = ? ORDER BY a.requested_at DESC LIMIT 100`).bind(me.id),
+    ]);
+    return json({
+      name: me.name, slug: me.slug,
+      mine: (mine.results as any[]).map((c) => ({ caseId: c.id, title: c.title, path: `/probes/${me.slug}/${c.slug}`, status: c.status, private: !!c.private, teaser: c.teaser ?? "" })),
+      incoming: (incoming.results as any[]).map((a) => ({ caseId: a.case_id, viewerId: a.viewer_id, viewer: a.viewer, title: a.title, status: a.status, note: a.note ?? "", requestedAt: a.requested_at, decidedAt: a.decided_at })),
+      // Others' titles stay hidden until access is approved, or the research is public again.
+      outgoing: (outgoing.results as any[]).map((a) => { const open = (a.status === "approved" || !a.private) && a.page_status !== "draft"; return { caseId: a.case_id, owner: a.owner, teaser: a.teaser ?? "", title: open ? a.title : null, path: open ? `/probes/${a.owner_slug}/${a.slug}` : null, status: a.status, requestedAt: a.requested_at, decidedAt: a.decided_at, retryAt: a.status === "rejected" || a.status === "revoked" ? retryAt(a.decided_at) : null }; }),
+    });
+  }
+  if (request.method !== "POST") return notFound();
+  const b = await request.json().catch(() => null) as { caseId?: unknown; viewerId?: unknown; decision?: unknown; private?: unknown; teaser?: unknown } | null;
+  if (typeof b?.caseId !== "string") return json({ error: "bad_request" }, 400);
+  const own = await env.DB.prepare("SELECT id FROM cases WHERE id = ? AND profile_id = ?").bind(b.caseId, me.id).first();
+  if (!own) return json({ error: "not_yours" }, 403);
+  if (sub === "privacy") {
+    if (typeof b.private !== "boolean") return json({ error: "bad_request" }, 400);
+    await env.DB.batch([
+      env.DB.prepare("UPDATE cases SET private = ?, teaser = ?, updated_at = ? WHERE id = ?").bind(b.private ? 1 : 0, cleanTeaser(b.teaser) || null, new Date().toISOString(), b.caseId),
+      audit(env, b.caseId, "editor", b.private ? "made_private" : "made_public", null, ray),
+    ]);
+    await applyPrivateSlug(env, b.caseId);
+    return json({ ok: true });
+  }
+  if (sub === "access") {
+    const next = { approve: "approved", reject: "rejected", revoke: "revoked" }[String(b.decision)];
+    if (!next || typeof b.viewerId !== "string") return json({ error: "bad_request" }, 400);
+    // Approve and reject answer a request, and revoke ends an approval. The write only lands from that state, so a stale click changes nothing.
+    const from = next === "revoked" ? "approved" : "pending", now = new Date().toISOString();
+    const w = await env.DB.prepare("UPDATE access SET status = ?, decided_at = ?, decided_by = 'editor' WHERE case_id = ? AND viewer_id = ? AND status = ?").bind(next, now, b.caseId, b.viewerId, from).run();
+    if (!w.meta.changes) { const cur = await env.DB.prepare("SELECT status FROM access WHERE case_id = ? AND viewer_id = ?").bind(b.caseId, b.viewerId).first<{ status: string }>(); return json({ error: "stale", status: cur?.status ?? null }, 409); }
+    await audit(env, b.caseId, "editor", "access_" + next, "viewer=" + b.viewerId, ray).run();
+    return json({ ok: true, status: next });
+  }
+  return notFound();
+}
+async function setAccess(env: Env, caseId: string, viewerId: string, status: string, by: string, ray: string) {
+  const now = new Date().toISOString();
+  await env.DB.batch([
+    env.DB.prepare(`INSERT INTO access(case_id, viewer_id, status, requested_at, decided_at, decided_by) VALUES (?,?,?,?,?,?)
+      ON CONFLICT(case_id, viewer_id) DO UPDATE SET status = excluded.status, decided_at = excluded.decided_at, decided_by = excluded.decided_by`).bind(caseId, viewerId, status, now, status === "pending" ? null : now, status === "pending" ? null : by),
+    audit(env, caseId, by, "access_" + status, "viewer=" + viewerId, ray),
+  ]);
+}
+const pendingAccessFor = async (env: Env, id: string) => ((await env.DB.prepare("SELECT COUNT(*) AS n FROM access a JOIN cases c ON c.id = a.case_id JOIN profiles v ON v.id = a.viewer_id WHERE c.profile_id = ? AND a.status = 'pending' AND c.private = 1 AND c.status != 'draft' AND v.status = 'active'").bind(id).first<{ n: number }>())?.n ?? 0);
+
 async function pageApi(request: Request, env: Env, row: CaseRow, rest: string, ray: string) {
-  const editable = (await signedIn(request, env))?.id === row.profile_id;
+  const acc = await accessFor(request, env, row), editable = acc.owner;
   if (rest === "" && request.method === "GET") {
+    if (!acc.canSee) {
+      const mine = acc.me ? await env.DB.prepare("SELECT status, decided_at FROM access WHERE case_id = ? AND viewer_id = ?").bind(row.id, acc.me.id).first<{ status: string; decided_at: string | null }>() : null;
+      return json({ error: "private", caseId: row.id, name: row.p_name, teaser: row.teaser ?? "", signedIn: !!acc.me, request: mine ? { status: mine.status, retryAt: mine.status === "rejected" || mine.status === "revoked" ? retryAt(mine.decided_at) : null } : null }, 403);
+    }
     const [stepR, costR, rerouteR] = await env.DB.batch([
       env.DB.prepare("SELECT * FROM steps WHERE case_id = ? ORDER BY n").bind(row.id),
       env.DB.prepare("SELECT COALESCE(SUM(usd_micro), 0) AS micro FROM cost_entries WHERE case_id = ?").bind(row.id),
@@ -439,15 +577,16 @@ async function pageApi(request: Request, env: Env, row: CaseRow, rest: string, r
     const steps: Step[] = (stepR.results as any[]).map((x) => ({ n: x.n, title: x.title, intro: parse(x.intro_json, []), sections: parse<Section[]>(x.questions_json, []), plan: parse(x.plan_json, []), createdAt: x.created_at }));
     const open = answerStep(steps);
     // Answers and requested directions are private to the profile. Visitors get research, questions, status and cost.
-    const pub = { title: row.title, name: row.p_name, profileSlug: row.p_slug, status: row.status, costUsd: ((costR.results[0] as any)?.micro ?? 0) / 1_000_000, editable, steps, openStep: open?.n ?? null, rerouting: !!rerouteR.results[0] };
-    if (!editable) return json(pub);
+    const pub = { title: row.title, name: row.p_name, profileSlug: row.p_slug, status: row.status, costUsd: ((costR.results[0] as any)?.micro ?? 0) / 1_000_000, editable, seeAnswers: acc.seeAnswers, viewer: !editable && acc.seeAnswers, asAdmin: acc.admin && !editable && !acc.viewer, private: !!row.private, caseId: row.id, steps, openStep: open?.n ?? null, rerouting: !!rerouteR.results[0] };
+    if (!acc.seeAnswers) return json(pub);
     const subs = await env.DB.prepare("SELECT seq, step_n, submitted_at, payload FROM submissions WHERE case_id = ? ORDER BY seq").bind(row.id).all<any>();
     const logs: Record<string, unknown> = {};
     for (const x of subs.results) logs[x.step_n] = { seq: x.seq, submittedAt: x.submitted_at, items: parse(x.payload, []) };
     return json({ ...pub, reroute: rerouteR.results[0] ?? null, answers: await currentAnswers(env, row.id), submissions: await summaries(env, row.id), logs });
   }
   if (!(rest === "answers" && request.method === "PUT") && !((rest === "submit" || rest === "reroute") && request.method === "POST")) return notFound();
-  if (!editable) return json({ error: "sign_in_required" }, 401);
+  // Only the owner writes. Approved viewers and the site owner read.
+  if (!editable) return json({ error: acc.me ? "view_only" : "sign_in_required" }, acc.me ? 403 : 401);
   // A closed probe, or one whose final report is out, takes no more answers, decisions or new directions.
   if (row.status === "closed" || row.status === "plan_ready") return json({ error: "closed" }, 403);
 
@@ -578,13 +717,16 @@ async function adminSite(request: Request, env: Env, parts: string[], ray: strin
     const answered = await env.DB.prepare("SELECT case_id, question_id FROM answers WHERE trim(text) != ''").all<{ case_id: string; question_id: string }>();
     const savedNow = new Map<string, number>();
     for (const a of answered.results) if (openIds.get(a.case_id)?.has(a.question_id)) savedNow.set(a.case_id, (savedNow.get(a.case_id) ?? 0) + 1);
-    const r = await env.DB.prepare(`SELECT c.id, c.title, c.status, c.updated_at, p.name AS profile, p.slug AS profile_slug, c.slug,
+    const r = await env.DB.prepare(`SELECT c.id, c.title, c.status, c.updated_at, c.private, c.teaser, p.name AS profile, p.slug AS profile_slug, c.slug,
       (SELECT COUNT(*) FROM submissions s WHERE s.case_id = c.id) AS submissions,
       EXISTS (SELECT 1 FROM reroutes r WHERE r.case_id = c.id AND r.handled_at IS NULL) AS rerouting,
       (SELECT COALESCE(SUM(e.usd_micro), 0) / 1000000.0 FROM cost_entries e WHERE e.case_id = c.id) AS cost_usd
       FROM cases c JOIN profiles p ON p.id = c.profile_id ORDER BY c.created_at`).all<any>();
     const requests = await env.DB.prepare("SELECT r.id, r.name, r.title, r.status, r.created_at, (SELECT COUNT(*) FROM request_files f WHERE f.request_id = r.id) AS files FROM requests r ORDER BY CASE r.status WHEN 'new' THEN 0 WHEN 'approved' THEN 1 ELSE 2 END, r.created_at DESC LIMIT 100").all();
-    return json({ pending: await pendingWork(env), requests: requests.results, profiles: profiles.results, pages: r.results.map((x) => ({ ...x, saved: savedNow.get(x.id) ?? 0, total: totals.get(x.id) ?? 0, steps: stepCount.get(x.id) ?? 1, lastKind: lastKind.get(x.id) ?? "final" })) });
+    const accessR = await env.DB.prepare(`SELECT a.case_id, a.viewer_id, a.status, a.note, a.requested_at, a.decided_at, a.decided_by, c.title, o.name AS owner, v.name AS viewer
+      FROM access a JOIN cases c ON c.id = a.case_id JOIN profiles o ON o.id = c.profile_id JOIN profiles v ON v.id = a.viewer_id
+      ORDER BY CASE a.status WHEN 'pending' THEN 0 WHEN 'approved' THEN 1 ELSE 2 END, a.requested_at DESC LIMIT 300`).all();
+    return json({ pending: await pendingWork(env), requests: requests.results, profiles: profiles.results, access: accessR.results, pages: r.results.map((x) => ({ ...x, saved: savedNow.get(x.id) ?? 0, total: totals.get(x.id) ?? 0, steps: stepCount.get(x.id) ?? 1, lastKind: lastKind.get(x.id) ?? "final" })) });
   }
   if (what === "profiles" && !id && request.method === "POST") {
     const b = await request.json().catch(() => null) as { name?: unknown } | null;
@@ -631,6 +773,7 @@ async function adminSite(request: Request, env: Env, parts: string[], ray: strin
       if (used) return json({ error: "has_pages" }, 409);
       await env.DB.batch([
         env.DB.prepare("DELETE FROM sessions WHERE case_id = ?").bind(id),
+        env.DB.prepare("DELETE FROM access WHERE viewer_id = ?").bind(id),
         env.DB.prepare("DELETE FROM profiles WHERE id = ?").bind(id),
         audit(env, null, "admin", "profile_deleted", id, ray),
       ]);
@@ -638,11 +781,32 @@ async function adminSite(request: Request, env: Env, parts: string[], ray: strin
     }
     return notFound();
   }
+  // The site owner can set any grant to any state, at any time, with no cooldown.
+  if (what === "access" && !id && request.method === "POST") {
+    const b = await request.json().catch(() => null) as { caseId?: unknown; viewerId?: unknown; status?: unknown } | null;
+    if (typeof b?.caseId !== "string" || typeof b.viewerId !== "string" || !["approved", "rejected", "revoked", "pending"].includes(String(b.status))) return json({ error: "bad_request" }, 400);
+    const ok = await env.DB.batch([env.DB.prepare("SELECT profile_id FROM cases WHERE id = ?").bind(b.caseId), env.DB.prepare("SELECT 1 FROM profiles WHERE id = ?").bind(b.viewerId)]);
+    const owner = (ok[0].results[0] as any)?.profile_id;
+    if (!owner || !ok[1].results.length) return json({ error: "not_found" }, 404);
+    if (owner === b.viewerId) return json({ error: "own_research" }, 400);
+    await setAccess(env, b.caseId, b.viewerId, String(b.status), "admin", ray);
+    return json({ ok: true });
+  }
   if (what !== "pages" || !id) return notFound();
   const row = await env.DB.prepare("SELECT * FROM cases WHERE id = ?").bind(id).first<CaseRow>();
   if (!row) return json({ error: "not_found" }, 404);
 
   if (!sub && request.method === "DELETE") { await deleteCase(env, id, ray); return json({ ok: true }); }
+  if (sub === "privacy" && request.method === "POST") {
+    const b = await request.json().catch(() => null) as { private?: unknown; teaser?: unknown } | null;
+    if (typeof b?.private !== "boolean") return json({ error: "bad_request" }, 400);
+    await env.DB.batch([
+      env.DB.prepare("UPDATE cases SET private = ?, teaser = ?, updated_at = ? WHERE id = ?").bind(b.private ? 1 : 0, cleanTeaser(b.teaser) || null, new Date().toISOString(), id),
+      audit(env, id, "admin", b.private ? "made_private" : "made_public", null, ray),
+    ]);
+    await applyPrivateSlug(env, id);
+    return json({ ok: true });
+  }
   if (sub === "answers" && request.method === "PUT") {
     const b = await request.json().catch(() => null) as { answers?: Record<string, unknown> } | null;
     const known = new Set((await loadSteps(env, id)).flatMap((x) => flatten(x.sections).map((q) => q.id)));
@@ -662,7 +826,8 @@ async function adminSite(request: Request, env: Env, parts: string[], ray: strin
     const auditRows = await env.DB.prepare("SELECT actor, action, detail, at FROM audit_log WHERE case_id = ? OR detail = ? ORDER BY id DESC LIMIT 50").bind(id, "profile=" + row.profile_id).all();
     const costs = await env.DB.prepare("SELECT usd_micro, label, at FROM cost_entries WHERE case_id = ? ORDER BY id").bind(id).all<any>();
     return json({
-      title: row.title, profile: p?.name, status: row.status, steps: await loadSteps(env, id), answers: await currentAnswers(env, id),
+      title: row.title, profile: p?.name, status: row.status, private: !!(row as any).private, teaser: (row as any).teaser ?? "", steps: await loadSteps(env, id), answers: await currentAnswers(env, id),
+      access: (await env.DB.prepare("SELECT a.viewer_id, a.status, a.note, a.requested_at, a.decided_at, a.decided_by, v.name AS viewer FROM access a JOIN profiles v ON v.id = a.viewer_id WHERE a.case_id = ? ORDER BY a.requested_at DESC").bind(id).all()).results,
       reroute: await openReroute(env, id), costUsd: await costUsd(env, id), audit: auditRows.results,
       costs: costs.results.map((c) => ({ usd: c.usd_micro / 1_000_000, label: c.label, at: c.at })),
       submissions: await Promise.all(subs.results.map(async (s) => ({ seq: s.seq, stepN: s.step_n, submittedAt: s.submitted_at, answered: s.answered, total: s.total, intact: (await sha256(s.payload)) === s.sha256, items: parse(s.payload, null) }))),
@@ -688,7 +853,14 @@ async function admin(request: Request, env: Env, parts: string[], ray: string) {
     if (id && !sub && request.method === "POST") {
       const b = await request.json().catch(() => null) as { status?: string; caseId?: string } | null;
       if (!["approved", "rejected", "started"].includes(b?.status ?? "")) return json({ error: "bad_status" }, 400);
+      if (b!.caseId) {
+        // The page must exist and belong to the person who asked, or the request's privacy would land in the wrong place.
+        const pair = await env.DB.batch([env.DB.prepare("SELECT profile_id FROM cases WHERE id = ?").bind(b!.caseId), env.DB.prepare("SELECT profile_id FROM requests WHERE id = ?").bind(id)]);
+        const pageOwner = (pair[0].results[0] as any)?.profile_id, asker = (pair[1].results[0] as any)?.profile_id;
+        if (!pageOwner || !pair[1].results.length || (asker && asker !== pageOwner)) return json({ error: "request_mismatch" }, 400);
+      }
       await setRequestStatus(env, id, b!.status!, b!.caseId ?? null, ray);
+      if (b!.caseId) await applyPrivateSlug(env, b!.caseId);
       return json({ ok: true });
     }
     return notFound();
@@ -716,15 +888,19 @@ async function admin(request: Request, env: Env, parts: string[], ray: string) {
     return json({ cases: r.results });
   }
   if (!id && request.method === "POST") {
-    const b = await request.json().catch(() => null) as { title?: string; profile?: string; create?: boolean } | null;
+    const b = await request.json().catch(() => null) as { title?: string; profile?: string; create?: boolean; private?: boolean; teaser?: string; requestId?: string } | null;
     if (!b?.title || !b.profile) return json({ error: "title and profile required" }, 400);
     const caseId = crypto.randomUUID().slice(0, 8);
     const { match, names } = await findProfile(env, b.profile);
     if (!match && !b.create) return json({ error: "unknown_profile", profiles: names }, 404);
     const p = match ?? await createProfile(env, b.profile, now);
-    const slug = await freeSlug(env, "cases", slugify(b.title), p.id);
+    // A page for a goal request takes that request's privacy from the start, so it is never public by accident.
+    const req = b.requestId ? await env.DB.prepare("SELECT profile_id, private, teaser FROM requests WHERE id = ?").bind(b.requestId).first<{ profile_id: string | null; private: number; teaser: string | null }>() : null;
+    if (b.requestId && (!req || (req.profile_id && req.profile_id !== p.id))) return json({ error: "request_mismatch" }, 400);
+    const isPrivate = !!b.private || !!req?.private, teaser = cleanTeaser(b.teaser) || req?.teaser || null;
+    const slug = (await freeSlug(env, "cases", slugify(b.title), p.id)) + (isPrivate ? "-p" + suffixToken() : "");
     await env.DB.batch([
-      env.DB.prepare("INSERT INTO cases(id, token_hash, title, first_name, profile_id, slug, created_at, updated_at) VALUES (?,?,?,?,?,?,?,?)").bind(caseId, await sha256(randomToken()), b.title, p.name, p.id, slug, now, now),
+      env.DB.prepare("INSERT INTO cases(id, token_hash, title, first_name, profile_id, slug, created_at, updated_at, private, teaser) VALUES (?,?,?,?,?,?,?,?,?,?)").bind(caseId, await sha256(randomToken()), b.title, p.name, p.id, slug, now, now, isPrivate ? 1 : 0, teaser),
       env.DB.prepare("INSERT INTO steps(case_id, n, title, created_at) VALUES (?,1,?,?)").bind(caseId, FIRST_STEP, now),
       audit(env, caseId, "admin", "create", null, ray),
     ]);
@@ -740,7 +916,7 @@ async function admin(request: Request, env: Env, parts: string[], ray: string) {
     return json({ id: row.id, title: row.title, profile: p?.name, path: `/probes/${p?.slug}/${row.slug}`, status: row.status, hasPassword: !!(await profileOf(env, row.profile_id))?.password_hash, costUsd: await costUsd(env, id), reroute: await openReroute(env, id), steps, openStep: open?.n ?? null, sections: open?.sections ?? [], submissionCurrent: !!last && !!open && last.stepN === open.n, answers: await currentAnswers(env, id), submissions });
   }
   if (!sub && request.method === "PATCH") {
-    const b = await request.json().catch(() => null) as { intro?: unknown; questions?: unknown; plan?: unknown; status?: string; newStep?: unknown; step?: unknown; stepTitle?: unknown } | null;
+    const b = await request.json().catch(() => null) as { intro?: unknown; questions?: unknown; plan?: unknown; status?: string; newStep?: unknown; step?: unknown; stepTitle?: unknown; private?: unknown; teaser?: unknown } | null;
     if (!b) return json({ error: "bad_request" }, 400);
     if (b.questions !== undefined && !validSections(b.questions)) return json({ error: "invalid_questions" }, 400);
     if (b.intro !== undefined && !validBlocks(b.intro)) return json({ error: "invalid_intro" }, 400);
@@ -753,6 +929,8 @@ async function admin(request: Request, env: Env, parts: string[], ray: string) {
     const size = (x: unknown) => JSON.stringify(x ?? []).length;
     if (size(b.intro) + size(b.questions) + size(b.plan) > MAX_DOC) return json({ error: "too_large" }, 413);
     const writes: D1PreparedStatement[] = [];
+    if (typeof b.private === "boolean") writes.push(env.DB.prepare("UPDATE cases SET private = ? WHERE id = ?").bind(b.private ? 1 : 0, id));
+    if (typeof b.teaser === "string") writes.push(env.DB.prepare("UPDATE cases SET teaser = ? WHERE id = ?").bind(cleanTeaser(b.teaser) || null, id));
     if (typeof b.stepTitle === "string") {
       const target = b.step === undefined ? latest : steps.find((x) => x.n === b.step);
       if (!target) return json({ error: "unknown_step" }, 404);
@@ -777,7 +955,9 @@ async function admin(request: Request, env: Env, parts: string[], ray: string) {
       env.DB.prepare("UPDATE cases SET status = ?, updated_at = ? WHERE id = ?").bind(b.status ?? (closesReroute || (typeof b.newStep === "string" && validSections(b.questions) && b.questions.length) ? "open" : row.status), now, id),
       audit(env, id, "admin", "update", Object.keys(b).join(","), ray),
     ]);
-    return json({ ok: true });
+    if (b.private === true) await applyPrivateSlug(env, id);
+    const moved = await env.DB.prepare("SELECT c.slug, p.slug AS p_slug FROM cases c JOIN profiles p ON p.id = c.profile_id WHERE c.id = ?").bind(id).first<{ slug: string; p_slug: string }>();
+    return json({ ok: true, path: moved ? `/probes/${moved.p_slug}/${moved.slug}` : null });
   }
   if (sub === "import" && request.method === "POST") {
     // Answers collected somewhere else become a normal submission.
@@ -827,6 +1007,7 @@ export default {
       if (parts[0] === "probes" && (parts.length === 1 || parts.length === 3) && page) return html(APP, request);
       if (parts[0] === "admin" && parts.length === 1 && page) return html(ADMIN, request);
       if (parts[0] === "request" && parts.length === 1 && page) return html(REQUEST, request);
+      if (parts[0] === "account" && parts.length === 1 && page) return html(ACCOUNT_PAGE, request);
       if (!schemaReady) { if (!(await schemaCurrent(env))) await migrate(env); schemaReady = true; }
       if (parts[0] === "api" && parts[1] === "admin") return await adminSite(request, env, parts.slice(2), ray);
       if (parts[0] === "admin") return await admin(request, env, parts.slice(1), ray);
@@ -834,15 +1015,21 @@ export default {
       // Browsers send Origin on cross-site writes. Refusing a foreign one blocks forged forms, including sign-in.
       const origin = request.headers.get("Origin");
       if (request.method !== "GET" && origin && origin !== url.origin) return json({ error: "bad_origin" }, 403);
+      const size = Number(request.headers.get("Content-Length") ?? NaN), hasBody = request.method === "POST" || request.method === "PUT";
+      // Browsers always send a length with a body. Refusing writes without one stops a chunked upload from skipping the cap.
+      if (hasBody && !(parts[1] === "requests" && parts.length === 2) && !(size >= 0)) return json({ error: "length_required" }, 411);
+      if (request.method !== "GET" && !(parts[1] === "requests" && parts.length === 2) && size > MAX_JSON_BYTES) return json({ error: "too_large" }, 413);
+      if (parts[1] === "access" && parts.length === 2 && request.method === "POST") return await requestAccess(request, env, ray);
+      if (parts[1] === "account" && parts.length <= 3) return await accountApi(request, env, parts[2] ?? "", ray);
       if (parts[1] === "requests" && parts.length === 2 && request.method === "POST") return await createRequest(request, env, ray);
       if (parts[1] === "profiles" && parts.length === 2 && request.method === "POST") return await applyForProfile(request, env, ray);
       if (parts[1] === "session" && parts[2] === "password" && parts.length === 3 && request.method === "POST") return await changePassword(request, env, ray);
       if (parts[1] === "session" && parts.length === 2) {
-        if (request.method === "GET") { const me = await signedIn(request, env); return json(me ? { signedIn: true, name: me.name, slug: me.slug } : { signedIn: false }); }
+        if (request.method === "GET") { const me = await signedIn(request, env); return json(me ? { signedIn: true, name: me.name, slug: me.slug, pendingAccess: await pendingAccessFor(env, me.id) } : { signedIn: false }); }
         if (request.method === "POST") return await signIn(request, env, ray);
         if (request.method === "DELETE") return await signOut(request, env);
       }
-      if (parts[1] === "probes" && parts.length === 2 && page) return json({ profiles: await directory(env) });
+      if (parts[1] === "probes" && parts.length === 2 && page) return json({ profiles: await directory(env, request) });
       if (parts[1] === "pages" && parts[2] && parts[3]) {
         const row = await env.DB.prepare("SELECT c.*, p.name AS p_name, p.slug AS p_slug FROM cases c JOIN profiles p ON p.id = c.profile_id WHERE p.slug = ? AND c.slug = ? AND c.status != 'draft' AND p.status = 'active'").bind(parts[2], parts[3]).first<CaseRow>();
         if (!row) return json({ error: "not_found" }, 404);

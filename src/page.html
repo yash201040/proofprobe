@@ -184,9 +184,17 @@ body{background:#fff}#acct,.topbar,.tracker,#stepTabs,#reportBar,#notice,#loadba
 *{-webkit-print-color-adjust:exact;print-color-adjust:exact}details>summary::before{display:none}.fold{break-inside:avoid-page}
 }
 .chip{white-space:nowrap}
+.lockico{display:inline-grid;place-items:center;color:var(--stop);vertical-align:-3px;margin-right:6px}.lockico svg{width:17px;height:17px}.lockico.big svg{width:24px;height:24px}
+.pagelink.locked{cursor:pointer}.pagelink.locked b{color:var(--muted)}.pagelink.locked:focus-visible{outline:2px solid var(--stop);outline-offset:3px}
+.chip.privtag{font-size:12.5px;padding:1px 8px;color:var(--accent);background:var(--accent-soft);vertical-align:2px}
+.lockhead{display:flex;align-items:center;gap:8px;margin-bottom:8px}.lockhead h3{margin:0;color:var(--stop)}#lockBox{border-color:var(--stop)}
+.lockteaser{color:var(--muted);margin-top:6px}#lockAsk{margin-top:12px}#lockAsk textarea{min-height:64px;margin-top:4px}
+.lockstate{min-height:22px;margin-top:10px;color:var(--muted);font-size:15.5px}.lockrow{display:flex;justify-content:flex-end;gap:8px;margin-top:10px}
+.lockedbox{display:grid;gap:10px;justify-items:start;padding:20px;margin-block:18px;border:1px solid var(--stop);background:color-mix(in srgb,var(--stop) 8%,var(--surface))}
+.viewerbar{margin-top:10px;padding:8px 12px;border-left:3px solid var(--accent);background:var(--accent-soft);font-size:15.5px}
 </style></head><body><div id="loadbar" role="progressbar" aria-label="Loading"></div><div class="wrap">
 <div class="topbar"><a class="brandlink" href="/">ProofProbe</a></div>
-<header><div class="eyebrow" id="eyebrow"></div><h1 id="title"></h1>
+<header><div class="eyebrow" id="eyebrow"></div><h1 id="title"></h1><p class="viewerbar" id="viewerBar" hidden></p>
   <p class="cost" id="cost" hidden></p>
   <p class="callout" id="rerouteInfo" hidden></p>
 </header>
@@ -195,6 +203,10 @@ body{background:#fff}#acct,.topbar,.tracker,#stepTabs,#reportBar,#notice,#loadba
 <div id="unlockfx" hidden aria-hidden="true"><div class="fxring"></div><svg viewBox="0 0 120 120" fill="none" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"><path class="fxsh" d="M38 56V38a22 22 0 0 1 44 0v18"/><rect class="fxbody" x="24" y="56" width="72" height="52" rx="12"/><path class="fxtick" d="M46 82l10 10 19-20"/></svg></div>
 <div class="skel" id="skel" aria-hidden="true"><i></i><i></i><i></i></div>
 <div id="tip" role="tooltip" hidden></div>
+<dialog id="lockBox" aria-labelledby="lockTitle"><div class="lockhead"><span class="lockico big" id="lockIco"></span><h3 id="lockTitle">Private research</h3></div><p id="lockText"></p><p class="lockteaser" id="lockTeaser"></p>
+<div id="lockAsk"><label for="lockNote">Why you'd like access (optional)</label><textarea id="lockNote" maxlength="300" placeholder="A line for the owner"></textarea></div>
+<p class="lockstate" id="lockState" role="status"></p><div class="lockrow"><button type="button" class="ghost" id="lockClose">Close</button><button type="button" id="lockGo">Request access</button></div></dialog>
+<section class="lockedbox" id="lockedBox" hidden><span class="lockico big" aria-hidden="true" id="lockedIco"></span><p id="lockedText"></p><p><button type="button" id="lockedBtn">Request access</button></p></section>
 <div id="fatal" class="alert" hidden><p id="fatalText"></p><p style="margin-top:9px"><button type="button" id="retry">Try again</button></p></div>
 <section id="dirBox" hidden><div class="dirtools"><div class="filterwrap"><button type="button" id="sortBtn" class="ghost" aria-expanded="false" aria-controls="sortPanel"></button><div class="filterpanel sortpanel" id="sortPanel" hidden><fieldset><legend>Sort by</legend><label><input type="radio" name="sortField" value="created">Date created</label><label><input type="radio" name="sortField" value="updated">Last updated</label><label><input type="radio" name="sortField" value="profile">Profile</label><label><input type="radio" name="sortField" value="cost">Cost</label></fieldset></div></div><button type="button" id="sortDir" class="ghost" aria-label="Change sort direction"></button><div class="filterwrap"><button type="button" id="filterBtn" class="ghost" aria-expanded="false" aria-controls="filterPanel">Filter</button><div class="filterpanel" id="filterPanel" hidden><fieldset id="filterStatus"><legend>Status</legend></fieldset><fieldset id="filterProfile"><legend>Profile</legend></fieldset><button type="button" class="ghost" id="filterClear">Clear filters</button></div></div><span class="dircount" id="dirCount" role="status"></span><a class="reqlink" href="/request">Request a probe</a></div><div id="profiles" class="profiles"></div><p id="dirEmpty" hidden></p></section>
 <section id="planBox" hidden><div class="stack"><h2 id="planTitle">Recommended path</h2><div class="reportbar" id="reportBar" hidden><span>Nothing left to do here. Take the report with you:</span><div class="row"><button type="button" id="dlHtml">Download report (HTML)</button><button type="button" class="ghost" id="dlPdf">Save as PDF</button></div></div><div id="plan" class="blocks"></div></div></section>
@@ -392,11 +404,11 @@ function fail(m){$("fatalText").textContent=m;$("fatal").hidden=false}
 function notFound(){document.title="Page not found";$("title").textContent="Page not found";const e=$("eyebrow");e.textContent="";const a=el("a","Back to Probes");a.href="/probes";e.appendChild(a);const n=$("notice");if(n)n.hidden=true}
 function showRead(d,s){
   const qs=s.sections.flatMap(x=>x.questions),log=d.logs&&d.logs[s.n];
-  $("viewNote").textContent=!d.editable?"Answers are private to this profile.":!log&&isLocked()&&s.n===d.openStep?"Locked. Press Unlock to answer.":log?"Submission "+log.seq+", "+fmt(log.submittedAt)+". Read only.":"No answers were submitted for this step.";
+  $("viewNote").textContent=!d.seeAnswers?"Answers are private to this profile.":!d.editable?(log?"Submission "+log.seq+", "+fmt(log.submittedAt)+". Read only.":"No answers were submitted for this step."):!log&&isLocked()&&s.n===d.openStep?"Locked. Press Unlock to answer.":log?"Submission "+log.seq+", "+fmt(log.submittedAt)+". Read only.":"No answers were submitted for this step.";
   const l=$("viewList");l.textContent="";
   qs.forEach((q,i)=>{const w=el("div",null,"qa");w.appendChild(el("b",(i+1)+". "+q.text));
     if(q.kind==="decision"&&q.lean)w.appendChild(el("p","If left on Auto: "+q.lean,"lean"));
-    if(d.editable&&log){const it=log.items.find(x=>x.id===q.id),t=it?it.answer.trim():"";
+    if(d.seeAnswers&&log){const it=log.items.find(x=>x.id===q.id),t=it?it.answer.trim():"";
       if(q.kind==="decision"){const p=readChoice(t),c=CHOICES.find(x=>x[0]===p.choice),r=el("p",null,"has decided");r.appendChild(el("span",c[2],"chip "+c[1]));if(p.note.trim())r.append(" "+p.note.trim());w.appendChild(r)}
       else w.appendChild(el("p",t?it.answer:"Not answered",t?"has":""))}
     l.appendChild(w)});
@@ -470,8 +482,11 @@ $("dlPdf").addEventListener("click",()=>print());
 const hashStep=()=>{const m=location.hash.match(/^#step-(\d+)$/);return m?Number(m[1]):null};
 async function showPage(){
   $("fatal").hidden=true;
-  const r=await fetch(API);if(!r.ok)throw r;
+  const r=await fetch(API);
+  if(r.status===403){const info=await r.json().catch(()=>null);if(info&&info.error==="private")return showLockedPage(info)}
+  if(!r.ok)throw r;
   const d=pageData=await r.json();
+  const vb=$("viewerBar");vb.hidden=!d.viewer;if(d.viewer)vb.textContent=d.asAdmin?"You're signed in to Admin, so everything is shown. Only "+d.name+" can change it.":"You can read this private research, including its answers. Only "+d.name+" can change it.";
   document.title=d.title;$("title").textContent=d.title;
   const eb=$("eyebrow");eb.textContent="";const a=el("a","Probes");a.href="/probes";eb.append(a," / "+d.name);
   $("cost").textContent="Research cost so far: "+money(d.costUsd);$("cost").hidden=false;
@@ -499,9 +514,47 @@ function playUnlock(){const f=$("unlockfx");f.hidden=false;f.style.animation="no
 const day=iso=>new Date(iso).toLocaleDateString([],{dateStyle:"medium"});
 const stageOf=g=>stageNow(g.status,g.rerouting,g.lastKind);
 let directory=[];
+const LOCK_SVG='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>';
+// One notice for private research, from a card on Probes or from a direct link.
+let lockInfo=null;
+const LOCK_STATES={pending:"Your request is waiting for the owner's decision.",approved:"You have access.",rejected:"The owner declined your request.",revoked:"The owner removed your access."};
+async function showLockBox(info){
+  await PP.ready;lockInfo=info;const b=$("lockBox");$("lockIco").innerHTML=LOCK_SVG;
+  $("lockText").textContent=info.name+" made this research private. Only people they approve can open it.";
+  $("lockTeaser").textContent=info.teaser||"";$("lockTeaser").hidden=!info.teaser;$("lockNote").value="";
+  const req=info.request,me=PP.me,go=$("lockGo"),st=$("lockState");let wait=req&&req.retryAt&&new Date(req.retryAt)>new Date();
+  st.textContent=req?(LOCK_STATES[req.status]||"")+(wait?" You can ask again from "+day(req.retryAt)+".":""):"";
+  const own=me&&me.slug===info.profileSlug;
+  $("lockAsk").hidden=!me||own||(req&&(req.status==="pending"||req.status==="approved"))||!!wait;
+  go.hidden=own||(req&&(req.status==="pending"||req.status==="approved"))||!!wait;go.disabled=false;go.textContent=me?"Request access":"Sign in to request access";
+  if(!b.open)b.showModal();
+}
+$("lockClose").addEventListener("click",()=>$("lockBox").close());
+$("lockGo").addEventListener("click",async()=>{
+  if(!PP.me){$("lockBox").close();PP.open("");return}
+  const go=$("lockGo"),st=$("lockState");go.disabled=true;st.textContent="Sending...";
+  try{const r=await fetch("/api/access",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({caseId:lockInfo.caseId,note:$("lockNote").value})});const d=await r.json().catch(()=>({}));
+    if(r.ok){lockInfo.request={status:d.status};st.textContent=d.status==="approved"?"You already have access. Reload to open it.":"Request sent. You'll see the owner's decision on your account page.";go.hidden=true;$("lockAsk").hidden=true;directory.forEach(p=>p.pages.forEach(g=>{if(g.caseId===lockInfo.caseId)g.request={status:d.status}}));return}
+    st.textContent=r.status===429&&d.retryAt?"You can ask again from "+day(d.retryAt)+".":r.status===429?"You've sent a lot of requests today. Please try again tomorrow.":"That wasn't sent. Please try again.";
+  }catch(e){st.textContent="That wasn't sent. Check your connection and try again."}
+  go.disabled=false;
+});
+function showLockedPage(info){
+  document.title="Private research";$("title").textContent="Private research";const eb=$("eyebrow");eb.textContent="";const a=el("a","Probes");a.href="/probes";eb.append(a," / "+info.name);
+  const box=$("lockedBox");box.hidden=false;$("lockedIco").innerHTML=LOCK_SVG;$("lockedText").textContent=info.name+" made this research private."+(info.teaser?" "+info.teaser:"");
+  $("lockedBtn").onclick=()=>showLockBox({...info,profileSlug:seg[1]});$("notice").hidden=true;
+}
 function pageLink(p,g){
-  const a=el("a",null,"pagelink"),k=stageOf(g);a.href="/probes/"+encodeURIComponent(p.slug)+"/"+encodeURIComponent(g.slug);
-  a.appendChild(el("b",g.title));a.appendChild(el("span",stageName(k),"chip "+(STAGE_TONE[k]||"info")));
+  const k=stageOf(g);
+  if(g.private&&!g.access){
+    // A private card shows the teaser and stage only, and opens a small notice instead of the page.
+    const a=el("div",null,"pagelink locked");a.tabIndex=0;a.setAttribute("role","button");a.setAttribute("aria-label","Private research by "+p.name+". Opens access options.");
+    const t=el("b");const lk=el("span",null,"lockico");lk.innerHTML=LOCK_SVG;t.append(lk,g.teaser||"Private research");a.appendChild(t);a.appendChild(el("span",stageName(k),"chip "+(STAGE_TONE[k]||"info")));
+    a.appendChild(el("small","Private · Created "+day(g.createdAt)+" · Updated "+day(g.updatedAt)));
+    const open=()=>showLockBox({caseId:g.caseId,name:p.name,teaser:g.teaser,request:g.request});a.addEventListener("click",open);a.addEventListener("keydown",e=>{if(e.key==="Enter"||e.key===" "){e.preventDefault();open()}});return a;
+  }
+  const a=el("a",null,"pagelink");a.href="/probes/"+encodeURIComponent(p.slug)+"/"+encodeURIComponent(g.slug);
+  const tb=el("b",g.title);if(g.private)tb.append(" ",el("span","Private","chip privtag"));a.appendChild(tb);a.appendChild(el("span",stageName(k),"chip "+(STAGE_TONE[k]||"info")));
   a.appendChild(el("small","Created "+day(g.createdAt)+" · Updated "+day(g.updatedAt)+" · Research cost "+money(g.costUsd)));return a;
 }
 const SORTS={created:["Newest first","Oldest first","desc"],updated:["Latest first","Earliest first","desc"],profile:["A to Z","Z to A","asc"],cost:["Highest first","Lowest first","desc"]};

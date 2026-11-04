@@ -25,6 +25,8 @@
 .acctrow{display:flex;justify-content:flex-end;gap:8px;margin-top:4px}.acctrow button{min-height:44px;padding:9px 18px;border-radius:8px;border:1px solid var(--accent,#5FC6C9);font:600 16px sans-serif;font-family:inherit;cursor:pointer;background:var(--accent,#5FC6C9);color:var(--surface,#071019)}.acctrow button.gh{background:transparent;color:var(--accent,#5FC6C9)}
 .accterr{min-height:22px;color:var(--stop,#F0978C);font-size:15.5px}.acctok{color:var(--go,#6FD09D)}
 .acctswitch{margin-top:12px;font-size:15.5px;color:var(--muted,#9FB6BC)}.acctswitch button{background:none;border:0;padding:6px 2px;color:var(--accent,#5FC6C9);font:600 15.5px sans-serif;font-family:inherit;text-decoration:underline;cursor:pointer}
+.acctbadge{display:inline-grid;place-items:center;min-width:22px;height:22px;padding:0 6px;border-radius:999px;background:var(--stop,#F0978C);color:#fff;font:700 12.5px/1 system-ui,sans-serif;flex:none}
+.accttrap{position:absolute;left:-9999px;width:1px;height:1px;overflow:hidden}
 @media (max-width:640px){.acctpill .pre{display:none}.acctpill{padding:10px 16px}}
 @media (prefers-reduced-motion:reduce){.acctpill{transition:none}}
 `;
@@ -67,7 +69,10 @@
   function apply(name) {
     shell("Request a profile", "You can sign in once it's approved.");
     const form = el("form"), n = field("Profile name", "applyName", "text", { autocomplete: "username", maxlength: "60" }), p = field("Password", "applyPass", "password", { autocomplete: "new-password" }), r = field("Why do you want a profile?", "applyReason", "area", { maxlength: "500" });
-    n.i.value = name || ""; form.append(n.l, p.l, el("p", "Use 8 or more characters, and choose a new password. The site owner can see it, so don't reuse one from anywhere else.", "acctnote"), r.l);
+    // A hidden field people never see. Bots that fill every box give themselves away.
+    const trap = field("Website", "applySite", "text", { tabindex: "-1", autocomplete: "off" }); trap.l.className = "accttrap"; trap.l.setAttribute("aria-hidden", "true");
+    const opened = Date.now();
+    n.i.value = name || ""; form.append(n.l, p.l, el("p", "Use 8 or more characters, and choose a new password. The site owner can see it, so don't reuse one from anywhere else.", "acctnote"), r.l, trap.l);
     const { err, go } = actions(form, "Send request"); dlg.appendChild(form);
     const sw = el("p", "Already approved? ", "acctswitch"), b = el("button", "Sign in"); b.type = "button"; b.addEventListener("click", () => signIn(n.i.value)); sw.appendChild(b); dlg.appendChild(sw);
     form.addEventListener("submit", async (e) => {
@@ -77,7 +82,7 @@
       if (r.i.value.trim().length < 10) return void (err.textContent = "Please add a short reason.");
       go.disabled = true;
       try {
-        const res = await fetch("/api/profiles", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: n.i.value, password: p.i.value, reason: r.i.value }) });
+        const res = await fetch("/api/profiles", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: n.i.value, password: p.i.value, reason: r.i.value, website: trap.i.value, t: Date.now() - opened }) });
         if (res.ok) { shell("Request sent", "We'll review it. You can sign in once it's approved."); const row = el("div", null, "acctrow"), ok = el("button", "Done"); ok.addEventListener("click", () => dlg.close()); row.appendChild(ok); dlg.appendChild(row); return; }
         err.textContent = res.status === 409 ? "That name is taken. Please choose another." : res.status === 429 ? "Too many requests right now. Please try again later." : "Please check the form and try again.";
       } catch (x) { err.textContent = "That wasn't sent. Check your connection and try again."; }
@@ -115,17 +120,19 @@
       const b = el("button", null, "acctpill"); b.type = "button"; b.id = "acctBtn"; b.innerHTML = LOCK; b.appendChild(el("span", "Sign in")); b.addEventListener("click", () => PP.open()); root.appendChild(b);
     } else {
       const b = el("button", null, "acctpill me"); b.type = "button"; b.id = "acctMe"; b.setAttribute("aria-expanded", "false"); b.setAttribute("aria-haspopup", "true"); b.innerHTML = PERSON; b.append(el("span", "Signed in as", "pre"), el("span", PP.me.name, "nm"));
+      if (PP.me.pending) { const n = el("span", String(PP.me.pending), "acctbadge"); n.id = "acctBadge"; n.setAttribute("aria-label", PP.me.pending + " access requests waiting"); b.appendChild(n); }
       const menu = el("div"); menu.id = "acctMenu"; menu.hidden = true;
-      const mine = el("a", "My probes"); mine.href = "/probes#mine"; const req = el("a", "Request a probe"); req.href = "/request";
+      const mine = el("a", "My probes"); mine.href = "/probes#mine";
+      const acct = el("a", PP.me.pending ? "Your account (" + PP.me.pending + " waiting)" : "Your account"); acct.href = "/account"; acct.id = "acctPage"; const req = el("a", "Request a probe"); req.href = "/request";
       const pw = el("button", "Change password"); pw.type = "button"; pw.id = "acctPw"; pw.addEventListener("click", changePassword);
       const out = el("button", "Sign out"); out.type = "button"; out.id = "acctOut";
       out.addEventListener("click", async () => { await fetch("/api/session", { method: "DELETE" }).catch(() => {}); location.reload(); });
-      menu.append(mine, req, pw, out); root.append(b, menu);
+      menu.append(acct, mine, req, pw, out); root.append(b, menu);
       b.addEventListener("click", (e) => { e.stopPropagation(); menu.hidden = !menu.hidden; b.setAttribute("aria-expanded", String(!menu.hidden)); });
       document.addEventListener("click", () => { menu.hidden = true; b.setAttribute("aria-expanded", "false"); });
       document.addEventListener("keydown", (e) => { if (e.key === "Escape") { menu.hidden = true; b.setAttribute("aria-expanded", "false"); } });
     }
     root.hidden = false;
   }
-  PP.ready = fetch("/api/session").then((r) => r.json()).then((d) => { PP.me = d.signedIn ? { name: d.name, slug: d.slug } : null; }).catch(() => {}).then(() => { render(); return PP.me; });
+  PP.ready = fetch("/api/session").then((r) => r.json()).then((d) => { PP.me = d.signedIn ? { name: d.name, slug: d.slug, pending: d.pendingAccess || 0 } : null; }).catch(() => {}).then(() => { render(); return PP.me; });
 })();
