@@ -163,6 +163,8 @@ h2{font:800 clamp(32px,4vw,52px)/1.02 var(--display);letter-spacing:-.025em;marg
 <script src="/assets/account.js"></script>
 <script>
 const still=matchMedia("(prefers-reduced-motion:reduce)").matches;
+// The README recorder adds ?record to hold the board steady, so frames compress cleanly.
+const RECORDING=/[?&]record\b/.test(location.search);
 const $=id=>document.getElementById(id);
 // The seven moves over four turns: "a" is your move, "b" is the probe's.
 const MOVES=[
@@ -261,7 +263,7 @@ function routeLine(route,col,a,width,dash,t=1){if(a<=0)return;ctx.save();ctx.glo
   const n=60;for(let s=0;s<=n*t;s++){const p=along(route,s/n),q=proj(p[0],p[1],.02);s?ctx.lineTo(q[0],q[1]):ctx.moveTo(q[0],q[1])}ctx.stroke();ctx.restore()}
 function draw(i,p,now){
   const S=state(i,p);ctx.clearRect(0,0,W,H);
-  yaw=lerp(yaw,yawT+(still?0:Math.sin(now*.00018)*.07),.06);
+  yaw=lerp(yaw,yawT+(still||RECORDING?0:Math.sin(now*.00018)*.07),.06);
   // board slab and rim light
   const c0=proj(-4.25,-4.25),c1=proj(4.25,-4.25),c2=proj(4.25,4.25),c3=proj(-4.25,4.25),d0=proj(-4.25,-4.25,-.35),d1=proj(4.25,-4.25,-.35);
   ctx.fillStyle="rgba(143,230,242,.05)";poly([c0,c1,d1,d0]);ctx.fill();

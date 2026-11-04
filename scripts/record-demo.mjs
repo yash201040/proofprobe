@@ -7,7 +7,7 @@ import { mkdtempSync, rmSync, statSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-const url = process.argv[2] || "http://localhost:8799/";
+const base = process.argv[2] || "http://localhost:8799/", url = base + (base.includes("?") ? "&" : "?") + "record";
 const FPS = 12, SPEED = 1.3, OUT = "docs/demo.webp", SCALE = 2;
 const dir = mkdtempSync(join(tmpdir(), "proofprobe-demo-"));
 const browser = await puppeteer.launch({ executablePath: process.env.CHROME || "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome", headless: "new" });
@@ -37,7 +37,8 @@ try {
     await page.screenshot({ path: join(dir, String(i).padStart(4, "0") + ".png"), clip });
   }
   const files = Array.from({ length: frames }, (_, i) => join(dir, String(i).padStart(4, "0") + ".png"));
-  execFileSync("img2webp", ["-loop", "0", "-mixed", "-q", process.env.QUALITY || "80", "-m", "6", "-d", String(Math.round(1000 / FPS)), "-o", OUT, ...files], { stdio: "inherit" });
+  // Lossless keeps every pixel exact. Lossy modes leave blotches in the dark squares that build up over frames.
+  execFileSync("img2webp", ["-loop", "0", "-lossless", "-q", "75", "-m", "4", "-exact", "-d", String(Math.round(1000 / FPS)), "-o", OUT, ...files], { stdio: "inherit" });
   console.log(`${OUT}: ${frames} frames, ${(statSync(OUT).size / 1048576).toFixed(2)} MB, ${clip.width * SCALE}x${clip.height * SCALE}`);
 } finally {
   await browser.close();
