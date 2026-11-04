@@ -225,7 +225,7 @@ body{background:#fff}#acct,.topbar,.tracker,#stepTabs,#reportBar,#notice,#loadba
     <p id="submitHint" class="state warn" style="margin-top:8px"></p>
     <p id="submitStatus" role="status" style="margin-top:10px"></p><ul id="log" class="log"></ul></div>
 </div></section>
-<footer class="notice" id="notice">Privacy: anyone with this site's address can read each page's research, questions, status and cost. Answers stay private. Only the signed-in profile, and the site owner, can see or edit them.</footer>
+<footer class="notice" id="notice">Privacy: anyone with this site's address can read a public probe's research, every stage, its questions, submitted answers, status and cost. That includes any new direction the profile asks for. Only the signed-in profile, and the site owner, can change it, and unsubmitted drafts stay with the profile. A private probe opens only for its owner, people they approve, and the site owner.</footer>
 </div>
 <script src="/assets/account.js"></script>
 <script>
@@ -404,11 +404,11 @@ function fail(m){$("fatalText").textContent=m;$("fatal").hidden=false}
 function notFound(){document.title="Page not found";$("title").textContent="Page not found";const e=$("eyebrow");e.textContent="";const a=el("a","Back to Probes");a.href="/probes";e.appendChild(a);const n=$("notice");if(n)n.hidden=true}
 function showRead(d,s){
   const qs=s.sections.flatMap(x=>x.questions),log=d.logs&&d.logs[s.n];
-  $("viewNote").textContent=!d.seeAnswers?"Answers are private to this profile.":!d.editable?(log?"Submission "+log.seq+", "+fmt(log.submittedAt)+". Read only.":"No answers were submitted for this step."):!log&&isLocked()&&s.n===d.openStep?"Locked. Press Unlock to answer.":log?"Submission "+log.seq+", "+fmt(log.submittedAt)+". Read only.":"No answers were submitted for this step.";
+  $("viewNote").textContent=!d.editable?(log?"Submission "+log.seq+", "+fmt(log.submittedAt)+". Read only.":"No answers were submitted for this step."):!log&&isLocked()&&s.n===d.openStep?"Locked. Press Unlock to answer.":log?"Submission "+log.seq+", "+fmt(log.submittedAt)+". Read only.":"No answers were submitted for this step.";
   const l=$("viewList");l.textContent="";
   qs.forEach((q,i)=>{const w=el("div",null,"qa");w.appendChild(el("b",(i+1)+". "+q.text));
     if(q.kind==="decision"&&q.lean)w.appendChild(el("p","If left on Auto: "+q.lean,"lean"));
-    if(d.seeAnswers&&log){const it=log.items.find(x=>x.id===q.id),t=it?it.answer.trim():"";
+    if(log){const it=log.items.find(x=>x.id===q.id),t=it?it.answer.trim():"";
       if(q.kind==="decision"){const p=readChoice(t),c=CHOICES.find(x=>x[0]===p.choice),r=el("p",null,"has decided");r.appendChild(el("span",c[2],"chip "+c[1]));if(p.note.trim())r.append(" "+p.note.trim());w.appendChild(r)}
       else w.appendChild(el("p",t?it.answer:"Not answered",t?"has":""))}
     l.appendChild(w)});

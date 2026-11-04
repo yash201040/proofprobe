@@ -181,9 +181,9 @@ await page.goto(first.link, { waitUntil: "networkidle0" }); await page.waitForSe
 
 await page.type("#q-a1", " draft"); await page.click("#saveAll"); await saved();
 const pub = await (await fetch(first.api)).json();
-ok(pub.steps[0].sections.length === 1 && !JSON.stringify(pub).includes("first answer") && !JSON.stringify(pub).includes("second answer") && !pub.answers && !pub.logs && !pub.submissions, "visitors never receive answers");
+ok(pub.steps[0].sections.length === 1 && JSON.stringify(pub.logs).includes("second answer") && !JSON.stringify(pub).includes("first answer draft") && !pub.answers && !pub.submissions && !pub.editable, "visitors read submitted answers, never saved drafts, and can't edit");
 const anonContext = await browser.createBrowserContext(); const anonView = await anonContext.newPage(); await anonView.goto(first.link, { waitUntil: "networkidle0" }); await anonView.waitForSelector("#viewQs:not([hidden])");
-ok(!(await anonView.$eval("body", (e) => e.textContent)).includes("second answer") && (await anonView.$eval("#viewNote", (e) => e.textContent)).includes("private"), "the page shows questions but not answers");
+ok((await anonView.$eval("#viewQs", (e) => e.textContent)).includes("second answer") && !(await anonView.$eval("body", (e) => e.textContent)).includes("first answer draft") && (await anonView.$eval("#viewNote", (e) => e.textContent)).includes("Read only"), "a public page shows submitted answers, read only");
 await anonContext.close();
 const stale = await page.evaluate(async (api) => (await fetch(api + "/answers", { method: "PUT", body: JSON.stringify({ answers: { a1: "old" }, bases: { a1: "2000-01-01" } }) })).status, first.api.replace(base, ""));
 ok(stale === 409, "a stale save is refused");
@@ -194,7 +194,7 @@ await page.type("#rerouteText", "Focus on product roles instead");
 await page.click("#rerouteSend");
 await page.waitForFunction(() => /Received/.test(document.querySelector("#rerouteState").textContent));
 const rerouted = await (await fetch(first.api)).json();
-ok(rerouted.rerouting === true && rerouted.reroute === undefined && !JSON.stringify(rerouted).includes("product roles") && JSON.parse(pp("status", first.id)).reroute, "a new direction is private and starts nothing");
+ok(rerouted.rerouting === true && rerouted.reroute.message.includes("product roles") && !rerouted.answers && JSON.parse(pp("status", first.id)).reroute, "a new direction is public on a public page and starts nothing");
 const dir = await (await fetch(base + "/api/probes")).json();
 ok(dir.profiles.flatMap((p) => p.pages).some((g) => g.rerouting), "the directory shows the status");
 writeFileSync(qf + ".plan", JSON.stringify([{ t: "p", text: "Old path" }]));
@@ -278,7 +278,7 @@ const ds = JSON.parse(pp("fetch", dec.id)), dAns = (id) => ds.items.find((i) => 
 ok(dAns("d1") === "Accept\nOnly for new tasks" && dAns("d2") === "Reject", "decisions are stored as plain text the research can read");
 const decView = await browser.createBrowserContext(), dv = await decView.newPage(); await dv.goto(dec.link, { waitUntil: "networkidle0" }); await dv.waitForSelector("#viewQs:not([hidden])");
 const dvText = await dv.$eval("#viewQs", (e) => e.textContent);
-ok(dvText.includes("If left on Auto: Accept") && !dvText.includes("Only for new tasks") && !JSON.stringify(await (await fetch(dec.api)).json()).includes("Only for new tasks"), "visitors see each proposal's default but never the choice or note");
+ok(dvText.includes("If left on Auto: Accept") && dvText.includes("Only for new tasks") && !(await dv.$("#qBox:not([hidden])")), "visitors see the submitted decisions on a public page, read only");
 ok((await dv.$eval("#trackNow", (e) => e.textContent)).includes("Stage 3b") && (await dv.$eval("#trackNow", (e) => e.textContent)).includes("our side"), "after submitting, the tracker shows our side working");
 await decView.close();
 await page.goto(allAuto.link, { waitUntil: "networkidle0" }); await page.waitForSelector('input[name="q-d1-c"]');

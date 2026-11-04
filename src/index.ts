@@ -576,12 +576,12 @@ async function pageApi(request: Request, env: Env, row: CaseRow, rest: string, r
     ]);
     const steps: Step[] = (stepR.results as any[]).map((x) => ({ n: x.n, title: x.title, intro: parse(x.intro_json, []), sections: parse<Section[]>(x.questions_json, []), plan: parse(x.plan_json, []), createdAt: x.created_at }));
     const open = answerStep(steps);
-    // Answers and requested directions are private to the profile. Visitors get research, questions, status and cost.
+    // Anyone who can open the page reads every stage, its submitted answers and any requested new direction. Saved drafts and the submission list stay with the owner, approved viewers and the site owner.
     const pub = { title: row.title, name: row.p_name, profileSlug: row.p_slug, status: row.status, costUsd: ((costR.results[0] as any)?.micro ?? 0) / 1_000_000, editable, seeAnswers: acc.seeAnswers, viewer: !editable && acc.seeAnswers, asAdmin: acc.admin && !editable && !acc.viewer, private: !!row.private, caseId: row.id, steps, openStep: open?.n ?? null, rerouting: !!rerouteR.results[0] };
-    if (!acc.seeAnswers) return json(pub);
     const subs = await env.DB.prepare("SELECT seq, step_n, submitted_at, payload FROM submissions WHERE case_id = ? ORDER BY seq").bind(row.id).all<any>();
     const logs: Record<string, unknown> = {};
     for (const x of subs.results) logs[x.step_n] = { seq: x.seq, submittedAt: x.submitted_at, items: parse(x.payload, []) };
+    if (!acc.seeAnswers) return json({ ...pub, logs, reroute: rerouteR.results[0] ?? null });
     return json({ ...pub, reroute: rerouteR.results[0] ?? null, answers: await currentAnswers(env, row.id), submissions: await summaries(env, row.id), logs });
   }
   if (!(rest === "answers" && request.method === "PUT") && !((rest === "submit" || rest === "reroute") && request.method === "POST")) return notFound();

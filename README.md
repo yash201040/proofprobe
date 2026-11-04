@@ -38,13 +38,13 @@ Local test: put `ADMIN_TOKEN_SHA256=<hash>` and `PASSWORD_KEY=<base64 key>` in `
 
 ## Data rules
 
-- Anyone can read each page's research, questions, status and cost, and a notice says so. Answers stay private to the signed-in profile and the owner. People apply for a profile, the owner approves it, and signing in unlocks that profile's pages and no others. People can change their own password once signed in.
+- Anyone can read a public page's research, questions, submitted answers, status and cost, and a notice says so. That includes requested new directions. Only the signed-in profile and the owner can change it, and unsubmitted drafts stay with them. Private pages open only for their owner, people they approve, and the owner of the site. People apply for a profile, the owner approves it, and signing in unlocks that profile's pages and no others. People can change their own password once signed in.
 - People act at Stages 1a, 2a, 3a and 4a: set a goal, answer questions, decide on proposals (Accept, Reject or Auto), then read and download the final report. Stages 1b, 2b and 3b are research the owner runs. Each stage is a view on the same page, and new research never replaces an earlier one.
 - Submitting stores a log and starts nothing. Research continues only when `/proofprobe` is run.
 - The cost shown on a page is treg data spend logged with `proofprobe cost`. Claude usage is not included.
 - Submissions are append-only. A database trigger blocks updates, and each log stores a SHA-256 so corruption is detectable.
 - Page content is rendered as text only, so stored content cannot inject markup.
-- CVs and research notes stay in `.proofprobe/` on this machine, which git ignores. The server holds what the site needs: questions, research, costs, answers and decisions (private to the profile and owner), and goal requests with their files (private to the owner).
+- CVs and research notes stay in `.proofprobe/` on this machine, which git ignores. The server holds what the site needs: questions, research, costs, answers and decisions (submitted ones are public on public pages, drafts stay private), and goal requests with their files (private to the owner).
 - Answer text and tokens are never logged.
 - Spam limits run on the free tier: per-device and per-profile hourly and daily caps on profile applications, goal requests and access requests, a cap of 3 waiting requests per profile, a 500 MB ceiling on uploaded files, a 1 MB limit on other requests, a hidden honeypot field and a minimum fill time on forms, a pause after 20 wrong sign-ins from one device, and a check that writes come from this site.
 

@@ -63,14 +63,14 @@ button{font:600 16px var(--body);cursor:pointer}.rm{flex:none;min-height:34px;pa
     <div class="field"><label for="files">Documents (optional)</label><input id="files" type="file" multiple accept=".pdf,.doc,.docx,.odt,.txt,.md,.rtf,.json,.ppt,.pptx,.odp,.key,.xls,.xlsx,.ods,.csv,.tsv,.png,.jpg,.jpeg,.webp,.gif,.heic"><div class="drop" id="drop"><b>Choose files</b><span class="hint">or drag them here. Up to 5 files, 10 MB in total. Larger uploads can't be accepted.</span></div><ul class="list" id="list"></ul></div>
     <fieldset class="priv"><legend>Who can see the research</legend>
       <label class="check"><input type="checkbox" id="private"> Keep this research private</label>
-      <p class="hint">Off by default, so it's public like the other probes. When private, Probes shows only a card with your teaser and stage. Others can ask for access, and you decide on your account page.</p>
+      <p class="hint">Off by default, so it's public like the other probes, including the answers you submit. When private, Probes shows only a card with your teaser and stage. Others can ask for access, and you decide on your account page.</p>
       <div class="field" id="teaserBox" hidden><label for="teaser">Teaser for the card (optional)</label><input id="teaser" type="text" maxlength="140" placeholder="Example: Moving into a new field within a year"><p class="hint">Shown to everyone. Leave out names, employers and other personal details.</p></div>
     </fieldset>
     <div class="trap" aria-hidden="true"><label for="website">Website</label><input id="website" type="text" tabindex="-1" autocomplete="off"></div>
     <button class="send" id="send" type="submit">Send request</button>
     <p class="err" id="err" role="alert"></p>
   </form>
-  <p class="notice">Your request and documents stay private to you and the owner. If it's accepted, the research page is public unless you chose private above, and your answers are never public.</p>
+  <p class="notice">Your request and documents stay private to you and the owner. If it's accepted, the research page is public unless you chose private above. On a public probe, the answers you submit are public too, so choose private if they're personal.</p>
 </main>
 <section class="done" id="done" hidden><h2>Request received</h2><p>We'll review it and contact you with the outcome. Your reference is <strong id="ref"></strong>.</p><p><a href="/probes">See the probes</a></p></section>
 </div>
