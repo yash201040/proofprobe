@@ -17,6 +17,7 @@ const ADMIN_LOCK_MINUTES = 15;
 const ADMIN_SESSION = "__admin";
 const SCHEMA_VERSION = "6";
 const MAX_PENDING_PROFILES = 100;
+const SIGNIN_MAX_MISSES = 20, SIGNIN_WINDOW_MS = 15 * 60_000;
 const APPLICATIONS_PER_HOUR = 5;
 const MAX_FILES = 5;
 const MAX_UPLOAD = 10 * 1024 * 1024;
@@ -313,12 +314,19 @@ async function setProfilePassword(env: Env, id: string, password: string, actor:
 
 // There is deliberately no lockout on profile passwords.
 async function signIn(request: Request, env: Env, ray: string) {
+  // Wrong guesses never lock a profile. One device gets a short pause after many misses, so guessing can't run unchecked.
+  const ipKey = await sha256("signin:" + (request.headers.get("cf-connecting-ip") ?? "local"));
+  const misses = await env.DB.prepare("SELECT COUNT(*) AS n FROM audit_log WHERE action = 'sign_in_failed' AND detail = ? AND at > ?").bind(ipKey, new Date(Date.now() - SIGNIN_WINDOW_MS).toISOString()).first<{ n: number }>();
+  if ((misses?.n ?? 0) >= SIGNIN_MAX_MISSES) return json({ error: "slow_down" }, 429);
   const body = await request.json().catch(() => null) as { name?: unknown; password?: unknown } | null;
   if (typeof body?.name !== "string" || typeof body.password !== "string" || body.password.length > 200) return json({ error: "bad_request" }, 400);
   const { match } = await findProfile(env, body.name);
   const profile = match ? await profileOf(env, match.id) : null;
   const right = !!profile?.password_hash && !!profile.password_salt && (await sha256(profile.password_salt + body.password)) === profile.password_hash;
-  if (!profile || !right) return json({ error: "wrong_details" }, 401);
+  if (!profile || !right) {
+    await audit(env, null, "visitor", "sign_in_failed", ipKey, ray).run();
+    return json({ error: "wrong_details" }, 401);
+  }
   if (profile.status !== "active") return json({ error: "not_approved", status: profile.status }, 403);
   const cookie = await newSession(env, profile.id);
   await env.DB.batch([
@@ -440,7 +448,8 @@ async function pageApi(request: Request, env: Env, row: CaseRow, rest: string, r
   }
   if (!(rest === "answers" && request.method === "PUT") && !((rest === "submit" || rest === "reroute") && request.method === "POST")) return notFound();
   if (!editable) return json({ error: "sign_in_required" }, 401);
-  if (row.status === "closed") return json({ error: "closed" }, 403);
+  // A closed probe, or one whose final report is out, takes no more answers, decisions or new directions.
+  if (row.status === "closed" || row.status === "plan_ready") return json({ error: "closed" }, 403);
 
   if (rest === "reroute") {
     // This only records the request. Research restarts when the owner runs it.
@@ -558,20 +567,24 @@ async function adminSite(request: Request, env: Env, parts: string[], ray: strin
   if (what === "overview" && request.method === "GET") {
     const profiles = await env.DB.prepare(`SELECT p.id, p.name, p.slug, p.status, p.reason, p.created_at, p.password_hash IS NOT NULL AS has_password, (SELECT COUNT(*) FROM cases c WHERE c.profile_id = p.id) AS pages FROM profiles p ORDER BY p.created_at`).all();
     const stepRows = await env.DB.prepare("SELECT case_id, n, questions_json FROM steps ORDER BY n").all<any>();
-    const totals = new Map<string, number>(), stepCount = new Map<string, number>();
+    const totals = new Map<string, number>(), stepCount = new Map<string, number>(), openIds = new Map<string, Set<string>>(), lastKind = new Map<string, string>();
     for (const x of stepRows.results) {
       stepCount.set(x.case_id, (stepCount.get(x.case_id) ?? 0) + 1);
-      const n = flatten(parse<Section[]>(x.questions_json, [])).length;
-      if (n) totals.set(x.case_id, n);
+      const secs = parse<Section[]>(x.questions_json, []), qs = flatten(secs);
+      if (qs.length) { totals.set(x.case_id, qs.length); openIds.set(x.case_id, new Set(qs.map((q) => q.id))); }
+      lastKind.set(x.case_id, secs.some((s) => s.questions.some((q) => q.kind === "decision")) ? "decisions" : qs.length ? "questions" : "final");
     }
+    // "Saved" counts only answers to the step people can answer now, so it can never exceed the total.
+    const answered = await env.DB.prepare("SELECT case_id, question_id FROM answers WHERE trim(text) != ''").all<{ case_id: string; question_id: string }>();
+    const savedNow = new Map<string, number>();
+    for (const a of answered.results) if (openIds.get(a.case_id)?.has(a.question_id)) savedNow.set(a.case_id, (savedNow.get(a.case_id) ?? 0) + 1);
     const r = await env.DB.prepare(`SELECT c.id, c.title, c.status, c.updated_at, p.name AS profile, p.slug AS profile_slug, c.slug,
       (SELECT COUNT(*) FROM submissions s WHERE s.case_id = c.id) AS submissions,
-      (SELECT COUNT(*) FROM answers a WHERE a.case_id = c.id AND trim(a.text) != '') AS saved,
       EXISTS (SELECT 1 FROM reroutes r WHERE r.case_id = c.id AND r.handled_at IS NULL) AS rerouting,
       (SELECT COALESCE(SUM(e.usd_micro), 0) / 1000000.0 FROM cost_entries e WHERE e.case_id = c.id) AS cost_usd
       FROM cases c JOIN profiles p ON p.id = c.profile_id ORDER BY c.created_at`).all<any>();
     const requests = await env.DB.prepare("SELECT r.id, r.name, r.title, r.status, r.created_at, (SELECT COUNT(*) FROM request_files f WHERE f.request_id = r.id) AS files FROM requests r ORDER BY CASE r.status WHEN 'new' THEN 0 WHEN 'approved' THEN 1 ELSE 2 END, r.created_at DESC LIMIT 100").all();
-    return json({ pending: await pendingWork(env), requests: requests.results, profiles: profiles.results, pages: r.results.map((x) => ({ ...x, total: totals.get(x.id) ?? 0, steps: stepCount.get(x.id) ?? 1 })) });
+    return json({ pending: await pendingWork(env), requests: requests.results, profiles: profiles.results, pages: r.results.map((x) => ({ ...x, saved: savedNow.get(x.id) ?? 0, total: totals.get(x.id) ?? 0, steps: stepCount.get(x.id) ?? 1, lastKind: lastKind.get(x.id) ?? "final" })) });
   }
   if (what === "profiles" && !id && request.method === "POST") {
     const b = await request.json().catch(() => null) as { name?: unknown } | null;
@@ -761,7 +774,7 @@ async function admin(request: Request, env: Env, parts: string[], ray: string) {
     if (closesReroute) writes.push(env.DB.prepare("UPDATE reroutes SET handled_at = ? WHERE case_id = ? AND handled_at IS NULL").bind(now, id));
     await env.DB.batch([
       ...writes,
-      env.DB.prepare("UPDATE cases SET status = ?, updated_at = ? WHERE id = ?").bind(b.status ?? (closesReroute ? "open" : row.status), now, id),
+      env.DB.prepare("UPDATE cases SET status = ?, updated_at = ? WHERE id = ?").bind(b.status ?? (closesReroute || (typeof b.newStep === "string" && validSections(b.questions) && b.questions.length) ? "open" : row.status), now, id),
       audit(env, id, "admin", "update", Object.keys(b).join(","), ray),
     ]);
     return json({ ok: true });
@@ -818,6 +831,9 @@ export default {
       if (parts[0] === "api" && parts[1] === "admin") return await adminSite(request, env, parts.slice(2), ray);
       if (parts[0] === "admin") return await admin(request, env, parts.slice(1), ray);
       if (parts[0] !== "api") return notFound();
+      // Browsers send Origin on cross-site writes. Refusing a foreign one blocks forged forms, including sign-in.
+      const origin = request.headers.get("Origin");
+      if (request.method !== "GET" && origin && origin !== url.origin) return json({ error: "bad_origin" }, 403);
       if (parts[1] === "requests" && parts.length === 2 && request.method === "POST") return await createRequest(request, env, ray);
       if (parts[1] === "profiles" && parts.length === 2 && request.method === "POST") return await applyForProfile(request, env, ray);
       if (parts[1] === "session" && parts[2] === "password" && parts.length === 3 && request.method === "POST") return await changePassword(request, env, ray);
@@ -828,7 +844,7 @@ export default {
       }
       if (parts[1] === "probes" && parts.length === 2 && page) return json({ profiles: await directory(env) });
       if (parts[1] === "pages" && parts[2] && parts[3]) {
-        const row = await env.DB.prepare("SELECT c.*, p.name AS p_name, p.slug AS p_slug FROM cases c JOIN profiles p ON p.id = c.profile_id WHERE p.slug = ? AND c.slug = ? AND c.status != 'draft'").bind(parts[2], parts[3]).first<CaseRow>();
+        const row = await env.DB.prepare("SELECT c.*, p.name AS p_name, p.slug AS p_slug FROM cases c JOIN profiles p ON p.id = c.profile_id WHERE p.slug = ? AND c.slug = ? AND c.status != 'draft' AND p.status = 'active'").bind(parts[2], parts[3]).first<CaseRow>();
         if (!row) return json({ error: "not_found" }, 404);
         return await pageApi(request, env, row, parts.slice(4).join("/"), ray);
       }

@@ -30,8 +30,8 @@ const txt = (id) => page.$eval(id, (e) => e.textContent);
 const shown = (id) => page.$eval(id, (e) => !e.hidden);
 const saved = () => page.waitForFunction(() => document.querySelector("#saveAll").textContent === "All changes saved");
 const settle = (id) => page.waitForFunction((i) => !document.querySelector(i).disabled, {}, id);
-const post = (path, body, cookie) => fetch(base + path, { method: "POST", headers: { "Content-Type": "application/json", ...(cookie ? { Cookie: cookie } : {}) }, body: JSON.stringify(body) });
-const signInStatus = async (name, password) => (await post("/api/session", { name, password })).status;
+const post = (path, body, cookie, extra = {}) => fetch(base + path, { method: "POST", headers: { "Content-Type": "application/json", ...(cookie ? { Cookie: cookie } : {}), ...extra }, body: JSON.stringify(body) });
+const signInStatus = async (name, password, ip) => (await post("/api/session", { name, password }, null, ip ? { "cf-connecting-ip": ip } : {})).status;
 const signInCookie = async (name, password) => (await post("/api/session", { name, password })).headers.get("set-cookie").split(";")[0];
 const openSignIn = async (p) => { await p.waitForSelector("#acctBtn"); await p.click("#acctBtn"); await p.waitForSelector("#acctDlg[open]"); };
 
@@ -50,6 +50,11 @@ const boardTops = []; for (const i of [0, 1, 6]) { await page.click('#moves .mv[
 ok(new Set(boardTops).size === 1, "the board stays put whichever stage is shown");
 await new Promise((r) => setTimeout(r, 400)); ok(await page.$eval("#board", (c) => { const x = c.getContext("2d").getImageData(0, 0, c.width, c.height).data; let n = 0; for (let i = 3; i < x.length; i += 400) if (x[i] > 0) n++; return n > 200; }), "the crystal board draws");
 ok((await page.$$("#bring .chips span")).length >= 40, "Stage 1a lists many things people can bring");
+ok((await page.$$eval("#stages .badge", (l) => l.map((e) => e.textContent).join())) === "1a,1b,2a,2b,3a,3b,4a" && (await page.$$eval("#stages .badge", (l) => l.every((e) => getComputedStyle(e).textTransform === "none"))), "every stage has its own section, with lowercase codes");
+await page.setViewport({ width: 1366, height: 900 });
+ok(await page.evaluate(() => { const t = [...document.querySelectorAll("#bring .group")].map((g) => Math.round(g.getBoundingClientRect().top)); return new Set(t).size === 1; }), "the five Stage 1a groups fit one row on desktop");
+await page.setViewport({ width: 800, height: 600 });
+await page.click('#decideDemo .prop:first-child button[data-v="Accept"]'); ok((await txt("#demoNote")).includes("left on Auto"), "the Stage 3a demo responds to a choice");
 ok((await page.$$("#density .method a")).length === 5 && (await page.$$("#chartSources .bar")).length === 3, "the density estimate shows its charts and cites its sources");
 await page.evaluate(() => scrollTo(0, document.documentElement.scrollHeight)); await new Promise((r) => setTimeout(r, 300));
 ok(await page.$eval("#acctBtn", (e) => { const s = getComputedStyle(e); return s.backgroundColor !== s.color && e.getBoundingClientRect().top < 30; }), "Sign in stays readable at the end of the page");
@@ -75,7 +80,7 @@ ok((await txt("#filterBtn")) === "Filter" && (await page.$("#statusBy")) === nul
 await page.click("#filterBtn"); await page.waitForSelector("#filterPanel:not([hidden])");
 ok((await page.$$("#filterPanel input:checked")).length === 0 && (await page.$$('#filterStatus input')).length === 7, "stage options are unchecked checkboxes");
 const box = (group, value) => page.click(`#filterPanel input[data-group="${group}"][value="${value}"]`);
-ok((await page.$$eval('#filterStatus label', (l) => l.map((e) => e.textContent))).join("|").includes("Stage 2b · Deep research"), "filters use the turn-based stage names");
+ok((await page.$$eval('#filterStatus label', (l) => l.map((e) => e.textContent))).join("|").includes("Stage 2b · Probing deep"), "filters use the turn-based stage names");
 await box("status", "4a"); ok((await titles()).length === 1 && (await txt("#dirCount")) === "1 probe" && (await txt("#filterBtn")) === "Filter (1)", "one status filters the list");
 await box("status", "2a"); ok((await titles()).length === 3, "two stages combine with OR");
 const otherSlug = (await (await fetch(base + "/api/probes")).json()).profiles.find((p) => p.name === "Other Person").slug;
@@ -204,7 +209,9 @@ await page.goto(first.link, { waitUntil: "networkidle0" }); await page.waitForSe
 ok((await page.$$("#stepTabs .steptab")).length === 3 && (await txt("#plan")).includes("Old path") && (await page.$$(".profile")).length === 0, "steps appear as views on the same probe");
 await page.click('#stepTabs [data-step="1"]'); await page.waitForFunction(() => document.querySelector("#viewList").textContent.includes("second answer"));
 ok(true, "the signed-in profile can reread their earlier answers");
-await page.click('#stepTabs [data-step="2"]'); await page.waitForSelector("#form details"); await page.reload({ waitUntil: "networkidle0" }); await page.waitForSelector("#form details");
+await page.click('#stepTabs [data-step="2"]'); await page.waitForSelector("#viewQs:not([hidden])"); await page.reload({ waitUntil: "networkidle0" }); await page.waitForSelector("#viewQs:not([hidden])");
+ok(!(await shown("#qBox")) && !(await page.$("#lockToggle")), "once the final report is out, earlier steps are read-only");
+ok((await fetch(first.api + "/answers", { method: "PUT", headers: { Cookie: `${c.name}=${c.value}` }, body: JSON.stringify({ answers: { a1: "late" } }) })).status === 403, "a finished probe refuses new answers");
 ok(page.url().endsWith("#step-2"), "a step view survives a refresh");
 await page.click('#stepTabs [data-step="3"]');
 writeFileSync(qf + ".ans", JSON.stringify({ a1: "imported answer" }));
@@ -284,9 +291,12 @@ const pend = JSON.parse(pp("pending")); ok([dec.id, allAuto.id].every((id) => pe
 const newPw = pp("password", first.id).match(/password: (\S+)/)[1];
 await page.reload({ waitUntil: "networkidle0" }); await page.waitForSelector("#acctBtn");
 ok(!(await shown("#qBox")) && newPw !== first.pw, "resetting a password signs out open devices");
-const tries = []; for (let i = 0; i < 12; i++) tries.push(await signInStatus("Other Person", "guess-" + i));
+const tries = []; for (let i = 0; i < 12; i++) tries.push(await signInStatus("Other Person", "guess-" + i, "203.0.113.7"));
 ok(tries.every((s) => s === 401), "wrong guesses never lock anyone out");
 ok((await signInStatus("Other Person", other.pw)) === 200, "the right password still works after many wrong ones");
+const flood = []; for (let i = 0; i < 21; i++) flood.push(await signInStatus("Other Person", "flood-" + i, "203.0.113.99"));
+ok(flood.slice(0, 20).every((s) => s === 401) && flood[20] === 429 && (await signInStatus("Other Person", other.pw, "203.0.113.50")) === 200, "a device that keeps guessing is paused, and the profile still signs in elsewhere");
+ok((await fetch(base + "/api/session", { method: "POST", headers: { "Content-Type": "application/json", Origin: "https://evil.example" }, body: JSON.stringify({ name: "Other Person", password: other.pw }) })).status === 403, "sign-in from another site is refused");
 ok(!ppFails("password", other.id, "--set", "shortpw") , "a short custom password can be set");
 // Admin area
 ok((await page.goto(base + "/admin", { waitUntil: "networkidle0" })).ok(), "admin page loads");
@@ -376,6 +386,8 @@ await jp.$eval("#applyPass", (e) => (e.value = "")); await jp.type("#applyPass",
 ok(true, "anyone can request a profile");
 ok(!(await (await fetch(base + "/api/probes")).text()).includes(applicant), "a waiting profile stays out of the public list");
 ok((await signInStatus(applicant, "applicant-pass-1")) === 403 && (await signInStatus(applicant, "wrong-pass-123")) === 401, "a waiting profile can't sign in");
+const waitingPage = JSON.parse(pp("new", "--profile", applicant, "--title", "Waiting page")); pp("publish", waitingPage.id, "--questions", qf, "--status", "open"); cleanup.push(waitingPage.id);
+ok((await fetch(waitingPage.link.replace("/probes/", "/api/pages/"))).status === 404, "a waiting profile's pages aren't public");
 ok((await post("/api/profiles", { name: applicant, password: "another-pass-1", reason })).status === 409 && (await post("/api/profiles", { name: "Test Person", password: "another-pass-1", reason })).status === 409, "taken names are refused");
 ok((await post("/api/profiles", { name: "No Reason", password: "another-pass-1", reason: "x" })).status === 400, "a reason is required");
 ok((await post("/api/profiles", { name: reject, password: "reject-pass-1", reason })).status === 201, "a second request is accepted");

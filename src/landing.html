@@ -58,13 +58,50 @@ h1 em{font-style:normal;background:linear-gradient(100deg,var(--you),#E8FBFF 45%
 .eyebrow{font:500 13px var(--mono);letter-spacing:.14em;text-transform:uppercase;color:var(--you);margin:0 0 10px}
 h2{font:800 clamp(32px,4vw,52px)/1.02 var(--display);letter-spacing:-.025em;margin:0 0 14px}
 .intro{color:var(--muted);max-width:44em;margin:0 0 28px}
-.groups{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,280px),1fr));gap:16px}
-.group{padding:18px;border:1px solid var(--line);border-radius:14px;background:rgba(255,255,255,.02)}
-.group h3{font:700 18px var(--display);margin:0 0 12px;display:flex;align-items:center;gap:8px}
-.group h3{flex-wrap:wrap;gap:2px 8px}.group h3 span{font:500 12px var(--mono);color:var(--faint);flex-basis:100%}
-.chips{display:flex;flex-wrap:wrap;gap:7px}
-.chips span{padding:6px 11px;border:1px solid var(--line);border-radius:999px;font-size:15px;color:var(--ink);background:rgba(143,230,242,.04)}
-.small{font-size:15px;color:var(--faint);margin-top:16px}
+/* Stage by stage: one timeline, the same header on every stage, and a body that suits each. */
+.stages{list-style:none;margin:0;padding:0;display:grid;gap:22px;position:relative}
+.stages::before{content:"";position:absolute;left:21px;top:10px;bottom:10px;width:2px;background:linear-gradient(var(--you),var(--probe),var(--you));opacity:.35}
+.stage{position:relative;padding-left:62px}
+.shead{display:grid;grid-template-columns:auto 1fr;column-gap:12px;align-items:center;margin-bottom:14px}
+.badge{position:absolute;left:0;top:-2px;display:grid;place-items:center;width:44px;height:44px;border-radius:50%;font:600 15px var(--mono);text-transform:none;background:var(--bg);border:2px solid currentColor}
+.stage.you .badge{color:var(--you)}.stage.probe .badge{color:var(--probe);border-style:dashed}
+.side{grid-column:1/-1;font:500 12.5px var(--mono);letter-spacing:.14em;text-transform:uppercase}.stage.you .side{color:var(--you)}.stage.probe .side{color:var(--probe)}
+.shead h3{grid-column:1/-1;font:700 clamp(21px,2vw,26px)/1.2 var(--display);margin:2px 0 4px}
+.shead p{grid-column:1/-1;margin:0;color:var(--muted);max-width:52em;font-size:16.5px}
+.groups,.outs{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:12px}
+.group{padding:14px;border:1px solid var(--line);border-radius:14px;background:rgba(255,255,255,.02);min-width:0}
+.group h3{font:700 17px var(--display);margin:0 0 10px;display:flex;flex-wrap:wrap;gap:2px 8px}
+.group h3 span{font:500 11.5px var(--mono);color:var(--faint);flex-basis:100%}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chips span{padding:5px 10px;border:1px solid var(--line);border-radius:999px;font-size:14px;line-height:1.3;color:var(--ink);background:rgba(143,230,242,.04)}
+.small{font-size:15px;color:var(--faint);margin:12px 0 0}
+.tracks{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
+.track4,.qcard,.outs>div,.prop{padding:14px 16px;border:1px solid var(--line);border-radius:14px;background:rgba(255,255,255,.02);display:grid;gap:5px;align-content:start;min-width:0}
+.track4 b,.outs b{font:700 17px var(--display)}.stage.probe .track4 b,.stage.probe .outs b{color:var(--probe)}
+.track4 span,.outs span,.qcard span,.prop span{color:var(--muted);font-size:15px}
+.tagline{margin:12px 0 0;color:var(--muted);font-size:15px;display:flex;flex-wrap:wrap;align-items:center;gap:6px}
+.tag{padding:3px 9px;border-radius:999px;font:500 12.5px var(--mono)}.tag.v{color:var(--good);background:rgba(111,208,157,.12)}.tag.s{color:var(--probe);background:rgba(255,180,84,.12)}.tag.i{color:var(--info);background:rgba(143,193,240,.12)}
+.qcards{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+.qcard b{font-weight:600}.qcard i{margin-top:6px;padding:8px 10px;border:1px solid var(--line);border-radius:8px;font-style:normal;color:var(--ink);background:rgba(0,0,0,.25)}.qcard i.skip{color:var(--faint)}
+.funnel{display:grid;gap:8px;max-width:760px}
+.funnel div{width:var(--w);min-width:min(100%,250px);padding:11px 16px;border-radius:10px;background:linear-gradient(90deg,rgba(255,180,84,.22),rgba(255,180,84,.06));border:1px solid rgba(255,180,84,.35);font-size:15.5px}
+.funnel div.last{background:linear-gradient(90deg,rgba(255,180,84,.45),rgba(255,180,84,.15));font-weight:600}
+.demo{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.prop b{font-weight:600}.opts{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
+.opts button{min-height:40px;padding:7px 14px;border-radius:999px;border:1px solid var(--line);background:transparent;color:var(--ink);font:600 15px var(--body);cursor:pointer}
+.opts button[data-v="Accept"][aria-pressed="true"]{background:rgba(111,208,157,.15);border-color:var(--good);color:var(--good)}
+.opts button[data-v="Reject"][aria-pressed="true"]{background:rgba(240,151,140,.15);border-color:var(--bad);color:var(--bad)}
+.opts button[data-v="Auto"][aria-pressed="true"]{background:rgba(143,193,240,.15);border-color:var(--info);color:var(--info)}
+.opts button:focus-visible{outline:2px solid var(--you);outline-offset:2px}
+.demonote{grid-column:1/-1;margin:2px 0 0;color:var(--muted);font-size:15px}
+.report{display:grid;grid-template-columns:minmax(0,1.6fr) minmax(0,1fr);gap:12px;align-items:start}
+.report .because{border-left:4px solid var(--you);background:rgba(255,255,255,.03);padding:14px 16px;border-radius:0 12px 12px 0;display:grid;gap:4px}
+.report .because b{font:700 18px var(--display)}.report .because em{font:600 12px var(--mono);letter-spacing:.08em;text-transform:uppercase;font-style:normal;color:var(--you);margin-top:4px}
+.report .because ul{margin:0;padding-left:20px;color:var(--ink)}.report .because span{color:var(--muted)}
+.dl{display:grid;gap:8px;justify-items:start}.dlnote{font-size:14.5px;color:var(--faint)}.fake{cursor:default;opacity:.85}.fake{padding:10px 16px;border-radius:8px;background:var(--you);color:#05121A;font-weight:600}.fake.alt{background:transparent;border:1px solid var(--you);color:var(--you)}.dl a{color:var(--you);font-weight:600;margin-top:4px}
+@media (max-width:1180px){.groups,.outs{grid-template-columns:repeat(3,minmax(0,1fr))}.tracks{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media (max-width:760px){.groups,.outs,.qcards,.demo,.report{grid-template-columns:minmax(0,1fr)}.stage{padding-left:52px}.stages::before{left:17px}.badge{width:36px;height:36px;font-size:13px}}
+@media (max-width:480px){.tracks{grid-template-columns:minmax(0,1fr)}}
 .headline{font:700 clamp(22px,2.4vw,30px)/1.3 var(--display);max-width:38em;margin:0 0 30px}
 .headline em{font-style:normal;color:var(--you)}
 .charts{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,400px),1fr));gap:18px}
@@ -111,18 +148,69 @@ h2{font:800 clamp(32px,4vw,52px)/1.02 var(--display);letter-spacing:-.025em;marg
   </div>
 </section>
 
-<section id="bring">
-  <p class="eyebrow">Stage 1a · Your opening move</p>
-  <h2>Bring anything.</h2>
-  <p class="intro">Start with whatever you have. One line of a question is enough, and every extra file sharpens the research. Attach files to your request, and paste links in the description.</p>
-  <div class="groups">
+<section id="stages">
+  <p class="eyebrow">Stage by stage</p>
+  <h2>Every turn, up close.</h2>
+  <p class="intro">Seven moves over four turns. You make each "a" move, and the probe answers with each "b" move.</p>
+  <ol class="stages">
+  <li class="stage you" id="bring"><header class="shead"><span class="badge">1a</span><span class="side">You</span><h3>Set the goal. Bring anything.</h3><p>One line of a question is enough, and every extra file sharpens the research. Attach files to your request, and paste links in the description.</p></header>
+    <div class="groups">
     <div class="group"><h3>Career and interviews <span>job switch, promotion, offer</span></h3><div class="chips"><span>CV or résumé</span><span>LinkedIn profile</span><span>Job post</span><span>Interview invite and date</span><span>Offer letter</span><span>Portfolio</span><span>GitHub profile</span><span>Cover letter</span><span>Performance review</span><span>Certificates</span><span>Salary slip</span><span>Target company list</span></div></div>
     <div class="group"><h3>Side income <span>freelance, part-time, creator</span></h3><div class="chips"><span>Skills list</span><span>Hours you can spare</span><span>Freelance profile</span><span>Past client work</span><span>Rate card</span><span>Channel or page stats</span><span>Employment contract</span><span>Local market or city</span></div></div>
     <div class="group"><h3>Startup or product <span>idea to first customers</span></h3><div class="chips"><span>Idea in one line</span><span>Product doc or PRD</span><span>Pitch deck</span><span>Prototype link</span><span>Code repository</span><span>Competitor list</span><span>Customer interview notes</span><span>Survey results</span><span>Financial model</span><span>Pricing page</span><span>Analytics export</span><span>Waitlist numbers</span><span>Founder profiles</span></div></div>
     <div class="group"><h3>Study and research <span>courses, papers, exams</span></h3><div class="chips"><span>Research paper</span><span>Dataset</span><span>Syllabus</span><span>Thesis outline</span><span>Lab notes</span><span>Reading list</span><span>Exam date</span><span>Benchmark or eval results</span></div></div>
     <div class="group"><h3>Anything else <span>if it explains the goal</span></h3><div class="chips"><span>Spreadsheet</span><span>Screenshots</span><span>Meeting notes</span><span>Email thread</span><span>Policy or contract</span><span>Budget</span><span>Photos of a whiteboard</span><span>A question in one line</span></div></div>
   </div>
-  <p class="small">Files: PDF, Word, slides, sheets, text, Markdown, JSON and images, up to 5 files and 10 MB per request. Everything you send stays private to you and the owner.</p>
+    <p class="small">Files: PDF, Word, slides, sheets, text, Markdown, JSON and images, up to 5 files and 10 MB per request. Everything you send stays private to you and the owner.</p>
+  </li>
+  <li class="stage probe"><header class="shead"><span class="badge">1b</span><span class="side">Probe</span><h3>Probe wide.</h3><p>The probe maps the whole field before asking you anything, and checks every key number at its source.</p></header>
+    <div class="tracks">
+      <div class="track4"><b>Demand</b><span>Job posts, buyers, search interest and who is hiring or paying right now.</span></div>
+      <div class="track4"><b>Money</b><span>Real pay, rates, prices and costs, with the range, not one lucky number.</span></div>
+      <div class="track4"><b>Competition</b><span>Who else is doing it, the substitutes, and where the gaps are.</span></div>
+      <div class="track4"><b>Blockers</b><span>Rules, contracts, visas, budget, time, and whatever could rule out everything.</span></div>
+    </div>
+    <p class="tagline"><span class="tag v">verified</span><span class="tag s">single-source</span><span class="tag i">inferred</span> Every claim carries one of three tags, and it all ends in the questions only you can answer.</p>
+  </li>
+  <li class="stage you"><header class="shead"><span class="badge">2a</span><span class="side">You</span><h3>Answer what only you know.</h3><p>Each answer closes an open end. Skip any question, or point the probe somewhere new instead.</p></header>
+    <div class="qcards">
+      <div class="qcard"><b>How many hours a week can you give this?</b><span>Why it matters: rules out every route that needs more.</span><i>10 hours, mostly weekends</i></div>
+      <div class="qcard"><b>What would make this not worth doing?</b><span>Why it matters: sets the bar the final path has to clear.</span><i>Less than $500 a month extra</i></div>
+      <div class="qcard"><b>What did we miss?</b><span>Why it matters: anything here can change the path.</span><i class="skip">Skipped</i></div>
+    </div>
+    <p class="tagline">Save as you go on any device. Submitting never starts anything until the owner runs the next turn.</p>
+  </li>
+  <li class="stage probe"><header class="shead"><span class="badge">2b</span><span class="side">Probe</span><h3>Probe deep, inside your fence.</h3><p>Your answers fence in the problem. Every option is tested against them, and what fails is ruled out.</p></header>
+    <div class="funnel">
+      <div style="--w:100%"><span>Every option from the wide probe</span></div>
+      <div style="--w:74%"><span>Fits your answers</span></div>
+      <div style="--w:50%"><span>Survives the evidence</span></div>
+      <div style="--w:30%" class="last"><span>Proposals, each with evidence and a default</span></div>
+    </div>
+  </li>
+  <li class="stage you"><header class="shead"><span class="badge">3a</span><span class="side">You</span><h3>Make the calls.</h3><p>Accept, reject, or leave a proposal on Auto and let the probe decide. Try it:</p></header>
+    <div class="demo" id="decideDemo">
+      <div class="prop"><b>Lead with the shared core, then add one overlay per benchmark</b><span>Based on: 8 of 9 defect types are the same across benchmarks.</span><div class="opts" role="radiogroup" aria-label="Proposal 1"><button type="button" data-v="Accept">Accept</button><button type="button" data-v="Reject">Reject</button><button type="button" data-v="Auto" aria-pressed="true">Auto</button></div></div>
+      <div class="prop"><b>Drop the top-level name rule</b><span>Based on: no defect in the scan traced back to it.</span><div class="opts" role="radiogroup" aria-label="Proposal 2"><button type="button" data-v="Accept">Accept</button><button type="button" data-v="Reject">Reject</button><button type="button" data-v="Auto" aria-pressed="true">Auto</button></div></div>
+      <p class="demonote" id="demoNote">Both on Auto: the probe decides each one with the evidence, and says why.</p>
+    </div>
+  </li>
+  <li class="stage probe"><header class="shead"><span class="badge">3b</span><span class="side">Probe</span><h3>Build the answer.</h3><p>Your decisions become the deliverable your goal needs. Every major call is checked again as it's built.</p></header>
+    <div class="outs">
+      <div><b>Deterministic path</b><span>What to do, in order, by when, and how to tell it worked.</span></div>
+      <div><b>PRD</b><span>A clean product spec, with scope and what to leave out.</span></div>
+      <div><b>Build plan</b><span>Steps plus a ready prompt to build the first prototype.</span></div>
+      <div><b>Rulebook or guide</b><span>The rules to follow, each with its reason.</span></div>
+      <div><b>Direct answer</b><span>When the goal is a question, the answer and its proof.</span></div>
+    </div>
+  </li>
+  <li class="stage you"><header class="shead"><span class="badge">4a</span><span class="side">You</span><h3>Checkmate: your final report.</h3><p>Read only, nothing left to do. Every major decision shows its evidence and the choice that shaped it.</p></header>
+    <div class="report">
+      <div class="because"><b>Seal both reward files before anything else</b><em>Because</em><ul><li>3 of 90 clean tasks could rewrite reward.json in the October 2026 scan</li><li>It's one line in the shared grader</li></ul><em>Shaped by</em> <span>your Accept on the first grading rule</span></div>
+      <div class="dl"><span class="dlnote">In every final report:</span><span class="fake" aria-hidden="true">Download report (HTML)</span><span class="fake alt" aria-hidden="true">Save as PDF</span><a href="/probes">See real probes →</a></div>
+    </div>
+  </li>
+  </ol>
 </section>
 
 <section id="density">
@@ -152,8 +240,8 @@ h2{font:800 clamp(32px,4vw,52px)/1.02 var(--display);letter-spacing:-.025em;marg
 </section>
 
 <section class="end endwrap">
-  <p class="eyebrow">Stage 4a · Checkmate</p>
-  <h2>Your move.</h2>
+  <p class="eyebrow">Your move</p>
+  <h2>Start your game.</h2>
   <p class="intro">Request a probe with any goal, or see how others played theirs.</p>
   <div class="actions"><a class="cta" href="/probes">See the probes <span class="arrow" aria-hidden="true">→</span></a><a class="cta alt" href="/request">Request a probe</a><a class="cta alt" href="https://github.com/yash201040/proofprobe" target="_blank" rel="noopener noreferrer"><svg class="ico" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2a10 10 0 0 0-3.16 19.49c.5.09.68-.22.68-.48v-1.7c-2.78.6-3.37-1.34-3.37-1.34-.45-1.16-1.11-1.47-1.11-1.47-.91-.62.07-.61.07-.61 1 .07 1.53 1.03 1.53 1.03.89 1.53 2.34 1.09 2.91.83.09-.65.35-1.09.63-1.34-2.22-.25-4.55-1.11-4.55-4.94 0-1.09.39-1.98 1.03-2.68-.1-.25-.45-1.27.1-2.65 0 0 .84-.27 2.75 1.02A9.6 9.6 0 0 1 12 6.84c.85 0 1.7.11 2.5.34 1.91-1.29 2.75-1.02 2.75-1.02.55 1.38.2 2.4.1 2.65.64.7 1.03 1.59 1.03 2.68 0 3.84-2.34 4.68-4.57 4.93.36.31.68.92.68 1.85v2.74c0 .27.18.58.69.48A10 10 0 0 0 12 2z"/></svg>GitHub</a></div>
   <a class="adminlink" href="/admin"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>Admin</a>
@@ -206,29 +294,29 @@ function along(route,t){const n=route.length-1,f=cl(t)*n,i=Math.min(n-1,Math.flo
 function state(i,p){
   const S={you:null,probe:null,youA:1,probeA:0,glow:{},fence:0,routes:{a:0,b:0,c:0},decide:0,build:0,goal:0,bloom:0,rays:[],shatter:0,hopYou:0,arcProbe:0};
   const g=(c,r,col,a)=>{const k=c+","+r;const o=S.glow[k];if(!o||o.a<a)S.glow[k]={col,a}};
-  // stage 0
+  // 1a: your goal
   const p0=i>0?1:p;S.goal=ease(seg(p0,0,.35));S.youA=ease(seg(p0,0,.3));
   const y0=sq(...START),y1=sq(4,1);S.you=[lerp(y0[0],y1[0],ease(seg(p0,.45,.85))),lerp(y0[1],y1[1],ease(seg(p0,.45,.85)))];S.hopYou=Math.sin(Math.PI*seg(p0,.45,.85));
   if(i<1)return S;
-  // stage 0.5: the probe sweeps everything
+  // 1b: the probe sweeps everything
   const p1=i>1?1:p;S.probeA=ease(seg(p1,0,.25));const pa=[-5.2,.2],pb=sq(1,3);const tm=ease(seg(p1,0,.35));S.probe=[lerp(pa[0],pb[0],tm),lerp(pa[1],pb[1],tm)];S.arcProbe=Math.sin(Math.PI*tm);
   const lit=Math.floor(SOURCES.length*seg(p1,.3,.95));SOURCES.slice(0,lit).forEach(([c,r],k)=>{g(c,r,"you",.3);if(i===1&&k>=lit-4)S.rays.push([c,r])});
   if(i<2)return S;
-  // stage 1: your answers build the fence
+  // 2a: your answers build the fence
   const p2=i>2?1:p;S.fence=ease(seg(p2,.25,.9));const y2=sq(4,2);const t2=ease(seg(p2,0,.4));S.you=[lerp(y1[0],y2[0],t2),lerp(y1[1],y2[1],t2)];S.hopYou=Math.sin(Math.PI*t2);
   if(i<3)return S;
-  // stage 1.5: deep inside the fence
+  // 2b: deep inside the fence
   const p3=i>3?1:p;const q=sq(5,4),t3=ease(seg(p3,0,.35));S.probe=[lerp(pb[0],q[0],t3),lerp(pb[1],q[1],t3)];S.arcProbe=Math.sin(Math.PI*t3);
   const dl=Math.floor(DEEP.length*seg(p3,.25,.8));DEEP.slice(0,dl).forEach(([c,r],k)=>{g(c,r,"probe",.32);if(i===3&&k>=dl-4)S.rays.push([c,r])});
   S.routes={a:ease(seg(p3,.6,1)),b:ease(seg(p3,.65,1)),c:ease(seg(p3,.7,1))};
   if(i<4)return S;
-  // stage 2: you decide
+  // 3a: you decide
   const p4=i>4?1:p;S.decide=p4;S.hopYou=i===4?Math.abs(Math.sin(Math.PI*2*seg(p4,0,.5)))*.6:0;S.shatter=seg(p4,.45,.85);
   if(i<5)return S;
-  // stage 2.5: the probe builds the chosen route
+  // 3b: the probe builds the chosen route
   const p5=i>5?1:p;S.build=ease(seg(p5,.05,.9));const ap=along(ROUTES.a,S.build*0.84);const t5=seg(p5,0,.15);S.probe=[lerp(q[0],ap[0],ease(t5)),lerp(q[1],ap[1],ease(t5))];if(t5>=1)S.probe=ap;
   if(i<6){return S}
-  // stage 3: you walk the path to the goal
+  // 4a: you walk the path to the goal
   const p6=p;const off=sq(2,6);S.probe=[lerp(ap[0],off[0],ease(seg(p6,0,.25))),lerp(ap[1],off[1],ease(seg(p6,0,.25)))];
   S.you=along(ROUTES.a,ease(seg(p6,.15,.75)));S.hopYou=Math.abs(Math.sin(Math.PI*5*seg(p6,.15,.75)))*.35;S.bloom=seg(p6,.72,1);
   return S;
@@ -319,8 +407,12 @@ cv.addEventListener("pointermove",e=>{if(still||e.pointerType!=="mouse")return;c
 cv.addEventListener("pointerleave",()=>{yawT=0});
 new ResizeObserver(()=>{size();render(performance.now())}).observe(cv);
 size();setUi(0);if(still){cur=MOVES.length-1;setUi(cur);render(performance.now())}else kick();
+// The 3a demo: a choice per proposal, Auto by default, and a note that sums them up.
+document.querySelectorAll("#decideDemo .opts").forEach(g=>g.querySelectorAll("button").forEach(b=>b.addEventListener("click",()=>{g.querySelectorAll("button").forEach(x=>x.setAttribute("aria-pressed",String(x===b)));
+  const v=[...document.querySelectorAll('#decideDemo button[aria-pressed="true"]')].map(x=>x.dataset.v),a=v.filter(x=>x==="Auto").length;
+  $("demoNote").textContent=a===v.length?"Both on Auto: the probe decides each one with the evidence, and says why.":a?"Your call where you made one, and the probe decides the one left on Auto.":"Both are your calls. The final report shows how each one shaped the result."})));
 // Density charts: one unit per chart, comparators in grey and ProofProbe in the accent.
-const SOURCES_DATA=[{l:"A chat answer",v:19.48,lo:0.07,txt:"0–19",tip:"Range across four leading assistants with web search on, from two 2026 studies of 960 and 1,000 answers."},{l:"Best deep-research agent",v:111.21,txt:"111",tip:"Average effective citations per report, best of four agents on 100 PhD-level tasks (DeepResearch Bench, 2025)."},{l:"ProofProbe probe",v:229,txt:"229",us:1,tip:"Unique sources recorded in the notes of our deepest probe so far, RL Audits, from 60 domains."}];
+const SOURCES_DATA=[{l:"A chat answer",v:19.48,lo:0.07,txt:"0–19",tip:"Range across four leading assistants with web search on, from two 2026 studies of 960 answers and 1,000 questions."},{l:"Best deep-research agent",v:111.21,txt:"111",tip:"Average effective citations per report, best of four agents on 100 PhD-level tasks (DeepResearch Bench, 2025)."},{l:"ProofProbe probe",v:229,txt:"229",us:1,tip:"Unique sources recorded in the notes of our deepest probe so far, RL Audits, from 60 domains."}];
 const STEERS_DATA=[{l:"A chat answer",v:1,txt:"1",tip:"The prompt you type. Follow-ups are up to you."},{l:"ProofProbe, product audit",v:32,txt:"32",us:1,tip:"10 answers at Stage 2a and 22 decisions at Stage 3a (RL Audits)."},{l:"ProofProbe, career probe",v:40,txt:"40",us:1,tip:"40 questions answered at Stage 2a."}];
 function bars(host,data){const max=Math.max(...data.map(d=>d.v));data.forEach(d=>{const row=document.createElement("div");row.className="bar"+(d.us?" us":"");row.dataset.tip=d.tip;
   const l=document.createElement("span");l.className="lbl";l.textContent=d.l;const tr=document.createElement("span");tr.className="track";const f=document.createElement("span");f.className="fill"+(d.lo!==undefined?" range":"");f.style.width=Math.max(1.2,d.v/max*100)+"%";if(d.lo!==undefined){f.style.left=d.lo/max*100+"%";f.style.width=Math.max(1.2,(d.v-d.lo)/max*100)+"%"}tr.appendChild(f);

@@ -44,7 +44,7 @@ Local test: put `ADMIN_TOKEN_SHA256=<hash>` and `PASSWORD_KEY=<base64 key>` in `
 - The cost shown on a page is treg data spend logged with `proofprobe cost`. Claude usage is not included.
 - Submissions are append-only. A database trigger blocks updates, and each log stores a SHA-256 so corruption is detectable.
 - Page content is rendered as text only, so stored content cannot inject markup.
-- CVs and research notes stay in `.proofprobe/` on this machine, which git ignores. Only questions, intro, plan and costs go to the server.
+- CVs and research notes stay in `.proofprobe/` on this machine, which git ignores. The server holds what the site needs: questions, research, costs, answers and decisions (private to the profile and owner), and goal requests with their files (private to the owner).
 - Answer text and tokens are never logged.
 
 ## Design choices

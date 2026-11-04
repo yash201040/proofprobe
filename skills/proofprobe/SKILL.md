@@ -10,16 +10,16 @@ Staged research that ends in a clear, data-backed final report. Stages follow fo
 | Stage | Who | What happens | Page step |
 | --- | --- | --- | --- |
 | 1a | Person | Sets the goal, usually with a goal request | none |
-| 1b | You | Broad probing, ending in questions | step with plain questions |
+| 1b | You | Probe wide: broad research, ending in questions | step with plain questions |
 | 2a | Person | Answers the questions, or sends a new direction | |
-| 2b | You | Deep research inside the answers, ending in proposals | step with decision items |
+| 2b | You | Probe deep: research inside the answers, ending in proposals | step with decision items |
 | 3a | Person | Sets each proposal to Accept, Reject or Auto, then submits | |
 | 3b | You | Builds the deliverable from the decisions | step with only `plan.json` |
 | 4a | Person | Reads and downloads the final report. Nothing left to do | |
 
 The website numbers each page step by stage from its content, so always publish in this shape. Submitting never starts anything. Run a "b" stage only when the user asks.
 
-**This applies to every track.** On any page with questions, the person can skip answering and send a new direction. When the user asks you to continue, always check for that first, because it sends the work back to Step 1. See "Changing direction".
+**This applies to every track.** On any page with questions, the person can skip answering and send a new direction. When the user asks you to continue, always check for that first, because it sends the work back to Stage 1b. See "Changing direction".
 
 Helper, shown below as `proofprobe`, works from any folder:
 `node ~/HOME/Coding/Projects/personal/proofprobe/bin/proofprobe.mjs <command>`
@@ -61,7 +61,7 @@ This works from any folder and any chat, whether the research is new or already 
 
 ## Choose the track
 
-Any one starting input is enough. Profiles are optional. If there is no usable input at all, ask for one in one line. If two tracks fit and the choice changes the research, ask in one line.
+Any one starting input is enough. A LinkedIn profile, CV or founder profile helps but is optional. If there is no usable input at all, ask for one in one line. If two tracks fit and the choice changes the research, ask in one line.
 
 | Track | Typical input | Stage 1b researches | The final report must deliver |
 | --- | --- | --- | --- |
@@ -117,7 +117,7 @@ Then carry on with the next stage as normal. If the other chat already wrote pro
    - The last question must be an open "anything we missed?", marked `"catchAll": true`. Publishing refuses without it.
 8. Write `intro.json` with what the research found so far, so they see why the questions matter.
 9. Record the spend first, so the page never shows an old total: `proofprobe cost <id> <usd> "Stage 1b research"`. Use the sum of `charged_micro`, because other sessions share the treg balance. A negative amount corrects a mistake.
-10. Publish: `proofprobe publish <id> --questions .proofprobe/cases/<id>/questions.json --intro .proofprobe/cases/<id>/intro.json --status open`, Give the user the link. New profiles created here have no password. The user sets one on the Admin page.
+10. Publish: `proofprobe publish <id> --questions .proofprobe/cases/<id>/questions.json --intro .proofprobe/cases/<id>/intro.json --status open`, then give the user the link. New profiles created here have no password. The user sets one on the Admin page.
 
 `questions.json`:
 ```json
@@ -192,7 +192,7 @@ Decision items look like this. Their answers come back as `Accept`, `Reject` or 
 ## Rules
 
 - Never name Claude, treg or any research tool on a page. Describe the research by what it found, and avoid even general terms like "AI tools" or "web scraping" unless the page needs them. A person's own use of those tools can still be asked about. This applies to the website only, not to this repo.
-- Never send a CV, request text, attached document or other private material to treg or any outside service. Search with public facts only. Search with public facts only.
+- Never send a CV, request text, attached document or other private material to treg or any outside service. Search with public facts only.
 - Pages are public: anyone with the site address can read research, questions, status and cost. Answers and requested directions stay private to the profile and the owner, so never copy someone's answers, or details only they gave you, onto a page unless the user asks. Write step content with that in mind.
 - Never replace published work with new research. Each research stage is its own step on the same page, shown as a view, so don't create a second page for it.
 - People sign in with a profile name and password. Signing in unlocks that profile's pages and no others. Visitors can browse without an account. New profiles need the owner's approval, on the Admin page or with `proofprobe approve-profile <name>` when the user says so. People can change their own password, and the owner can view or reset it on the Admin page, so never ask for passwords or repeat them in chat. Wrong password guesses never lock anyone out.

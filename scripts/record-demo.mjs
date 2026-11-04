@@ -23,13 +23,14 @@ try {
     window.__step = (ms) => { t += ms; queue.splice(0).forEach((cb) => cb(t)); };
   });
   await page.goto(url, { waitUntil: "networkidle0" });
-  await page.addStyleTag({ content: "#acct{visibility:hidden!important} .moves{pointer-events:none}" });
+  // One flat background, so the edge of the fixed glow never shows as a strip in the frame.
+  await page.addStyleTag({ content: "#acct{visibility:hidden!important} .moves{pointer-events:none} body::before{display:none!important} html,body{background:#060A12!important}" });
   await page.evaluate(() => scrollTo(0, 0));
   await page.evaluate(() => document.fonts.ready);
   // The stage description, the board and the turns, edge to edge.
   const clip = await page.$eval("#game", (e) => { const r = e.getBoundingClientRect(); return { x: 0, y: Math.floor(r.top + scrollY) - 14, width: innerWidth, height: Math.ceil(r.height) + 28 }; });
   // One full game: the seven moves plus the pause on checkmate, then it loops.
-  const total = (3.8 + 4.4 + 3.8 + 4.4 + 4.2 + 4 + 5.2) * 1000 + 2400;
+  const total = (3.8 + 4.4 + 3.8 + 4.4 + 4.2 + 4 + 5.2) * 1000 + 2600; // matches the page: 2.6 s on checkmate before it loops
   const step = (1000 / FPS) * SPEED, frames = Math.ceil(total / step);
   await page.evaluate(() => window.__step(1));
   for (let i = 0; i < frames; i++) {

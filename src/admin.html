@@ -99,7 +99,12 @@ const $=id=>document.getElementById(id);
 const el=(t,x,c)=>{const e=document.createElement(t);if(x!=null)e.textContent=x;if(c)e.className=c;return e};
 const fmt=i=>i?new Date(i).toLocaleString([],{dateStyle:"medium",timeStyle:"short"}):"—";
 const money=n=>"$"+Number(n).toFixed(n>0&&n<1?3:2);
-const STAGE={draft:["Being prepared","info"],open:["Answering questions","warn"],submitted:["Answers in","info"],plan_ready:["Path ready","good"],closed:["Closed","bad"]};
+// The same turn-based stages as the probe pages: "a" is the person's move, "b" is research on your side.
+const STAGE_NAMES={"1b":"Probing wide","2a":"Answer questions","2b":"Probing deep","3a":"Decide","3b":"Building the final report","4a":"Final report"};
+const STAGE_TONE={"1b":"info","2a":"warn","2b":"info","3a":"warn","3b":"info","4a":"good",closed:"bad"};
+function stageOf(p){if(p.status==="closed")return "closed";if(p.rerouting||p.status==="draft")return "1b";if(p.status==="plan_ready"||p.lastKind==="final")return "4a";if(p.lastKind==="decisions")return p.status==="submitted"?"3b":"3a";return p.status==="submitted"?"2b":"2a"}
+const stageLabel=k=>k==="closed"?"Closed":"Stage "+k+" · "+STAGE_NAMES[k];
+const kindOfStep=s=>s.sections.some(x=>x.questions.some(q=>q.kind==="decision"))?"3a":s.sections.length?"2a":"4a";
 async function api(path,opts={}){
   const r=await fetch("/api/admin"+path,{...opts,headers:{"Content-Type":"application/json"}});
   const body=await r.json().catch(()=>({}));
@@ -147,7 +152,7 @@ function nameCell(cell,p){
     box.append(inp,save,no);cell.appendChild(box);inp.focus();inp.select();
   });
 }
-function profileRows(list,pages){
+function profileRows(list){
   const body=$("profiles");body.textContent="";
   list.forEach(p=>{
     const tr=el("tr"),pw=el("td"),set=el("td"),box=el("div",null,"row"),inp=el("input"),go=el("button","Set");
@@ -229,7 +234,7 @@ async function loadApp(){
   [[d.profiles.length,"Profiles"],[pages.length,"Pages"],[sub,"Submissions"],[money(cost),"Research cost"]].forEach(([v,l])=>{const c=el("div",null,"tile");c.append(el("b",String(v)),el("span",l));t.appendChild(c)});
   const body=$("rows");body.textContent="";
   pages.forEach(p=>{
-    const tr=el("tr"),[s,tone]=p.rerouting?["Changing direction","warn"]:STAGE[p.status]||[p.status,"info"];
+    const tr=el("tr"),k=stageOf(p),s=stageLabel(k),tone=STAGE_TONE[k]||"info";
     const open=el("button","Manage","link");open.type="button";open.addEventListener("click",()=>loadDetail(p.id));
     const stage=el("td");stage.appendChild(el("span",s,"chip "+tone));
     const a=el("a",p.title);a.href="/probes/"+p.profile_slug+"/"+p.slug;const title=el("td");title.appendChild(a);
@@ -266,14 +271,14 @@ async function loadDetail(id){
   save.addEventListener("click",async()=>{
     const changed={};qs.forEach(q=>{if(fields[q.id].value!==(d.answers[q.id]?.text||""))changed[q.id]=fields[q.id].value});
     if(!Object.keys(changed).length)return void(saveMsg.textContent="No changes to save.");
-    try{await api("/pages/"+id+"/answers",{method:"PUT",body:JSON.stringify({answers:changed})});saveMsg.textContent="Saved. Visitors see this after the next submission.";loadDetail(id);loadApp()}catch(e){saveMsg.textContent="Couldn't save."}
+    try{await api("/pages/"+id+"/answers",{method:"PUT",body:JSON.stringify({answers:changed})});saveMsg.textContent="Saved. The profile sees this now.";loadDetail(id);loadApp()}catch(e){saveMsg.textContent="Couldn't save."}
   });
   box.appendChild(ans);
 
   const logs=el("details",null,"fold");logs.appendChild(el("summary","Submission logs ("+d.submissions.length+")"));
   if(!d.submissions.length)logs.appendChild(el("p","Nothing submitted yet.","muted"));
   d.submissions.slice().reverse().forEach(s=>{
-    const one=el("details",null,"fold"),h=el("summary","Submission "+s.seq+" (step "+s.stepN+"), "+fmt(s.submittedAt)+", "+s.answered+" of "+s.total+" answers"+(s.intact?"":" (failed integrity check)"));one.appendChild(h);
+    const one=el("details",null,"fold"),h=el("summary","Submission "+s.seq+" (Stage "+(()=>{const st=d.steps.find(x=>x.n===s.stepN);return st?kindOfStep(st):"?"})()+", step "+s.stepN+"), "+fmt(s.submittedAt)+", "+s.answered+" of "+s.total+" answers"+(s.intact?"":" (failed integrity check)"));one.appendChild(h);
     const inner=el("div",null,"grid2");inner.style.marginTop="10px";(s.items||[]).forEach((q,i)=>{const w=el("div",null,"qa");w.append(el("b",(i+1)+". "+q.question),el("p",q.answer||"Not answered"));inner.appendChild(w)});one.appendChild(inner);logs.appendChild(one);
   });
   box.appendChild(logs);

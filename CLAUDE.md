@@ -7,10 +7,10 @@ ProofProbe turns any starting point into a clear, data-backed path through stage
 Stages follow four turns, like moves in a game: in each turn, "a" is the person's move and "b" is research the owner runs by asking for it. Nothing on the site starts research.
 
 - **1a, Goal.** A signed-in profile sends a goal request, or the owner starts a page.
-- **1b, Broad probing.** Spend treg credits on real analysis, split into a few research tracks, then turn the facts into exhaustive, personalised questions, gate questions first, ending with an open "anything we missed?".
-- **2a, Answers.** They answer in their own time, or send a new direction, which sends the work back to 1b. Submitting only stores a log.
-- **2b, Deep research.** Treat the answers as a fence, finish the research, and publish proposals as decision items, each with its evidence and an Auto default.
-- **3a, Decisions.** They set each proposal to Accept, Reject or Auto. Leaving everything on Auto must still produce a strong result.
+- **1b, Probe wide.** Spend treg credits on real analysis, split into a few research tracks, then turn the facts into exhaustive, personalised questions, gate questions first, ending with an open "anything we missed?".
+- **2a, Answer.** They answer in their own time, or send a new direction, which sends the work back to 1b. Submitting only stores a log.
+- **2b, Probe deep.** Treat the answers as a fence, finish the research, and publish proposals as decision items, each with its evidence and an Auto default.
+- **3a, Decide.** They set each proposal to Accept, Reject or Auto. Leaving everything on Auto must still produce a strong result.
 - **3b, Build.** Resolve every decision, build the deliverable (a deterministic path, PRD, build plan, rulebook or direct answer), and calibrate it while building.
 - **4a, Final report.** A read-only view with reasoning cards for each major call, downloadable as offline HTML or PDF.
 
@@ -43,7 +43,7 @@ Run it with no command to see the options. The Cloudflare and admin details are 
 
 ## Rules for changes
 
-- Free tier only. No login or accounts for now.
+- Free tier only. Accounts are owner-approved profiles with a name and password, and nothing more.
 - Navigation is deliberate: there is no menu, so the home page's links sit at the end of the scroll.
 - Site map: home page at `/`, directory at `/probes`, and each page at `/probes/<profile>/<page>`. One profile can hold several pages.
 - The Admin page at `/admin` opens with a master password. It shows passwords, answers, logs and costs. Profile passwords are hashed for checking and AES-GCM encrypted with the `PASSWORD_KEY` secret for display. Master password guesses pause after 6 tries, but profile passwords never do.
