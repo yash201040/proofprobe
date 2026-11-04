@@ -24,7 +24,8 @@ try {
   });
   await page.goto(url, { waitUntil: "networkidle0" });
   // One flat background, so the edge of the fixed glow never shows as a strip in the frame.
-  await page.addStyleTag({ content: "#acct{visibility:hidden!important} .moves{pointer-events:none} body::before{display:none!important} html,body{background:#060A12!important}" });
+  await page.addStyleTag({ content: "#acct{visibility:hidden!important} .moves{pointer-events:none} body::before{display:none!important} html,body{background:#060A12!important} *{transition:none!important}" });
+  await page.waitForSelector("#game.ready");
   await page.evaluate(() => scrollTo(0, 0));
   await page.evaluate(() => document.fonts.ready);
   // The stage description, the board and the turns, edge to edge.

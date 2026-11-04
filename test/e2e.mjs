@@ -43,6 +43,8 @@ ok((await page.$eval('.cta[href*="github"]', (e) => e.target)) === "_blank", "Gi
 ok((await page.$('.adminlink[href="/admin"]')) !== null, "the Admin link is on the home page");
 await page.waitForSelector("#acctBtn"); ok((await page.$eval("#acctBtn", (e) => { const r = e.getBoundingClientRect(); return r.top < 30 && innerWidth - r.right < 40 && e.textContent === "Sign in"; })), "Sign in is at the top right of the home page");
 ok(!(await page.$("#acctMe")), "a visitor isn't shown as signed in");
+await page.waitForSelector("#game.ready");
+ok((await txt("#capWho")).startsWith("Stage 1a") && (await page.$eval('#moves .mv[data-i="0"]', (e) => e.classList.contains("now"))) && (await page.$eval("#boardLoad", (e) => e.classList.contains("gone"))), "the game starts at 1a once the board is ready");
 ok((await page.$$("#moves .mv")).length === 7 && (await page.$$eval("#moves .mv.you", (l) => l.length)) === 4, "the game shows four moves for you and three for the probe");
 await page.click('#moves .mv[data-i="5"]'); ok((await txt("#capWho")).startsWith("Stage 3b") && (await page.$eval("#colProbe", (e) => e.classList.contains("on"))) && !(await page.$("#play")), "picking a move shows that stage and whose turn it is, with no pause button");
 ok(await page.evaluate(() => document.querySelector("#caption").getBoundingClientRect().bottom <= document.querySelector("#board").getBoundingClientRect().top + 1), "the stage description sits above the board");
@@ -50,6 +52,17 @@ const boardTops = []; for (const i of [0, 1, 6]) { await page.click('#moves .mv[
 ok(new Set(boardTops).size === 1, "the board stays put whichever stage is shown");
 await new Promise((r) => setTimeout(r, 400)); ok(await page.$eval("#board", (c) => { const x = c.getContext("2d").getImageData(0, 0, c.width, c.height).data; let n = 0; for (let i = 3; i < x.length; i += 400) if (x[i] > 0) n++; return n > 200; }), "the crystal board draws");
 ok((await page.$$("#bring .chips span")).length >= 40, "Stage 1a lists many things people can bring");
+const slow = await browser.newPage(); await slow.setRequestInterception(true);
+slow.on("request", (r) => { if (r.url().includes("fonts.googleapis")) setTimeout(() => r.continue(), 1800); else r.continue(); });
+await slow.goto(base + "/", { waitUntil: "domcontentloaded" }); await new Promise((r) => setTimeout(r, 600));
+ok((await slow.$eval("#boardLoad", (e) => !e.classList.contains("gone"))) && (await slow.$eval("#topLoad", (e) => !e.classList.contains("gone"))) && !(await slow.$("#game.ready")), "while the board loads, a loading bar shows instead of the game");
+await slow.waitForSelector("#game.ready", { timeout: 8000 });
+ok((await slow.$eval("#capWho", (e) => e.textContent)).startsWith("Stage 1a"), "after a slow load the game still starts at 1a"); await slow.close();
+const phoneHome = await browser.newPage(); await phoneHome.setViewport({ width: 390, height: 700, isMobile: true, hasTouch: true });
+await phoneHome.goto(base + "/", { waitUntil: "networkidle0" }); await phoneHome.waitForSelector("#game.ready"); await new Promise((r) => setTimeout(r, 5000));
+const beforeScroll = await phoneHome.$eval("#capWho", (e) => e.textContent);
+await phoneHome.$eval("#game", (e) => e.scrollIntoView({ block: "center" })); await new Promise((r) => setTimeout(r, 300));
+ok(beforeScroll.startsWith("Stage 1a") && (await phoneHome.$eval("#capWho", (e) => e.textContent)).startsWith("Stage 1a"), "the game waits off screen and starts at 1a when scrolled into view"); await phoneHome.close();
 ok((await page.$$eval("#stages .badge", (l) => l.map((e) => e.textContent).join())) === "1a,1b,2a,2b,3a,3b,4a" && (await page.$$eval("#stages .badge", (l) => l.every((e) => getComputedStyle(e).textTransform === "none"))), "every stage has its own section, with lowercase codes");
 await page.setViewport({ width: 1366, height: 900 });
 ok(await page.evaluate(() => { const t = [...document.querySelectorAll("#bring .group")].map((g) => Math.round(g.getBoundingClientRect().top)); return new Set(t).size === 1; }), "the five Stage 1a groups fit one row on desktop");

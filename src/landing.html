@@ -29,6 +29,16 @@ h1 em{font-style:normal;background:linear-gradient(100deg,var(--you),#E8FBFF 45%
 .cta .ico{width:19px;height:19px}.cta .arrow{transition:transform .2s ease}
 @media (hover:hover){.cta:hover{transform:translateY(-2px)}.cta:hover .arrow{transform:translateX(4px)}.cta.alt:hover{border-color:var(--you)}}
 .cta:active{transform:scale(.97)}
+/* Loading: a slim bar up top and a quiet notice on the board, until the board can start from 1a. */
+.topload{position:fixed;top:0;left:0;right:0;z-index:40;height:3px;overflow:hidden;background:rgba(143,230,242,.12)}
+.topload::before{content:"";position:absolute;top:0;bottom:0;left:-40%;width:40%;background:linear-gradient(90deg,transparent,var(--you),var(--probe),transparent);animation:lslide 1.1s ease-in-out infinite}
+.boardload{position:absolute;inset:0;display:grid;place-content:center;justify-items:center;gap:12px;color:var(--muted);font-size:15px;transition:opacity .35s ease}
+.lbar{display:block;width:min(220px,60%);height:4px;border-radius:999px;overflow:hidden;background:rgba(143,230,242,.14);position:relative}
+.lbar i{position:absolute;top:0;bottom:0;left:-45%;width:45%;border-radius:999px;background:linear-gradient(90deg,var(--you),var(--probe));animation:lslide 1.1s ease-in-out infinite}
+@keyframes lslide{to{left:100%}}
+.boardload.gone,.topload.gone{opacity:0;pointer-events:none}.topload{transition:opacity .35s ease}
+#board{transition:opacity .45s ease}.game:not(.ready) #board{opacity:0}
+@media (prefers-reduced-motion:reduce){.topload::before,.lbar i{animation:none;left:0;width:100%}.boardload,#board,.topload{transition:none}}
 /* the game */
 .game{position:relative;display:grid;gap:14px}
 .boardwrap{position:relative;aspect-ratio:1/.86;width:100%}
@@ -132,6 +142,7 @@ h2{font:800 clamp(32px,4vw,52px)/1.02 var(--display);letter-spacing:-.025em;marg
 @media (max-width:560px){section{padding-block:52px}.bar{grid-template-columns:minmax(0,104px) minmax(0,1fr) 54px;gap:8px}.mv{padding:6px 7px;font-size:14px}}
 @media (prefers-reduced-motion:reduce){.cta,.mv,.colhead,.fill{transition:none}.colhead.on i{animation:none}}
 </style></head><body>
+<div class="topload" id="topLoad" aria-hidden="true"></div>
 <div class="top"><span class="brand">ProofProbe</span></div>
 <main>
 <section class="hero">
@@ -143,7 +154,7 @@ h2{font:800 clamp(32px,4vw,52px)/1.02 var(--display);letter-spacing:-.025em;marg
   </div>
   <div class="game" id="game">
     <div class="caption you" id="caption" aria-live="polite"><div class="cap"><div class="who" id="capWho"></div><h3 id="capTitle"></h3><p id="capText"></p></div></div>
-    <div class="boardwrap"><canvas id="board" role="img" aria-label="A crystal chessboard where you and the probe take turns, ending in one lit path to the goal."></canvas></div>
+    <div class="boardwrap"><canvas id="board" role="img" aria-label="A crystal chessboard where you and the probe take turns, ending in one lit path to the goal."></canvas><div class="boardload" id="boardLoad" role="status"><span class="lbar"><i></i></span><span>Setting up the board</span></div></div>
     <div class="movebox"><div class="colheads" aria-hidden="true"><span class="colhead you" id="colYou"><i></i>You</span><span class="colhead probe" id="colProbe"><i></i>Probe</span></div><ol class="moves" id="moves" aria-label="Moves. Pick one to jump to it."></ol></div>
   </div>
 </section>
@@ -389,24 +400,33 @@ function draw(i,p,now){
   ps.sort((a,b)=>b[1][1]-a[1][1]).forEach(([k,pos,a,l])=>piece(pos[0],pos[1],k,a,l,now));
 }
 // Playback
-let cur=0,t0=performance.now(),playing=!still,visible=true,raf=0;
+// The game starts at 1a only once the board is ready and on screen, and it pauses (never skips) while hidden.
+let cur=0,t0=performance.now(),playing=!still,visible=false,raf=0,ready=false,started=false,held=null;
 function setUi(i){const m=MOVES[i];$("caption").className="caption "+m.who;const cw=$("capWho"),code=document.createElement("span");code.className="code";code.textContent=m.k;cw.textContent="";cw.append("Stage ",code," · "+(m.who==="you"?"Your move":"The probe's move"));$("capTitle").textContent=m.t;$("capText").textContent=m.d;
   $("colYou").classList.toggle("on",m.who==="you");$("colProbe").classList.toggle("on",m.who==="probe");
   document.querySelectorAll(".mv").forEach(b=>{const k=+b.dataset.i;b.classList.toggle("now",k===i);b.classList.toggle("done",k<i);b.setAttribute("aria-current",k===i?"step":"false")})}
-function jump(i){cur=i;t0=performance.now()-(still?MOVES[i].dur*1000:0);setUi(i);if(still)render(performance.now());else kick()}
-function render(now){const m=MOVES[cur],p=still?1:cl((now-t0)/(m.dur*1000));draw(cur,p,now);return p}
-function loop(now){raf=0;if(!visible)return;
+function jump(i){if(!ready)return;started=true;held=null;cur=i;t0=performance.now()-(still?MOVES[i].dur*1000:0);setUi(i);render(performance.now());kick()}
+function render(now){if(!ready)return 0;const m=MOVES[cur],p=still?1:cl((now-t0)/(m.dur*1000));draw(cur,p,now);return p}
+function begin(){if(started||!ready||!visible)return;started=true;held=null;cur=still?MOVES.length-1:0;t0=performance.now();setUi(cur);if(still)render(t0);else kick()}
+function pause(){if(started&&held===null)held=performance.now()-t0}
+function resume(){if(held!==null){t0=performance.now()-held;held=null}begin();kick()}
+function loop(now){raf=0;if(!visible||!started)return;
   const p=render(now);
   if(playing&&p>=1){if(cur<MOVES.length-1){cur++;t0=now;setUi(cur)}else if(now-t0>MOVES[cur].dur*1000+2600){cur=0;t0=now;setUi(0)}}
   raf=requestAnimationFrame(loop)}
-function kick(){if(!raf&&visible&&!still)raf=requestAnimationFrame(loop)}
+function kick(){if(!raf&&visible&&started&&!still)raf=requestAnimationFrame(loop)}
 if(still)playing=false;
-new IntersectionObserver(es=>es.forEach(e=>{visible=e.isIntersecting;if(visible){kick();if(still)render(performance.now())}}),{threshold:.05}).observe($("game"));
-document.addEventListener("visibilitychange",()=>{visible=!document.hidden;kick()});
+let onScreen=false;const setVisible=()=>{const v=onScreen&&!document.hidden;if(v===visible)return;visible=v;if(v)resume();else pause()};
+new IntersectionObserver(es=>es.forEach(e=>{onScreen=e.isIntersecting;setVisible()}),{threshold:.3}).observe(cv);
+document.addEventListener("visibilitychange",setVisible);
 cv.addEventListener("pointermove",e=>{if(still||e.pointerType!=="mouse")return;const r=cv.getBoundingClientRect();yawT=((e.clientX-r.left)/r.width-.5)*.2});
 cv.addEventListener("pointerleave",()=>{yawT=0});
 new ResizeObserver(()=>{size();render(performance.now())}).observe(cv);
-size();setUi(0);if(still){cur=MOVES.length-1;setUi(cur);render(performance.now())}else kick();
+size();setUi(0);
+// Ready means the font stylesheet arrived and the fonts drawn on the board are in, with a fallback so a slow font server never strands anyone.
+const fontCss=new Promise(r=>{const l=document.querySelector('link[href*="fonts.googleapis"]');if(!l||(l.rel==="stylesheet"&&l.sheet))return r();l.addEventListener("load",()=>setTimeout(r,0));l.addEventListener("error",r)});
+Promise.race([fontCss.then(()=>Promise.all(['600 13px "Instrument Sans"','800 40px "Bricolage Grotesque"','500 12px "JetBrains Mono"'].map(f=>document.fonts.load(f)))).catch(()=>{}),new Promise(r=>setTimeout(r,4000))])
+  .then(()=>{size();ready=true;$("game").classList.add("ready");$("boardLoad").classList.add("gone");$("topLoad").classList.add("gone");setTimeout(()=>{$("boardLoad").hidden=true;$("topLoad").hidden=true},400);begin()});
 // The 3a demo: a choice per proposal, Auto by default, and a note that sums them up.
 document.querySelectorAll("#decideDemo .opts").forEach(g=>g.querySelectorAll("button").forEach(b=>b.addEventListener("click",()=>{g.querySelectorAll("button").forEach(x=>x.setAttribute("aria-pressed",String(x===b)));
   const v=[...document.querySelectorAll('#decideDemo button[aria-pressed="true"]')].map(x=>x.dataset.v),a=v.filter(x=>x==="Auto").length;
