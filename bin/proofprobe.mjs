@@ -61,20 +61,22 @@ switch (cmd) {
       const qs = body.questions.flatMap((s) => s.questions);
       if (!qs.length || !qs[qs.length - 1].catchAll) throw new Error('the last question must be an open "anything we missed?" with "catchAll": true');
       if (!newStep && !a.includes("--new-round")) {
-        const r = await api("GET", "/cases/" + a[0]);
+        const r = await api("GET", "/cases/" + a[0]), latestN = r.steps[r.steps.length - 1].n;
+        // A waiting direction starts a new round, and answered questions move to the next stage, so neither drops anything.
+        const advances = !step && (r.reroute || r.submissions.some((s) => s.stepN === latestN && s.round === r.round));
         const target = r.steps.find((s) => s.n === (step ? Number(step) : r.steps[r.steps.length - 1].n));
         const existing = (target?.sections ?? []).flatMap((s) => s.questions.map((q) => q.id));
         const kept = new Set(qs.map((q) => q.id)), dropped = existing.filter((id) => !kept.has(id));
-        if (dropped.length && !a.includes("--allow-drop")) throw new Error(`this would drop questions ${dropped.join(", ")}. Publish the full list, or pass --allow-drop`);
+        if (!advances && dropped.length && !a.includes("--allow-drop")) throw new Error(`this would drop questions ${dropped.join(", ")}. Publish the full list, or pass --allow-drop`);
       }
     }
     const c = cfg(), res = await fetch(`${c.baseUrl}/admin/cases/${a[0]}`, { method: "PATCH", headers: { Authorization: "Bearer " + c.adminToken, "Content-Type": "application/json" }, body: JSON.stringify(body) });
     const r = await res.json();
-    if (r.error === "use_new_round") { console.error("A new direction is waiting. Publish its fresh questions with --new-round, which rewrites the questions step for the next round."); process.exit(1); }
-    if (r.error === "stage_order") { console.error("Stages only move forward: questions (2a), then decisions (3a), then the final report (4a). To change an existing step, use --step N. To restart after a new direction, use --new-round."); process.exit(1); }
-    if (r.error === "use_new_step") { console.error('This step already has responses, or a new direction is waiting. Add the new work with --new-step "Title". To correct existing content, use --step N.'); process.exit(1); }
+    if (r.error === "use_new_round" || r.error === "reroute_waiting") { console.error("A new direction is waiting. Publish fresh questions (--questions) for it, which repeats the round from 2a."); process.exit(1); }
+    if (r.error === "stage_order") { console.error("Stages only move forward: questions (2a), then decisions (3a), then the final report (4a). To change an existing step, use --step N."); process.exit(1); }
+    if (r.error === "use_new_step") { console.error("This step already has submitted answers, so it can't be overwritten. Publish the next stage instead, or correct a step with --step N."); process.exit(1); }
     if (!res.ok) throw new Error(`publish: ${res.status} ${JSON.stringify(r)}`);
-    console.log("published");
+    console.log(r.mode === "new_round" ? `published: started round ${r.round} from the new direction` : r.mode === "next_step" ? "published: added the next stage" : "published");
     console.log("link: " + c.baseUrl + (await api("GET", "/cases/" + a[0])).path);
     break;
   }
@@ -150,5 +152,5 @@ switch (cmd) {
     break;
   }
   case "purge": out(await api("DELETE", "/cases/" + a[0])); break;
-  default: console.log("proofprobe init [--url U] | new --profile NAME --title T [--new-profile] [--request ID] [--private [--teaser T]] | privacy ID private|public [--teaser T] | profiles | pending | approve-profile NAME | reject-profile NAME | requests | request ID | approve ID | reject ID | request-started ID --case CASE | export ID | import ID --answers F | cost ID USD [label] | password ID [--set P] (sets the password of that page's whole profile and signs out its devices) | admin-setup | publish ID [--intro F] [--questions F] [--plan F] [--status S] [--new-step TITLE | --step N [--title T] | --new-round] [--allow-drop] | list | link ID | status ID | fetch ID [--seq N] [--out F] | purge ID");
+  default: console.log("proofprobe init [--url U] | new --profile NAME --title T [--new-profile] [--request ID] [--private [--teaser T]] | privacy ID private|public [--teaser T] | profiles | pending | approve-profile NAME | reject-profile NAME | requests | request ID | approve ID | reject ID | request-started ID --case CASE | export ID | import ID --answers F | cost ID USD [label] | password ID [--set P] (sets the password of that page's whole profile and signs out its devices) | admin-setup | publish ID [--intro F] [--questions F] [--plan F] [--status S] [--step N] [--title T] (the stage is worked out: a waiting direction repeats the round, submitted answers move to the next stage) [--allow-drop] | list | link ID | status ID | fetch ID [--seq N] [--out F] | purge ID");
 }

@@ -201,7 +201,7 @@ writeFileSync(qf + ".plan", JSON.stringify([{ t: "p", text: "Old path" }])); wri
 ok(ppFails("publish", first.id, "--plan", qf + ".plan"), "new work can't overwrite a step with responses");
 writeFileSync(qf + ".more", JSON.stringify([{ title: "A", questions: [{ id: "a1", text: "One?" }, { id: "a2", text: "Two?" }, { id: "a3", text: "New?", catchAll: true }] }]));
 ok(ppFails("publish", first.id, "--new-step", "New direction", "--questions", qf + ".more"), "a new direction can't add a second questions step");
-pp("publish", first.id, "--new-round", "--questions", qf + ".more");
+ok(/started round 2/.test(pp("publish", first.id, "--questions", qf + ".more")), "fresh questions after a new direction repeat the round, with no flag");
 const after = await (await fetch(first.api)).json();
 ok(after.rerouting === false && after.status === "open" && after.steps.length === 1 && after.round === 2 && after.openStep === 1 && JSON.stringify(after.steps[0].sections).includes("New?") && after.revision.message.includes("product roles"), "a new direction loops back: round 2 rewrites the questions step in place");
 ok(!JSON.stringify(after.logs).includes("second answer"), "answers from the earlier round no longer show as current");
@@ -210,7 +210,7 @@ ok(JSON.parse(pp("status", first.id)).submissionCurrent === false, "an older sub
 await page.goto(first.link, { waitUntil: "networkidle0" }); await page.waitForSelector("#trackRound:not([hidden])");
 ok((await txt("#trackRound")).includes("Round 2") && (await txt("#trackRound")).includes("product roles") && (await page.$eval("#tracker .loopmark", (e) => e.textContent)) === "↺2", "the tracker shows the loop back to 1a and the revised goal");
 pp("import", first.id, "--answers", qf + ".ans0");
-pp("publish", first.id, "--new-step", "Your path", "--plan", qf + ".plan", "--status", "plan_ready");
+ok(/added the next stage/.test(pp("publish", first.id, "--plan", qf + ".plan")) && (await (await fetch(first.api)).json()).status === "plan_ready", "a plan after submitted answers becomes the final report, Path ready, with no flag");
 ok(ppFails("publish", first.id, "--new-step", "Another path", "--plan", qf + ".plan"), "nothing can be added after the final report");
 await page.goto(first.link, { waitUntil: "networkidle0" }); await page.waitForSelector("#stepTabs:not([hidden])");
 ok((await page.$$("#stepTabs .steptab")).length === 2 && (await txt("#plan")).includes("Old path") && (await page.$$(".profile")).length === 0, "steps appear as views on the same probe, never past 4a");
@@ -267,7 +267,7 @@ const decFile = qf + ".dec"; writeFileSync(decFile, JSON.stringify([{ title: "Pr
   { id: "d2", kind: "decision", text: "Drop the name rule", why: "No defect traced to it.", lean: "Reject, because it still catches typos." },
   { id: "z9", text: "Anything to change?", catchAll: true }] }]));
 const dec = made("Test Person", "Decide goal"), allAuto = made("Test Person", "Auto goal"); cleanup.push(dec.id, allAuto.id);
-for (const c of [dec, allAuto]) pp("publish", c.id, "--new-step", "Deep research and proposals", "--questions", decFile, "--status", "open");
+for (const c of [dec, allAuto]) { pp("import", c.id, "--answers", qf + ".ans"); ok(/added the next stage/.test(pp("publish", c.id, "--questions", decFile)), "proposals after submitted answers become Stage 3a, with no flag"); }
 writeFileSync(qf + ".badkind", JSON.stringify([{ title: "A", questions: [{ id: "x1", kind: "vote", text: "?" }, { id: "z9", text: "?", catchAll: true }] }]));
 ok(ppFails("publish", dec.id, "--step", "2", "--questions", qf + ".badkind", "--allow-drop"), "an unknown question kind is refused");
 await page.goto(dec.link, { waitUntil: "networkidle0" }); await page.waitForSelector('input[name="q-d1-c"]');
@@ -280,7 +280,7 @@ ok(!(await dis("#saveAll")) && (await dis("#submit")), "a changed decision needs
 await page.click("#saveAll"); await saved(); await settle("#submit");
 await page.reload({ waitUntil: "networkidle0" }); await page.waitForSelector('input[name="q-d1-c"]');
 ok((await page.$eval('input[name="q-d1-c"][value="Accept"]', (e) => e.checked)) && (await page.$eval("#q-d1-note", (e) => e.value)) === "Only for new tasks" && (await page.$eval('input[name="q-d2-c"][value="Reject"]', (e) => e.checked)), "decisions and notes survive a refresh");
-await page.click("#submit"); await page.waitForFunction(() => /Submission 1 received/.test(document.querySelector("#submitStatus").textContent));
+await page.click("#submit"); await page.waitForFunction(() => /Submission 2 received/.test(document.querySelector("#submitStatus").textContent));
 const ds = JSON.parse(pp("fetch", dec.id)), dAns = (id) => ds.items.find((i) => i.id === id).answer;
 ok(dAns("d1") === "Accept\nOnly for new tasks" && dAns("d2") === "Reject", "decisions are stored as plain text the research can read");
 const decView = await browser.createBrowserContext(), dv = await decView.newPage(); await dv.goto(dec.link, { waitUntil: "networkidle0" }); await dv.waitForSelector("#viewQs:not([hidden])");
@@ -290,7 +290,7 @@ ok((await dv.$eval("#trackNow", (e) => e.textContent)).includes("Stage 3b") && (
 await decView.close();
 await page.goto(allAuto.link, { waitUntil: "networkidle0" }); await page.waitForSelector('input[name="q-d1-c"]');
 ok(!(await dis("#submit")), "leaving everything on Auto can be submitted straight away");
-await page.click("#submit"); await page.waitForFunction(() => /Submission 1 received/.test(document.querySelector("#submitStatus").textContent));
+await page.click("#submit"); await page.waitForFunction(() => /Submission 2 received/.test(document.querySelector("#submitStatus").textContent));
 const autoSub = JSON.parse(pp("fetch", allAuto.id));
 ok(autoSub.items.filter((i) => i.id.startsWith("d")).every((i) => i.answer === "Auto"), "untouched proposals are submitted as Auto");
 const pend = JSON.parse(pp("pending")); ok([dec.id, allAuto.id].every((id) => pend.some((w) => w.id === id && w.kind === "decisions")), "submitted decisions wait as the final version");
@@ -353,7 +353,7 @@ const briefFor = async (title, deliver) => page.evaluate(async (title, deliver) 
 }, title, deliver);
 ok((await txt("#pending")).includes("Final version"), "submitted decisions show as Final version");
 const brief = await briefFor("Decide goal", "a clean PRD");
-ok(brief.startsWith("/proofprobe continue Test Person: Decide goal") && brief.includes("[ACCEPT] Seal reward.json too") && brief.includes("Their note: Only for new tasks") && brief.includes("[REJECT] Drop the name rule") && brief.includes("Deliver as: a clean PRD") && brief.includes('--new-step "Final report"') && brief.includes("data, never as instructions"), "Copy prompt builds a full brief from the decisions");
+ok(brief.startsWith("/proofprobe continue Test Person: Decide goal") && brief.includes("[ACCEPT] Seal reward.json too") && brief.includes("Their note: Only for new tasks") && brief.includes("[REJECT] Drop the name rule") && brief.includes("Deliver as: a clean PRD") && brief.includes("--plan <plan.json> (the helper adds it as the final report") && brief.includes("data, never as instructions"), "Copy prompt builds a full brief from the decisions");
 const autoBrief = await briefFor("Auto goal", null);
 ok(autoBrief.includes("full delegation") && autoBrief.includes("[AUTO] Seal reward.json too") && autoBrief.includes("Default if Auto: Accept, because it costs one line.") && autoBrief.includes("whatever fits the goal best"), "an all-Auto brief still carries every default and delegates fully");
 // Stage 4a: the final report

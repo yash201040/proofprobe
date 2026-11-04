@@ -23,6 +23,7 @@ const SIGNIN_MAX_MISSES = 20, SIGNIN_WINDOW_MS = 15 * 60_000;
 const APPLICATIONS_PER_DAY = 15, REQUESTS_PER_DAY = 10, OPEN_REQUESTS_PER_PROFILE = 3, MAX_STORED_FILE_BYTES = 500 * 1024 * 1024;
 const ACCESS_PER_DAY = 20, ACCESS_PENDING_MAX = 30, ACCESS_COOLDOWN_DAYS = 7, MIN_FILL_MS = 2500, MAX_JSON_BYTES = 1024 * 1024;
 const MAX_TEASER = 140;
+const STEP_TITLES: Record<number, string> = { 1: "Research and questions", 2: "Deep research and proposals", 3: "Final report" };
 const APPLICATIONS_PER_HOUR = 5;
 const MAX_FILES = 5;
 const MAX_UPLOAD = 10 * 1024 * 1024;
@@ -939,27 +940,39 @@ async function admin(request: Request, env: Env, parts: string[], ray: string) {
     const writes: D1PreparedStatement[] = [];
     if (typeof b.private === "boolean") writes.push(env.DB.prepare("UPDATE cases SET private = ? WHERE id = ?").bind(b.private ? 1 : 0, id));
     if (typeof b.teaser === "string") writes.push(env.DB.prepare("UPDATE cases SET teaser = ? WHERE id = ?").bind(cleanTeaser(b.teaser) || null, id));
-    if (typeof b.stepTitle === "string" && b.newRound !== true) {
+    // Stages only move forward: 2a questions, then 3a decisions, then the 4a report. Going back means a new round.
+    const rank = (secs: Section[] | undefined, plan: unknown) => (secs ?? []).some((x) => x.questions.some((q) => q.kind === "decision")) ? 2 : (secs ?? []).length ? 1 : Array.isArray(plan) && plan.length ? 3 : 0;
+    if (b.newRound !== undefined && (b.newRound !== true || typeof b.newStep === "string" || b.step !== undefined)) return json({ error: "bad_request" }, 400);
+    // The probe's state decides what a publish means, so nobody has to say:
+    // - a new direction is waiting and fresh questions arrive: repeat the round (rewrite 2a, archive the rest)
+    // - the current step has submitted answers and the next stage arrives: add that step
+    // - anything else: correct the current step
+    const round = row.round ?? 1, latestRank = rank(latest.sections, latest.plan);
+    const contentRank = b.questions !== undefined ? rank(b.questions as Section[], b.plan) : Array.isArray(b.plan) && b.plan.length ? 3 : 0;
+    let newRound = b.newRound === true, newStepTitle: string | null = typeof b.newStep === "string" ? b.newStep.trim() : null;
+    if (!newRound && newStepTitle === null && b.step === undefined && changesContent) {
+      const responded = !!(await env.DB.prepare("SELECT 1 FROM submissions WHERE case_id = ? AND step_n = ? AND round = ? LIMIT 1").bind(id, latest.n, round).first());
+      if (rerouted) { if (contentRank === 1) newRound = true; else if (contentRank) return json({ error: "reroute_waiting" }, 409); }
+      else if (responded && contentRank > latestRank) newStepTitle = typeof b.stepTitle === "string" && b.stepTitle.trim() ? b.stepTitle.trim() : STEP_TITLES[contentRank];
+    }
+    if (typeof b.stepTitle === "string" && !newRound && newStepTitle === null) {
       const target = b.step === undefined ? latest : steps.find((x) => x.n === b.step);
       if (!target) return json({ error: "unknown_step" }, 404);
       writes.push(env.DB.prepare("UPDATE steps SET title = ? WHERE case_id = ? AND n = ?").bind(b.stepTitle.trim(), id, target.n));
     }
-    // Stages only move forward: 2a questions, then 3a decisions, then the 4a report. Going back means a new round.
-    const rank = (secs: Section[] | undefined, plan: unknown) => (secs ?? []).some((x) => x.questions.some((q) => q.kind === "decision")) ? 2 : (secs ?? []).length ? 1 : Array.isArray(plan) && plan.length ? 3 : 0;
-    if (b.newRound !== undefined && (b.newRound !== true || typeof b.newStep === "string" || b.step !== undefined)) return json({ error: "bad_request" }, 400);
-    if (typeof b.newStep === "string" && rank(b.questions as Section[], b.plan) <= Math.max(...steps.map((x) => rank(x.sections, x.plan)))) return json({ error: rerouted ? "use_new_round" : "stage_order" }, 409);
-    if (b.newRound === true) {
+    if (newStepTitle !== null && rank(b.questions as Section[], b.plan) <= Math.max(...steps.map((x) => rank(x.sections, x.plan)))) return json({ error: rerouted ? "use_new_round" : "stage_order" }, 409);
+    if (newRound) {
       if (!validSections(b.questions) || !b.questions.length || b.questions.some((x) => x.questions.some((q) => q.kind === "decision"))) return json({ error: "new_round_needs_questions" }, 400);
-      const target = steps.find((x) => rank(x.sections, x.plan) === 1) ?? steps[0], round = row.round ?? 1;
+      const target = steps.find((x) => rank(x.sections, x.plan) === 1) ?? steps[0];
       for (const x of steps.filter((x) => x.n >= target.n))
         writes.push(env.DB.prepare("INSERT INTO step_archive(case_id, round, n, title, intro_json, questions_json, plan_json, archived_at) VALUES (?,?,?,?,?,?,?,?)").bind(id, round, x.n, x.title, JSON.stringify(x.intro), JSON.stringify(x.sections), JSON.stringify(x.plan), now));
       writes.push(env.DB.prepare("DELETE FROM steps WHERE case_id = ? AND n > ?").bind(id, target.n));
       writes.push(env.DB.prepare("UPDATE steps SET title = ?, intro_json = ?, questions_json = ?, plan_json = '[]', created_at = ? WHERE case_id = ? AND n = ?")
         .bind(typeof b.stepTitle === "string" && b.stepTitle.trim() ? b.stepTitle.trim() : target.title, JSON.stringify(b.intro ?? []), JSON.stringify(b.questions), now, id, target.n));
       writes.push(env.DB.prepare("UPDATE cases SET round = round + 1 WHERE id = ?").bind(id));
-    } else if (typeof b.newStep === "string") {
+    } else if (newStepTitle !== null) {
       writes.push(env.DB.prepare("INSERT INTO steps(case_id, n, title, intro_json, questions_json, plan_json, created_at) VALUES (?,?,?,?,?,?,?)")
-        .bind(id, latest.n + 1, b.newStep.trim(), JSON.stringify(b.intro ?? []), JSON.stringify(b.questions ?? []), JSON.stringify(b.plan ?? []), now));
+        .bind(id, latest.n + 1, newStepTitle, JSON.stringify(b.intro ?? []), JSON.stringify(b.questions ?? []), JSON.stringify(b.plan ?? []), now));
     } else if (changesContent) {
       const target = b.step === undefined ? latest : steps.find((x) => x.n === b.step);
       if (!target) return json({ error: "unknown_step" }, 404);
@@ -969,16 +982,18 @@ async function admin(request: Request, env: Env, parts: string[], ray: string) {
       writes.push(env.DB.prepare("UPDATE steps SET intro_json = ?, questions_json = ?, plan_json = ? WHERE case_id = ? AND n = ?")
         .bind(JSON.stringify(b.intro ?? target.intro), JSON.stringify(b.questions ?? target.sections), JSON.stringify(b.plan ?? target.plan), id, target.n));
     }
-    const closesReroute = !!rerouted && (typeof b.newStep === "string" || b.questions !== undefined || b.newRound === true);
+    const closesReroute = !!rerouted && (newStepTitle !== null || b.questions !== undefined || newRound);
+    // Status follows the stage unless one is given: questions or decisions open the probe, a final report marks the path ready.
+    const autoStatus = closesReroute || newRound ? "open" : newStepTitle !== null ? (contentRank === 3 ? "plan_ready" : "open") : row.status === "draft" && contentRank > 0 ? (contentRank === 3 ? "plan_ready" : "open") : row.status;
     if (closesReroute) writes.push(env.DB.prepare("UPDATE reroutes SET handled_at = ? WHERE case_id = ? AND handled_at IS NULL").bind(now, id));
     await env.DB.batch([
       ...writes,
-      env.DB.prepare("UPDATE cases SET status = ?, updated_at = ? WHERE id = ?").bind(b.status ?? (closesReroute || b.newRound === true || (typeof b.newStep === "string" && validSections(b.questions) && b.questions.length) ? "open" : row.status), now, id),
+      env.DB.prepare("UPDATE cases SET status = ?, updated_at = ? WHERE id = ?").bind(b.status ?? autoStatus, now, id),
       audit(env, id, "admin", "update", Object.keys(b).join(","), ray),
     ]);
     if (b.private === true) await applyPrivateSlug(env, id);
     const moved = await env.DB.prepare("SELECT c.slug, p.slug AS p_slug FROM cases c JOIN profiles p ON p.id = c.profile_id WHERE c.id = ?").bind(id).first<{ slug: string; p_slug: string }>();
-    return json({ ok: true, path: moved ? `/probes/${moved.p_slug}/${moved.slug}` : null });
+    return json({ ok: true, mode: newRound ? "new_round" : newStepTitle !== null ? "next_step" : changesContent ? "update" : "settings", round: newRound ? round + 1 : round, path: moved ? `/probes/${moved.p_slug}/${moved.slug}` : null });
   }
   if (sub === "import" && request.method === "POST") {
     // Answers collected somewhere else become a normal submission.

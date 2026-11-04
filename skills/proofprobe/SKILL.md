@@ -17,7 +17,7 @@ Staged research that ends in a clear, data-backed final report. Stages follow fo
 | 3b | You | Builds the deliverable from the decisions | step with only `plan.json` |
 | 4a | Person | Reads and downloads the final report. Nothing left to do | |
 
-The website numbers each page step by stage from its content, so always publish in this shape. Stages only move forward, and the helper refuses a new step that isn't a later stage. Going back after a new direction is a new round (`--new-round`), never an extra step. Submitting never starts anything. Run a "b" stage only when the user asks.
+The website numbers each page step by stage from its content, so always publish in this shape. `proofprobe publish` works out what a publish means from the probe's state, so never pass a mode: a waiting new direction plus fresh questions repeats the round from 2a, and a step with submitted answers plus the next stage adds that stage. Anything else corrects the current step, and `--step N` corrects an older one. It also sets the status (questions open the probe, a final report marks it Path ready) and refuses anything that would go past 4a. Submitting never starts anything. Run a "b" stage only when the user asks.
 
 **This applies to every track.** On any page with questions, the person can skip answering and send a new direction. When the user asks you to continue, always check for that first, because it sends the work back to Stage 1b. See "Changing direction".
 
@@ -77,7 +77,7 @@ This works the same for jobs, side income, startups and any other goal. Someone 
 1. Treat the message as the new goal. It outranks the old analysis and any answers on the page.
 2. Run Stage 1b again, reusing whatever earlier research still applies. Tell the user the budget first.
 3. Keep any existing answers that still matter by reusing their question ids.
-4. Log the cost, then publish a new round: `proofprobe publish <id> --new-round --intro <file> --questions <file>`. This loops back to Stage 1a with the direction as the revised goal: the questions step (2a) is rewritten in place, any later steps (3a, 4a) are archived and removed, and the probe reopens. A probe never has more than the 2a, 3a and 4a steps. Earlier rounds stay in the archive on Admin, and submissions from them no longer count.
+4. Log the cost, then publish: `proofprobe publish <id> --intro <file> --questions <file>`. Because the direction is waiting, this starts a new round. It loops back to Stage 1a with the direction as the revised goal: the questions step (2a) is rewritten in place, any later steps (3a, 4a) are archived and removed, and the probe reopens. A probe never has more than the 2a, 3a and 4a steps. Earlier rounds stay in the archive on Admin, and submissions from them no longer count.
 
 ## Updating an existing page
 
@@ -97,7 +97,7 @@ Use this when Stage 1b or later already happened in another chat or folder. Don'
 3. Convert the existing questions to `questions.json` without changing their meaning, and fill gaps the flow requires: gate questions first, a `why` on each, and a final `catchAll` question.
 4. Summarise the findings so far into `intro.json`.
 5. Record what the research already cost with `proofprobe cost`, using the spend reported in that chat.
-6. Publish with `--status open`, give the user the link, and tell them which older page or file it replaces.
+6. Publish with `proofprobe publish <id> --intro <file> --questions <file>`, give the user the link, and tell them which older page or file it replaces.
 7. If answers already exist elsewhere, map them to question ids in a JSON file of `{"<question id>": "<answer>"}`, then run `proofprobe import <id> --answers <file>`. That counts as a normal submission.
 
 Then carry on with the next stage as normal. If the other chat already wrote proposals or a plan that asks for approval, publish them as decision items, not as a table to approve by number.
@@ -117,7 +117,7 @@ Then carry on with the next stage as normal. If the other chat already wrote pro
    - The last question must be an open "anything we missed?", marked `"catchAll": true`. Publishing refuses without it.
 8. Write `intro.json` with what the research found so far, so they see why the questions matter.
 9. Record the spend first, so the page never shows an old total: `proofprobe cost <id> <usd> "Stage 1b research"`. Use the sum of `charged_micro`, because other sessions share the treg balance. A negative amount corrects a mistake.
-10. Publish: `proofprobe publish <id> --questions .proofprobe/cases/<id>/questions.json --intro .proofprobe/cases/<id>/intro.json --status open`, then give the user the link. New profiles created here have no password. The user sets one on the Admin page.
+10. Publish: `proofprobe publish <id> --questions .proofprobe/cases/<id>/questions.json --intro .proofprobe/cases/<id>/intro.json`, then give the user the link. New profiles created here have no password. The user sets one on the Admin page.
 
 `questions.json`:
 ```json
@@ -162,7 +162,7 @@ These rules apply to every `intro.json` and `plan.json`. Check the page against 
    - Order them by impact, with gate decisions first. Use 5 to 25 items. Group them in sections by theme.
    - A skipped answer that truly blocks the result may come back as one plain follow-up question in the same step. Keep it rare.
    - End with a plain catch-all question, `"catchAll": true`, such as "Anything to change before the final version?"
-7. Record the spend with `proofprobe cost`, then publish: `proofprobe publish <id> --new-step "Deep research and proposals" --intro <file> --questions <file> --status open`. It opens as Stage 3a on the same page. Earlier steps stay exactly as they were.
+7. Record the spend with `proofprobe cost`, then publish: `proofprobe publish <id> --intro <file> --questions <file>`. The answers were submitted, so this adds Stage 3a. It opens as Stage 3a on the same page. Earlier steps stay exactly as they were.
 
 Decision items look like this. Their answers come back as `Accept`, `Reject` or `Auto` on the first line, with any note after it. A blank answer means Auto.
 ```json
@@ -187,7 +187,7 @@ Decision items look like this. Their answers come back as `Accept`, `Reject` or 
    - End with objective actionables: what to do, in what order, by when, how to tell it worked, and what could fail.
    - Learning goals: agree the topic list with the user before researching courses. Open each course to check it exists, is current and covers the topic. Prefer free and short.
    - Startups: name the first prototype scope, what to leave out, and who to approach, why them and with what pitch. Run every contact through the treg verify step, and show its verification state.
-6. Record the spend, then publish: `proofprobe publish <id> --new-step "Final report" --plan <file> --status plan_ready`. It shows as Stage 4a, with download buttons for an offline HTML file and a PDF.
+6. Record the spend, then publish: `proofprobe publish <id> --plan <file>`. The decisions were submitted, so this adds the final report and marks the probe Path ready. It shows as Stage 4a, with download buttons for an offline HTML file and a PDF.
 
 ## Rules
 
