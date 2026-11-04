@@ -1,171 +1,334 @@
 <!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%23071019'/%3E%3Ccircle cx='16' cy='16' r='10' fill='none' stroke='%235FC6C9' stroke-width='2'/%3E%3Ccircle cx='16' cy='16' r='3.5' fill='%23FFB454'/%3E%3C/svg%3E">
 <title>ProofProbe</title>
-<meta name="description" content="Any goal. One proven path.">
-<link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,800&family=Instrument+Sans:wght@400;500;600&display=swap" onload="this.onload=null;this.rel='stylesheet'">
+<meta name="description" content="Every human, a researcher. You make the moves only you can make. The probe researches between them. One proven path.">
+<link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,800&family=Instrument+Sans:wght@400;500;600&family=JetBrains+Mono:wght@500&display=swap" onload="this.onload=null;this.rel='stylesheet'">
 <style>
-/* Concept: a field of uncertainty that scroll resolves into one bright path, and the night sky turns to daylight as it does. */
-:root{--night:#071019;--day:#EEF2EA;--ink:#F2F7F6;--muted:#9FB6BC;--pulse:#FFB454;--line:rgba(255,255,255,.16);
---display:"Bricolage Grotesque","Segoe UI",system-ui,sans-serif;--body:"Instrument Sans","Segoe UI",system-ui,sans-serif;color-scheme:dark}
-:root{--accent:#5FC6C9;--surface:#132029;--bg:#071019}
-body.day{--ink:#0C1C24;--muted:#4B5F66;--line:rgba(12,28,36,.18);color-scheme:light;--accent:#0B6E72;--surface:#fff;--bg:#EEF2EA;--accent-soft:rgba(11,110,114,.12);--stop:#B3261E}
+/* Concept: research as a game of crystal chess. You move at whole stages, the probe answers at the half stages. */
+:root{--bg:#060A12;--bg2:#0B1220;--ink:#EEF5F7;--muted:#9DB0BA;--faint:#62737D;--line:rgba(160,220,235,.16);
+--you:#8FE6F2;--probe:#FFB454;--good:#6FD09D;--bad:#F0978C;--info:#8FC1F0;
+--accent:#5FC6C9;--surface:#111A27;--accent-soft:rgba(95,198,201,.14);--stop:#F0978C;
+--display:"Bricolage Grotesque","Segoe UI",system-ui,sans-serif;--body:"Instrument Sans","Segoe UI",system-ui,sans-serif;--mono:"JetBrains Mono",ui-monospace,monospace;color-scheme:dark}
 *{box-sizing:border-box}html{-webkit-text-size-adjust:100%}
-body{margin:0;background:var(--night);color:var(--ink);font:400 18px/1.5 var(--body);transition:color .5s ease;overflow-x:hidden}
-canvas{position:fixed;inset:0;width:100%;height:100lvh;display:block;pointer-events:none}
+body{margin:0;background:var(--bg);color:var(--ink);font:400 18px/1.55 var(--body);overflow-x:hidden}
+body::before{content:"";position:fixed;inset:0;z-index:-1;background:radial-gradient(1200px 700px at 78% 18%,rgba(143,230,242,.10),transparent 60%),radial-gradient(900px 600px at 10% 90%,rgba(255,180,84,.07),transparent 60%),var(--bg)}
 a{color:inherit}
-:focus-visible{outline:2px solid var(--pulse);outline-offset:3px}
-.top{position:fixed;inset:0 0 auto;z-index:5;display:flex;align-items:center;justify-content:space-between;padding:calc(env(safe-area-inset-top,0px) + 16px) max(20px,env(safe-area-inset-right,0px)) 16px max(20px,env(safe-area-inset-left,0px))}
-.brand{font:800 19px var(--display);letter-spacing:-.02em;text-decoration:none}
-main{position:relative;z-index:1}
-.panel{min-height:100svh;display:flex;flex-direction:column;justify-content:center;padding:96px max(24px,env(safe-area-inset-right,0px)) 96px max(24px,env(safe-area-inset-left,0px));max-width:1320px;margin:0 auto}
-.panel.right{align-items:flex-end;text-align:right}.panel.center{align-items:center;text-align:center}
-h1,h2{font-family:var(--display);font-weight:800;letter-spacing:-.035em;margin:0;text-wrap:balance}
-h1{font-size:clamp(58px,13vw,172px);line-height:.92}
-h2{font-size:clamp(46px,9vw,118px);line-height:.96}
-p{margin:18px 0 0;font-size:clamp(19px,2vw,25px);color:var(--muted);max-width:30ch;transition:color .5s ease}
-.step{font:600 14px var(--body);letter-spacing:.12em;text-transform:uppercase;color:var(--pulse);margin-bottom:14px}
-body.day .step{color:#A85E00}
-.tags{display:flex;flex-wrap:wrap;gap:10px;margin-top:26px;max-width:560px}
-.panel.right .tags{justify-content:flex-end}
-.tag{padding:9px 17px;border:1px solid var(--line);border-radius:999px;font-weight:500;font-size:16px;backdrop-filter:blur(6px)}
-.actions{display:flex;flex-direction:column;align-items:center;gap:12px;margin-top:34px}
-.cta{--x:50%;--y:50%;--mx:0px;--my:0px;position:relative;overflow:hidden;isolation:isolate;display:inline-flex;align-items:center;justify-content:center;gap:10px;min-width:230px;padding:16px 28px;border-radius:999px;background:#0C1C24;color:#F2F7F6;font-weight:600;text-decoration:none;transform:translate(var(--mx),var(--my));box-shadow:0 8px 22px rgba(12,28,36,.2);transition:transform .35s cubic-bezier(.2,1.4,.4,1),box-shadow .3s ease,background .3s ease}
-.cta::before{content:"";position:absolute;inset:0;z-index:-1;background:radial-gradient(150px circle at var(--x) var(--y),rgba(255,180,84,.6),transparent 70%);opacity:0;transition:opacity .25s ease}
-.cta:hover{box-shadow:0 14px 32px rgba(12,28,36,.3)}.cta:hover::before{opacity:1}
-.cta:active{transform:translate(var(--mx),var(--my)) scale(.95);box-shadow:0 4px 12px rgba(12,28,36,.25);transition-duration:.08s}
-.cta .arrow{display:inline-block;transition:transform .3s cubic-bezier(.2,1.4,.4,1)}.cta:hover .arrow{transform:translateX(6px)}
-.cta .ico{transition:transform .3s cubic-bezier(.2,1.4,.4,1)}.cta:hover .ico{transform:rotate(-8deg) scale(1.12)}
-.cta.alt{background:transparent;color:#0C1C24;box-shadow:inset 0 0 0 1.5px #0C1C24}.cta.alt:hover{box-shadow:inset 0 0 0 1.5px #0C1C24,0 12px 26px rgba(12,28,36,.16)}.cta.alt::before{background:radial-gradient(150px circle at var(--x) var(--y),rgba(255,180,84,.42),transparent 70%)}
-.ripple{position:absolute;width:12px;height:12px;margin:-6px 0 0 -6px;border-radius:50%;background:rgba(255,200,120,.65);pointer-events:none;animation:ripple .6s ease-out forwards}
-@keyframes ripple{to{transform:scale(32);opacity:0}}
-.ico{width:18px;height:18px;flex:none}
-.adminlink{min-height:40px;position:absolute;right:max(20px,env(safe-area-inset-right,0px));bottom:calc(env(safe-area-inset-bottom,0px) + 18px);display:inline-flex;align-items:center;gap:6px;padding:6px 8px;border-radius:8px;font-size:14px;color:var(--muted);text-decoration:none;opacity:.55;transition:opacity .2s ease,transform .2s ease}.adminlink .ico{width:14px;height:14px}.adminlink:hover{opacity:1;transform:translateY(-1px)}.adminlink:active{transform:scale(.96)}
-.cue{position:absolute;left:50%;bottom:26px;width:1px;height:46px;background:linear-gradient(var(--pulse),transparent);animation:cue 2s ease-in-out infinite}
-.hero{position:relative}
-@keyframes cue{50%{transform:translateY(10px);opacity:.4}}
-.ruler{position:fixed;z-index:4;left:max(20px,env(safe-area-inset-left,0px));bottom:calc(env(safe-area-inset-bottom,0px) + 22px);display:flex;align-items:center;gap:12px;font-size:13px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);transition:color .5s ease}
-.ticks{display:flex;gap:5px}.ticks i{display:block;width:22px;height:3px;border-radius:2px;background:var(--line);transition:background .3s ease}.ticks i.on{background:var(--pulse)}
-body.day .ticks i.on{background:#A85E00}
-.word{display:inline-block;overflow:hidden;vertical-align:bottom;padding-bottom:.08em;margin-bottom:-.08em}.word>span{display:inline-block;transform:translateY(105%);transition:transform .9s cubic-bezier(.2,.75,.15,1)}.in .word>span{transform:none}
-@media (max-width:640px){.cue{display:none}}
-.reveal{opacity:0;transform:translateY(26px);transition:opacity .8s ease,transform .8s cubic-bezier(.2,.7,.2,1)}
-.reveal.in{opacity:1;transform:none}
-@media (prefers-reduced-motion:reduce){.reveal{opacity:1;transform:none;transition:none}.word>span{transform:none;transition:none}.cue{animation:none}.cta,.cta .arrow,.cta .ico{transition:none}}
-@media (hover:none){.cta:hover{box-shadow:0 8px 22px rgba(12,28,36,.2)}.cta:hover::before{opacity:0}.cta:hover .arrow,.cta:hover .ico{transform:none}.adminlink:hover{opacity:.55;transform:none}}
-@media (max-width:360px){#rulerLabel{display:none}}
-.panel p{max-width:560px;font-size:19px;line-height:1.55;color:var(--muted)}.panel.right p{margin-left:auto}.panel.center p{margin-inline:auto}
-.hero .sub{max-width:620px;margin-top:22px}.endnote{margin-bottom:8px}
-@media (max-width:640px){.panel p{font-size:17px}}
+.top{position:absolute;top:0;left:0;right:0;padding:18px max(20px,env(safe-area-inset-left,0px));display:flex;align-items:center;min-height:66px}
+.brand{font:800 19px var(--display);letter-spacing:-.02em}
+main{max-width:1320px;margin:0 auto;padding:0 max(20px,env(safe-area-inset-right,0px)) 0 max(20px,env(safe-area-inset-left,0px))}
+section{padding-block:72px}
+.hero{min-height:100svh;display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.12fr);gap:40px;align-items:center;padding-top:96px}
+.kicker{font:500 13px var(--mono);letter-spacing:.14em;text-transform:uppercase;color:var(--probe);margin:0 0 18px}
+h1{font:800 clamp(46px,6.4vw,92px)/.95 var(--display);letter-spacing:-.035em;margin:0}
+h1 em{font-style:normal;background:linear-gradient(100deg,var(--you),#E8FBFF 45%,var(--probe));-webkit-background-clip:text;background-clip:text;color:transparent}
+.lede{font-size:clamp(18px,1.6vw,21px);color:var(--muted);max-width:34em;margin:24px 0 0}
+.lede b{color:var(--ink);font-weight:600}
+.actions{display:flex;flex-wrap:wrap;gap:12px;margin-top:30px}
+.cta{position:relative;display:inline-flex;align-items:center;gap:10px;min-height:52px;padding:13px 24px;border-radius:999px;background:var(--you);color:#05121A;font:600 17px var(--body);text-decoration:none;overflow:hidden;box-shadow:0 10px 30px rgba(143,230,242,.18);transition:transform .25s cubic-bezier(.2,1.4,.4,1),box-shadow .2s ease}
+.cta.alt{background:rgba(255,255,255,.04);color:var(--ink);border:1px solid var(--line);box-shadow:none}
+.cta .ico{width:19px;height:19px}.cta .arrow{transition:transform .2s ease}
+@media (hover:hover){.cta:hover{transform:translateY(-2px)}.cta:hover .arrow{transform:translateX(4px)}.cta.alt:hover{border-color:var(--you)}}
+.cta:active{transform:scale(.97)}
+/* the game */
+.game{position:relative;display:grid;gap:14px}
+.boardwrap{position:relative;aspect-ratio:1/.86;width:100%}
+#board{position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:pan-y}
+.clocks{display:flex;gap:10px;flex-wrap:wrap}
+.clock{display:inline-flex;align-items:center;gap:9px;min-height:40px;padding:8px 14px;border-radius:999px;border:1px solid var(--line);font:600 15px var(--body);color:var(--muted);background:rgba(255,255,255,.02);transition:all .3s ease}
+.clock i{width:10px;height:10px;border-radius:50%;background:currentColor;opacity:.5}
+.clock.on.you{color:var(--you);border-color:var(--you);background:rgba(143,230,242,.08)}.clock.on.probe{color:var(--probe);border-color:var(--probe);background:rgba(255,180,84,.08)}
+.clock.on i{opacity:1;box-shadow:0 0 0 4px rgba(255,255,255,.06);animation:tick 1s ease-in-out infinite}
+@keyframes tick{50%{transform:scale(1.35)}}
+.playbtn{margin-left:auto;min-height:40px;min-width:40px;padding:8px 14px;border-radius:999px;border:1px solid var(--line);background:transparent;color:var(--ink);font:600 15px var(--body);cursor:pointer}
+.caption{min-height:136px;padding:16px 18px;border:1px solid var(--line);border-radius:14px;background:linear-gradient(180deg,rgba(255,255,255,.035),rgba(255,255,255,.01))}
+.caption .who{font:500 12.5px var(--mono);letter-spacing:.12em;text-transform:uppercase}
+.caption.you .who{color:var(--you)}.caption.probe .who{color:var(--probe)}
+.caption h3{font:700 22px/1.2 var(--display);margin:4px 0 6px}
+.caption p{margin:0;color:var(--muted);font-size:16.5px}
+.moves{display:grid;grid-template-columns:34px 1fr 1fr;gap:4px 8px;font:500 15px var(--body);margin:0;padding:0;list-style:none}
+.moves .no{color:var(--faint);font:500 14px var(--mono);align-self:center;text-align:right}
+.mv{display:flex;align-items:center;gap:8px;min-height:40px;padding:6px 10px;border-radius:8px;border:1px solid transparent;background:transparent;color:var(--muted);font:inherit;text-align:left;cursor:pointer;transition:background .2s ease,color .2s ease,border-color .2s ease}
+.mv b{font:500 13px var(--mono);color:var(--faint);min-width:2.2em}
+.mv.you.now{color:var(--you);border-color:rgba(143,230,242,.5);background:rgba(143,230,242,.08)}.mv.probe.now{color:var(--probe);border-color:rgba(255,180,84,.5);background:rgba(255,180,84,.08)}
+.mv.done{color:var(--ink)}
+@media (hover:hover){.mv:hover{background:rgba(255,255,255,.05)}}
+.mv:focus-visible,.playbtn:focus-visible,.cta:focus-visible{outline:2px solid var(--you);outline-offset:2px}
+/* sections */
+.eyebrow{font:500 13px var(--mono);letter-spacing:.14em;text-transform:uppercase;color:var(--you);margin:0 0 10px}
+h2{font:800 clamp(32px,4vw,52px)/1.02 var(--display);letter-spacing:-.025em;margin:0 0 14px}
+.intro{color:var(--muted);max-width:44em;margin:0 0 28px}
+.groups{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,280px),1fr));gap:16px}
+.group{padding:18px;border:1px solid var(--line);border-radius:14px;background:rgba(255,255,255,.02)}
+.group h3{font:700 18px var(--display);margin:0 0 12px;display:flex;align-items:center;gap:8px}
+.group h3{flex-wrap:wrap;gap:2px 8px}.group h3 span{font:500 12px var(--mono);color:var(--faint);flex-basis:100%}
+.chips{display:flex;flex-wrap:wrap;gap:7px}
+.chips span{padding:6px 11px;border:1px solid var(--line);border-radius:999px;font-size:15px;color:var(--ink);background:rgba(143,230,242,.04)}
+.small{font-size:15px;color:var(--faint);margin-top:16px}
+.headline{font:700 clamp(22px,2.4vw,30px)/1.3 var(--display);max-width:38em;margin:0 0 30px}
+.headline em{font-style:normal;color:var(--you)}
+.charts{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,400px),1fr));gap:18px}
+.chart{padding:20px;border:1px solid var(--line);border-radius:14px;background:rgba(255,255,255,.02)}
+.chart h3{font:700 19px var(--display);margin:0 0 4px}.chart .unit{font-size:14.5px;color:var(--faint);margin:0 0 16px}
+.bar{display:grid;grid-template-columns:minmax(0,150px) minmax(0,1fr) 64px;gap:12px;align-items:center;min-height:34px;position:relative}
+.bar .lbl{font-size:15px;color:var(--muted);line-height:1.25}.bar.us .lbl{color:var(--ink);font-weight:600}
+.track{position:relative;height:10px}
+.fill{position:absolute;left:0;top:0;bottom:0;border-radius:0 4px 4px 0;background:#5B6B78;min-width:3px;transform-origin:left;transition:transform 1s cubic-bezier(.2,.8,.2,1)}
+.fill.range{background:repeating-linear-gradient(90deg,#5B6B78 0 6px,#3C4955 6px 9px)}
+.bar.us .fill{background:var(--you)}
+.val{font:500 14px var(--mono);color:var(--ink);text-align:right}
+.charts:not(.in) .fill{transform:scaleX(0)}
+.bar[data-tip]{cursor:default}
+.tipbox{position:fixed;z-index:30;max-width:280px;padding:9px 12px;border-radius:8px;background:#E8F2F5;color:#0B1520;font-size:14px;line-height:1.4;pointer-events:none;box-shadow:0 10px 26px rgba(0,0,0,.35)}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,230px),1fr));gap:12px}
+.stat{padding:16px;border:1px solid var(--line);border-radius:12px}
+.stat b{display:block;font:800 34px/1 var(--display);margin-bottom:6px}.stat.us b{color:var(--you)}
+.stat span{font-size:15px;color:var(--muted)}
+.method{margin-top:22px;border:1px solid var(--line);border-radius:12px;padding:6px 16px}
+.method summary{cursor:pointer;min-height:44px;display:flex;align-items:center;font-weight:600}
+.method ol,.method p{color:var(--muted);font-size:15.5px}.method a{color:var(--you)}
+.end{text-align:center;padding-bottom:120px}.end h2{margin-bottom:10px}.end .intro{margin-inline:auto}.end .actions{justify-content:center}
+.adminlink{min-height:40px;position:absolute;right:max(20px,env(safe-area-inset-right,0px));bottom:calc(env(safe-area-inset-bottom,0px) + 18px);display:inline-flex;align-items:center;gap:6px;padding:8px 10px;color:var(--muted);font-size:14.5px;text-decoration:none;opacity:.55;transition:opacity .2s ease}
+.adminlink .ico{width:15px;height:15px}.adminlink:hover{opacity:1}
+.endwrap{position:relative}
+@media (max-width:980px){.hero{grid-template-columns:1fr;gap:28px;padding-top:88px;min-height:auto}.boardwrap{aspect-ratio:1/.9}}
+@media (max-width:560px){section{padding-block:52px}.bar{grid-template-columns:minmax(0,104px) minmax(0,1fr) 54px;gap:8px}.moves{grid-template-columns:24px 1fr 1fr}.mv{padding:6px 7px;font-size:14px}.caption{min-height:170px}}
+@media (prefers-reduced-motion:reduce){.cta,.mv,.clock,.fill{transition:none}.clock.on i{animation:none}}
 </style></head><body>
-<canvas id="c" aria-hidden="true"></canvas>
 <div class="top"><span class="brand">ProofProbe</span></div>
-<div class="ruler" aria-hidden="true"><span class="ticks" id="ticks"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span><span id="rulerLabel">Start</span></div>
 <main>
-  <section class="panel hero"><h1 class="reveal">Any goal.<br>One proven path.</h1><p class="sub reveal">Tell us where you want to get. We research the field, ask only what you can answer, let you steer the big calls, and hand you one path backed by evidence. Whole-numbered stages are yours. Half stages happen on our side.</p><div class="cue"></div></section>
-  <section class="panel"><div class="reveal"><div class="step">Stage 0 · Your goal</div><h2>Bring what<br>you have.</h2><p>Sign in, request a probe and describe the goal: a new job, side income, a startup, or any open question. Attach a CV, a job post or a product document if you have one.</p>
-    <div class="tags"><span class="tag">CV</span><span class="tag">LinkedIn</span><span class="tag">Job post</span><span class="tag">Startup idea</span><span class="tag">An open question</span></div></div></section>
-  <section class="panel right"><div class="reveal"><div class="step">Stage 0.5 · Our side</div><h2>Probe wide.</h2><p>We map the whole field before asking you anything: demand, pay, competitors, rules, and what blocks each option. Key numbers are checked at their source. You get the findings, and the questions only you can answer.</p></div></section>
-  <section class="panel"><div class="reveal"><div class="step">Stage 1 · Your turn</div><h2>Answer what<br>only you know.</h2><p>Each question closes an open end: your time, money, limits and wants. Skip any you'd rather not answer, or send a new direction instead. Save as you go, and submit when you're ready.</p></div></section>
-  <section class="panel right"><div class="reveal"><div class="step">Stage 1.5 · Our side</div><h2>Probe deep.</h2><p>Your answers fence in the problem. We test every option against them, rule out what fails, and dig into what's left.</p></div></section>
-  <section class="panel"><div class="reveal"><div class="step">Stage 2 · Your turn</div><h2>Decide what<br>matters.</h2><p>You get the proposals that shape the result, each with its evidence and what we'd do by default. Everything starts on Auto, so you can submit without changing a thing. Accept or reject only where you feel strongly.</p></div></section>
-  <section class="panel right"><div class="reveal"><div class="step">Stage 2.5 · Our side</div><h2>Build it.</h2><p>We turn your decisions into what the goal needs: a step-by-step path, a product spec, a build plan, a rulebook or a straight answer. Every major call is checked again as it's built.</p></div></section>
-  <section class="panel center"><div class="reveal"><div class="step">Stage 3 · Yours to keep</div><h2>One path.<br>Backed by proof.</h2><p class="endnote">A clean final report. Each big decision shows the evidence behind it and the choice that shaped it. Read it online, or download it to keep.</p><div class="actions"><a class="cta" href="/probes">See the probes <span class="arrow" aria-hidden="true">→</span></a><a class="cta alt" href="/request">Request a probe</a><a class="cta alt" href="https://github.com/yash201040/proofprobe" target="_blank" rel="noopener noreferrer"><svg class="ico" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2a10 10 0 0 0-3.16 19.49c.5.09.68-.22.68-.48v-1.7c-2.78.6-3.37-1.34-3.37-1.34-.45-1.16-1.11-1.47-1.11-1.47-.91-.62.07-.61.07-.61 1 .07 1.53 1.03 1.53 1.03.89 1.53 2.34 1.09 2.91.83.09-.65.35-1.09.63-1.34-2.22-.25-4.55-1.11-4.55-4.94 0-1.09.39-1.98 1.03-2.68-.1-.25-.45-1.27.1-2.65 0 0 .84-.27 2.75 1.02A9.6 9.6 0 0 1 12 6.84c.85 0 1.7.11 2.5.34 1.91-1.29 2.75-1.02 2.75-1.02.55 1.38.2 2.4.1 2.65.64.7 1.03 1.59 1.03 2.68 0 3.84-2.34 4.68-4.57 4.93.36.31.68.92.68 1.85v2.74c0 .27.18.58.69.48A10 10 0 0 0 12 2z"/></svg>GitHub</a></div></div></section>
+<section class="hero">
+  <div class="copy">
+    <p class="kicker">Research, played as an AI power play</p>
+    <h1>Every human,<br><em>a researcher.</em></h1>
+    <p class="lede">You make the moves only you can make: <b>your goal, your answers, your calls.</b> Between each of them, the probe takes its turn: research across hundreds of sources, with every key number checked at the source. <b>Four moves from you. Three from the probe. One proven path.</b></p>
+    <div class="actions"><a class="cta" href="/probes">See the probes <span class="arrow" aria-hidden="true">→</span></a><a class="cta alt" href="/request">Request a probe</a></div>
+  </div>
+  <div class="game" id="game">
+    <div class="clocks"><span class="clock you" id="clockYou"><i></i>You</span><span class="clock probe" id="clockProbe"><i></i>Probe</span><button type="button" class="playbtn" id="play" aria-label="Pause the game">Pause</button></div>
+    <div class="boardwrap"><canvas id="board" role="img" aria-label="A crystal chessboard where you and the probe take turns, ending in one lit path to the goal."></canvas></div>
+    <div class="caption you" id="caption" aria-live="polite"><div class="who" id="capWho"></div><h3 id="capTitle"></h3><p id="capText"></p></div>
+    <ol class="moves" id="moves" aria-label="Moves"></ol>
+  </div>
+</section>
+
+<section id="bring">
+  <p class="eyebrow">Stage 0 · Your opening move</p>
+  <h2>Bring anything.</h2>
+  <p class="intro">Start with whatever you have. One line of a question is enough, and every extra file sharpens the research. Attach files to your request, and paste links in the description.</p>
+  <div class="groups">
+    <div class="group"><h3>Career and interviews <span>job switch, promotion, offer</span></h3><div class="chips"><span>CV or résumé</span><span>LinkedIn profile</span><span>Job post</span><span>Interview invite and date</span><span>Offer letter</span><span>Portfolio</span><span>GitHub profile</span><span>Cover letter</span><span>Performance review</span><span>Certificates</span><span>Salary slip</span><span>Target company list</span></div></div>
+    <div class="group"><h3>Side income <span>freelance, part-time, creator</span></h3><div class="chips"><span>Skills list</span><span>Hours you can spare</span><span>Freelance profile</span><span>Past client work</span><span>Rate card</span><span>Channel or page stats</span><span>Employment contract</span><span>Local market or city</span></div></div>
+    <div class="group"><h3>Startup or product <span>idea to first customers</span></h3><div class="chips"><span>Idea in one line</span><span>Product doc or PRD</span><span>Pitch deck</span><span>Prototype link</span><span>Code repository</span><span>Competitor list</span><span>Customer interview notes</span><span>Survey results</span><span>Financial model</span><span>Pricing page</span><span>Analytics export</span><span>Waitlist numbers</span><span>Founder profiles</span></div></div>
+    <div class="group"><h3>Study and research <span>courses, papers, exams</span></h3><div class="chips"><span>Research paper</span><span>Dataset</span><span>Syllabus</span><span>Thesis outline</span><span>Lab notes</span><span>Reading list</span><span>Exam date</span><span>Benchmark or eval results</span></div></div>
+    <div class="group"><h3>Anything else <span>if it explains the goal</span></h3><div class="chips"><span>Spreadsheet</span><span>Screenshots</span><span>Meeting notes</span><span>Email thread</span><span>Policy or contract</span><span>Budget</span><span>Photos of a whiteboard</span><span>A question in one line</span></div></div>
+  </div>
+  <p class="small">Files: PDF, Word, slides, sheets, text, Markdown, JSON and images, up to 5 files and 10 MB per request. Everything you send stays private to you and the owner.</p>
+</section>
+
+<section id="density">
+  <p class="eyebrow">Research density</p>
+  <h2>More proof behind every call.</h2>
+  <p class="headline">An estimate from published studies and our own probes: about <em>12 to 75 times</em> the sources behind a chat answer, about <em>2×</em> the best deep-research agent tested, and every finding fenced in by <em>30 or more</em> of your own answers and decisions.</p>
+  <div class="charts" id="charts">
+    <div class="chart"><h3>Sources behind one result</h3><p class="unit">Count of sources, one result each</p><div id="chartSources"></div></div>
+    <div class="chart"><h3>Personal steers the research uses</h3><p class="unit">Count of answers and decisions you give it</p><div id="chartSteers"></div></div>
+  </div>
+  <div class="stats" style="margin-top:18px">
+    <div class="stat"><b>45%</b><span>of AI assistant answers about the news had at least one significant issue, and 31% had serious sourcing problems.</span></div>
+    <div class="stat"><b>60%+</b><span>of queries got wrong citations across eight AI search tools asked to find a quoted article.</span></div>
+    <div class="stat"><b>90.2%</b><span>citation accuracy for the most precise deep-research agent tested, so about 1 citation in 10 still fails.</span></div>
+    <div class="stat us"><b>3 tags</b><span>on every claim in a probe: verified, single-source or inferred. Decisive numbers need a second, independent source.</span></div>
+  </div>
+  <details class="method"><summary>How this estimate was made</summary>
+    <p>It compares different ways of counting, so treat it as a range, not a lab result.</p>
+    <ol>
+      <li><b>Chat answers:</b> 0 to 19 sources per answer, so 229 is about 12 times the highest average (19.48) and 75 times the lowest that cites at all (3.05), across four leading assistants with web search on. One study measured 3.05 to 19.48 over 960 answers (Prefer, Sep 2026); another measured 0.07 to 19.08 over 1,000 questions (Slate, Aug 2026). The two disagree on individual assistants, so only the range is used.</li>
+      <li><b>Deep-research agents:</b> the best of four averaged 111.21 effective citations per report, and the most precise reached 90.24% citation accuracy, on 100 PhD-level tasks (DeepResearch Bench, 2025). Effective citations count only citations that support a statement.</li>
+      <li><b>ProofProbe:</b> 229 unique sources from 60 domains recorded in the research notes of our deepest probe so far (RL Audits, Oct to Nov 2026), with about 600 claims tagged by how well they're supported. It used 10 answers and 22 decisions; a career probe used 40 answers. Two other probes show 17 and 19 sources on their public pages. That's a small sample, and sources recorded aren't scored the same way as effective citations.</li>
+      <li><b>Error rates:</b> 45% and 31% come from over 3,000 answers judged by journalists from 22 public broadcasters (EBU and BBC, Oct 2025). 60%+ comes from 1,600 citation queries across eight AI search tools (Tow Center, Mar 2025).</li>
+    </ol>
+    <p>Sources: <a href="https://tryprefer.com/data/ai-answer-study/" target="_blank" rel="noopener noreferrer">Prefer AI answer study</a> · <a href="https://slatehq.com/data-studies/how-to-get-cited-by-chatgpt-perplexity-claude-and-gemini" target="_blank" rel="noopener noreferrer">Slate citation study</a> · <a href="https://deepresearch-bench.github.io/" target="_blank" rel="noopener noreferrer">DeepResearch Bench</a> · <a href="https://www.ebu.ch/news/2025/10/ai-s-systemic-distortion-of-news-is-consistent-across-languages-and-territories-international-study-by-public-service-broadcaste" target="_blank" rel="noopener noreferrer">EBU and BBC study</a> · <a href="https://www.cjr.org/tow_center/we-compared-eight-ai-search-engines-theyre-all-bad-at-citing-news.php" target="_blank" rel="noopener noreferrer">Tow Center study</a></p>
+  </details>
+</section>
+
+<section class="end endwrap">
+  <p class="eyebrow">Stage 3 · Checkmate</p>
+  <h2>Your move.</h2>
+  <p class="intro">Request a probe with any goal, or see how others played theirs.</p>
+  <div class="actions"><a class="cta" href="/probes">See the probes <span class="arrow" aria-hidden="true">→</span></a><a class="cta alt" href="/request">Request a probe</a><a class="cta alt" href="https://github.com/yash201040/proofprobe" target="_blank" rel="noopener noreferrer"><svg class="ico" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2a10 10 0 0 0-3.16 19.49c.5.09.68-.22.68-.48v-1.7c-2.78.6-3.37-1.34-3.37-1.34-.45-1.16-1.11-1.47-1.11-1.47-.91-.62.07-.61.07-.61 1 .07 1.53 1.03 1.53 1.03.89 1.53 2.34 1.09 2.91.83.09-.65.35-1.09.63-1.34-2.22-.25-4.55-1.11-4.55-4.94 0-1.09.39-1.98 1.03-2.68-.1-.25-.45-1.27.1-2.65 0 0 .84-.27 2.75 1.02A9.6 9.6 0 0 1 12 6.84c.85 0 1.7.11 2.5.34 1.91-1.29 2.75-1.02 2.75-1.02.55 1.38.2 2.4.1 2.65.64.7 1.03 1.59 1.03 2.68 0 3.84-2.34 4.68-4.57 4.93.36.31.68.92.68 1.85v2.74c0 .27.18.58.69.48A10 10 0 0 0 12 2z"/></svg>GitHub</a></div>
   <a class="adminlink" href="/admin"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>Admin</a>
+</section>
 </main>
+<div class="tipbox" id="tipbox" hidden></div>
 <script src="/assets/account.js"></script>
 <script>
-const canvas=document.getElementById("c"),ctx=canvas.getContext("2d");
 const still=matchMedia("(prefers-reduced-motion:reduce)").matches;
-let W=0,H=0,dpr=1,P=[];
-const STATES=8,NIGHT=[7,16,25],DAY=[238,242,234];
-const ease=t=>t*t*(3-2*t),mix=(a,b,t)=>a+(b-a)*t;
-function rand(i,s){const x=Math.sin(i*127.1+s*311.7)*43758.5453;return x-Math.floor(x)}
-function layout(){
-  dpr=Math.min(devicePixelRatio||1,1.6);W=innerWidth;H=innerHeight;
-  canvas.width=W*dpr;canvas.height=H*dpr;ctx.setTransform(dpr,0,0,dpr,0,0);
-  const n=Math.round(Math.min(1500,Math.max(500,W*H/800))),cx=W/2,cy=H/2,m=Math.min(W,H),cols=Math.max(9,Math.round(W/70)),rows=7;
-  P=Array.from({length:n},(_,i)=>{
-    const a=rand(i,1)*Math.PI*2,r=Math.sqrt(rand(i,2)),u=i/n;
-    const scatter=[rand(i,3)*W,rand(i,4)*H];
-    const groups=[[.68,.3],[.84,.52],[.62,.72],[.42,.5],[.8,.8]],g=groups[i%5],gr=rand(i,5)*m*.12;
-    const cluster=[W*g[0]+Math.cos(a)*gr,H*g[1]+Math.sin(a)*gr];
-    const ring=Math.floor(rand(i,6)*5)+1,ringR=ring*m*.1;
-    const sonar=[W*.34+Math.cos(a)*ringR,cy+Math.sin(a)*ringR];
-    const c=i%cols,ro=Math.floor(i/cols)%rows,gw=Math.min(W*.5,560);
-    const grid=[W*.46+c/cols*gw,H*.22+ro*H*.095];
-    const fa=rand(i,7)*.55-.27,fd=Math.pow(rand(i,8),.6)*W*.82;
-    const funnel=[W*.72-fd*Math.cos(fa),cy+fd*Math.sin(fa)];
-    const x=u*W*1.1-W*.05,jit=(rand(i,9)-.5)*2.5;
-    const path=[x,cy+Math.sin(u*Math.PI*2.1)*m*.14*(1-u*.2)+jit];
-    // Stage 2: proposals branch out. Stage 2.5: they settle into the lines of a report.
-    const br=i%4,bu=Math.pow(rand(i,13),.8),fork=[W*.44+bu*W*.5,cy+(br-1.5)*m*.2*bu+(rand(i,14)-.5)*6];
-    const row=i%15,len=.45+.55*rand(row,15),report=[W*.08+rand(i,16)*len*W*.34,H*.2+row*H*.042+(rand(i,17)-.5)*3];
-    return {s:[scatter,cluster,sonar,grid,funnel,fork,report,path],d:rand(i,10)*.28,z:1+rand(i,11)*1.7,w:rand(i,12)*6.28};
-  });
+const $=id=>document.getElementById(id);
+// The seven moves. Whole stages are yours, half stages are the probe's.
+const MOVES=[
+ {k:"0",who:"you",name:"Goal",t:"Set the goal.",d:"Open with what you want and what you have: a CV, a job post, a pitch deck, a code repository, or one line of a question.",dur:3.8},
+ {k:"0.5",who:"probe",name:"Probe wide",t:"The probe reads the whole board.",d:"Demand, pay, competitors, rules, and what blocks each option. Hundreds of sources, key numbers checked at the source. It ends in the questions only you can answer.",dur:4.4},
+ {k:"1",who:"you",name:"Answer",t:"Answer what only you know.",d:"Each answer fences in the problem: your time, money, limits and wants. Skip what you'd rather not say, or point the probe somewhere new.",dur:3.8},
+ {k:"1.5",who:"probe",name:"Probe deep",t:"The probe goes deep inside your fence.",d:"Every option is tested against your answers, and what fails is ruled out. It comes back with proposals, each with its evidence and a default.",dur:4.4},
+ {k:"2",who:"you",name:"Decide",t:"Make the calls.",d:"Accept, reject, or leave a proposal on Auto and let the probe decide. Submitting with everything on Auto is a valid move.",dur:4.2},
+ {k:"2.5",who:"probe",name:"Build",t:"The probe builds the answer.",d:"A path, a product spec, a build plan, a rulebook or a straight answer, whichever your goal needs. Every major call is checked again as it's built.",dur:4},
+ {k:"3",who:"you",name:"Final report",t:"Checkmate: one proven path.",d:"A clean final report, with the evidence behind every decision. Read it online, or take it home as a file.",dur:5.2},
+];
+const mv=$("moves");
+for(let r=0;r<4;r++){
+  const no=document.createElement("li");no.className="no";no.textContent=(r+1)+".";mv.appendChild(no);
+  [MOVES[r*2],MOVES[r*2+1]].forEach((m,j)=>{const li=document.createElement("li");if(!m){mv.appendChild(li);return}
+    const b=document.createElement("button");b.type="button";b.className="mv "+m.who;b.dataset.i=r*2+j;const s=document.createElement("b");s.textContent=m.k;b.append(s,m.name);
+    b.addEventListener("click",()=>{jump(r*2+j);});li.appendChild(b);mv.appendChild(li)});
 }
-let target=0,now=0,raf=0,px=-999,py=-999,pxs=-999,pys=-999;
-const LABELS=["Start","Your goal","Probe wide","Your answers","Probe deep","Your decisions","Build","Final report"],ticks=[...document.querySelectorAll("#ticks i")],rulerLabel=document.getElementById("rulerLabel");
-let lastLabel=-1;
-addEventListener("pointermove",e=>{if(e.pointerType==="mouse"){px=e.clientX;py=e.clientY}},{passive:true});
-document.addEventListener("pointerleave",()=>{px=py=-999});
-function read(){const max=document.documentElement.scrollHeight-innerHeight;target=max>0?scrollY/max:0}
-function draw(p,time){
-  const pos=p*(STATES-1),day=ease(Math.min(1,Math.max(0,(pos-(STATES-2.1))/1)));
-  const bg=NIGHT.map((v,i)=>Math.round(mix(v,DAY[i],day)));
-  document.body.style.background=canvas.style.background=`rgb(${bg})`;
-  document.body.classList.toggle("day",day>.55);
-  ctx.clearRect(0,0,W,H);
-  const lit=mix(0,1,day),rgb=[Math.round(mix(120,12,lit)),Math.round(mix(214,70,lit)),Math.round(mix(218,84,lit))];
-  ctx.fillStyle=`rgba(${rgb},${mix(.78,.9,lit)})`;
-  const sweep=time*.0009;
-  pxs+=(px-pxs)*.12;pys+=(py-pys)*.12;
-  const push=still?0:1,reach=130;
-  const label=Math.min(STATES-1,Math.round(pos));
-  if(label!==lastLabel){lastLabel=label;rulerLabel.textContent=LABELS[label];ticks.forEach((t,i)=>t.classList.toggle("on",i<label))}
-  for(const q of P){
-    const local=Math.min(STATES-1,Math.max(0,pos+q.d-.14));
-    const i=Math.min(STATES-2,Math.floor(local)),t=ease(local-i),a=q.s[i],b=q.s[i+1];
-    const wob=(1-Math.min(1,pos/(STATES-1.6)))*5;
-    let x=mix(a[0],b[0],t)+Math.cos(time*.0006+q.w)*wob,y=mix(a[1],b[1],t)+Math.sin(time*.0007+q.w)*wob;
-    if(push){const dx=x-pxs,dy=y-pys,d2=dx*dx+dy*dy;if(d2<reach*reach&&d2>1){const d=Math.sqrt(d2),f=(1-d/reach);x+=dx/d*f*f*46;y+=dy/d*f*f*46}}
-    ctx.fillRect(x,y,q.z,q.z);
-  }
-  if(pos>1.4&&pos<3){ // the probe sweeping the field
-    const o=Math.min(1,pos-1.4)*Math.min(1,3-pos),cx=W*.34,cy=H/2,R=Math.min(W,H)*.52;
-    ctx.save();ctx.strokeStyle=`rgba(255,180,84,${.75*o})`;ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(cx,cy);ctx.lineTo(cx+Math.cos(sweep)*R,cy+Math.sin(sweep)*R);ctx.stroke();
-    ctx.fillStyle=`rgba(255,180,84,${o})`;ctx.beginPath();ctx.arc(cx,cy,4,0,7);ctx.fill();ctx.restore();
-  }
-  if(pos>STATES-1.8){ // the proven path lights up from left to right
-    const o=Math.min(1,(pos-(STATES-1.8))/.7),m=Math.min(W,H);
-    ctx.save();ctx.strokeStyle=`rgba(216,120,10,${o})`;ctx.lineWidth=3;ctx.lineCap="round";ctx.beginPath();
-    for(let u=0;u<=o;u+=.01){const x=u*W*1.1-W*.05,y=H/2+Math.sin(u*Math.PI*2.1)*m*.14*(1-u*.2);u?ctx.lineTo(x,y):ctx.moveTo(x,y)}
-    ctx.stroke();ctx.restore();
-  }
+// Board geometry: squares are -4..4 on x (files) and z (ranks, far is positive).
+const cv=$("board"),ctx=cv.getContext("2d");let W=0,H=0,dpr=1,fx=0,cx=0,cy=0;
+const PITCH=1.1,DIST=11,cosP=Math.cos(PITCH),sinP=Math.sin(PITCH);let yaw=0,yawT=0;
+function proj(x,z,y=0){const c=Math.cos(yaw),s=Math.sin(yaw),X=x*c-z*s,Z=x*s+z*c;const y1=y*cosP+Z*sinP,z1=-y*sinP+Z*cosP+DIST;return[cx+fx*X/z1,cy-fx*y1/z1,fx/z1]}
+function size(){const r=cv.getBoundingClientRect();dpr=Math.min(devicePixelRatio||1,2);W=r.width;H=r.height;cv.width=W*dpr;cv.height=H*dpr;ctx.setTransform(dpr,0,0,dpr,0,0);
+  cx=0;cy=0;fx=1;let minx=1e9,maxx=-1e9,miny=1e9,maxy=-1e9;const keep=yaw;
+  // Fit the board at every angle the sway can reach, so it never clips.
+  for(const a of[-.2,0,.2]){yaw=a;for(const[x,z,y]of[[-4.3,-4.3,0],[4.3,-4.3,0],[-4.3,4.3,0],[4.3,4.3,0],[-4.3,-4.3,-.4],[4.3,-4.3,-.4],[-3.5,3.5,2.2],[3.5,3.5,2.2]]){const p=proj(x,z,y);minx=Math.min(minx,p[0]);maxx=Math.max(maxx,p[0]);miny=Math.min(miny,p[1]);maxy=Math.max(maxy,p[1])}}
+  yaw=keep;const sc=Math.min((W*.96)/(maxx-minx),(H*.96)/(maxy-miny));fx=sc;cx=W/2-(minx+maxx)/2*sc;cy=H/2-(miny+maxy)/2*sc}
+const sq=(c,r)=>[c-3.5,r-3.5];// square centre from file and rank 0..7
+const GOAL=[3,7],START=[4,0];
+const ROUTES={a:[[4,2],[4,3],[4,4],[3,5],[3,6],[3,7]],b:[[4,2],[5,3],[6,4],[6,5],[5,6],[4,7],[3,7]],c:[[4,2],[3,3],[2,4],[2,5],[2,6],[3,7]]};
+const inFence=(c,r)=>c>=2&&c<=6&&r>=2;
+function rnd(i){const x=Math.sin(i*91.7+13.1)*43758.5453;return x-Math.floor(x)}
+const SOURCES=Array.from({length:44},(_,i)=>[Math.floor(rnd(i)*8),Math.floor(rnd(i+99)*8)]).filter(([c,r])=>!(c===START[0]&&r===START[1]));
+const DEEP=Array.from({length:26},(_,i)=>[2+Math.floor(rnd(i+300)*5),2+Math.floor(rnd(i+500)*6)]);
+const ease=t=>t<.5?2*t*t:1-Math.pow(-2*t+2,2)/2,cl=t=>Math.max(0,Math.min(1,t)),seg=(p,a,b)=>cl((p-a)/(b-a));
+const lerp=(a,b,t)=>a+(b-a)*t;
+function along(route,t){const n=route.length-1,f=cl(t)*n,i=Math.min(n-1,Math.floor(f)),u=f-i,a=sq(...route[i]),b=sq(...route[i+1]);return[lerp(a[0],b[0],u),lerp(a[1],b[1],u)]}
+// The state of the board at move i, progress p.
+function state(i,p){
+  const S={you:null,probe:null,youA:1,probeA:0,glow:{},fence:0,routes:{a:0,b:0,c:0},decide:0,build:0,goal:0,bloom:0,rays:[],shatter:0,hopYou:0,arcProbe:0};
+  const g=(c,r,col,a)=>{const k=c+","+r;const o=S.glow[k];if(!o||o.a<a)S.glow[k]={col,a}};
+  // stage 0
+  const p0=i>0?1:p;S.goal=ease(seg(p0,0,.35));S.youA=ease(seg(p0,0,.3));
+  const y0=sq(...START),y1=sq(4,1);S.you=[lerp(y0[0],y1[0],ease(seg(p0,.45,.85))),lerp(y0[1],y1[1],ease(seg(p0,.45,.85)))];S.hopYou=Math.sin(Math.PI*seg(p0,.45,.85));
+  if(i<1)return S;
+  // stage 0.5: the probe sweeps everything
+  const p1=i>1?1:p;S.probeA=ease(seg(p1,0,.25));const pa=[-5.2,.2],pb=sq(1,3);const tm=ease(seg(p1,0,.35));S.probe=[lerp(pa[0],pb[0],tm),lerp(pa[1],pb[1],tm)];S.arcProbe=Math.sin(Math.PI*tm);
+  const lit=Math.floor(SOURCES.length*seg(p1,.3,.95));SOURCES.slice(0,lit).forEach(([c,r],k)=>{g(c,r,"you",.3);if(i===1&&k>=lit-4)S.rays.push([c,r])});
+  if(i<2)return S;
+  // stage 1: your answers build the fence
+  const p2=i>2?1:p;S.fence=ease(seg(p2,.25,.9));const y2=sq(4,2);const t2=ease(seg(p2,0,.4));S.you=[lerp(y1[0],y2[0],t2),lerp(y1[1],y2[1],t2)];S.hopYou=Math.sin(Math.PI*t2);
+  if(i<3)return S;
+  // stage 1.5: deep inside the fence
+  const p3=i>3?1:p;const q=sq(5,4),t3=ease(seg(p3,0,.35));S.probe=[lerp(pb[0],q[0],t3),lerp(pb[1],q[1],t3)];S.arcProbe=Math.sin(Math.PI*t3);
+  const dl=Math.floor(DEEP.length*seg(p3,.25,.8));DEEP.slice(0,dl).forEach(([c,r],k)=>{g(c,r,"probe",.32);if(i===3&&k>=dl-4)S.rays.push([c,r])});
+  S.routes={a:ease(seg(p3,.6,1)),b:ease(seg(p3,.65,1)),c:ease(seg(p3,.7,1))};
+  if(i<4)return S;
+  // stage 2: you decide
+  const p4=i>4?1:p;S.decide=p4;S.hopYou=i===4?Math.abs(Math.sin(Math.PI*2*seg(p4,0,.5)))*.6:0;S.shatter=seg(p4,.45,.85);
+  if(i<5)return S;
+  // stage 2.5: the probe builds the chosen route
+  const p5=i>5?1:p;S.build=ease(seg(p5,.05,.9));const ap=along(ROUTES.a,S.build*0.84);const t5=seg(p5,0,.15);S.probe=[lerp(q[0],ap[0],ease(t5)),lerp(q[1],ap[1],ease(t5))];if(t5>=1)S.probe=ap;
+  if(i<6){return S}
+  // stage 3: you walk the path to the goal
+  const p6=p;const off=sq(2,6);S.probe=[lerp(ap[0],off[0],ease(seg(p6,0,.25))),lerp(ap[1],off[1],ease(seg(p6,0,.25)))];
+  S.you=along(ROUTES.a,ease(seg(p6,.15,.75)));S.hopYou=Math.abs(Math.sin(Math.PI*5*seg(p6,.15,.75)))*.35;S.bloom=seg(p6,.72,1);
+  return S;
 }
-function loop(t){
-  raf=0;read();now+=(target-now)*.085;draw(now,t);
-  if(!document.hidden)raf=requestAnimationFrame(loop);
+const COL={you:[143,230,242],probe:[255,180,84],good:[111,208,157],bad:[240,151,140],info:[143,193,240]};
+const rgba=(c,a)=>`rgba(${COL[c]},${a})`;
+function quad(c,r){const x=c-4,z=r-4;return[proj(x,z),proj(x+1,z),proj(x+1,z+1),proj(x,z+1)]}
+function poly(pts){ctx.beginPath();pts.forEach((p,i)=>i?ctx.lineTo(p[0],p[1]):ctx.moveTo(p[0],p[1]));ctx.closePath()}
+function piece(x,z,kind,alpha,lift,now){
+  if(alpha<=0)return;const h=kind==="you"?1.55:1.2,w=kind==="you"?.3:.34,y=lift;
+  const base=proj(x,z,y),top=proj(x,z,y+h),k=base[2];const col=COL[kind];
+  ctx.save();ctx.globalAlpha=alpha;
+  // shadow on the glass
+  const sh=proj(x,z,0);ctx.fillStyle=`rgba(0,0,0,${.35-.15*Math.min(1,y)})`;ctx.beginPath();ctx.ellipse(sh[0],sh[1],w*sh[2]*1.25,w*sh[2]*.5,0,0,7);ctx.fill();
+  ctx.fillStyle=rgba(kind,.16);ctx.beginPath();ctx.ellipse(sh[0],sh[1],w*sh[2]*2.1,w*sh[2]*.85,0,0,7);ctx.fill();
+  const bw=w*k,tw=w*.42*k,mid=bw*.18;
+  const L=[[base[0]-bw,base[1]],[top[0]-tw,top[1]],[top[0]-tw*.15,top[1]-2],[base[0]-mid,base[1]+bw*.3]];
+  const M=[[base[0]-mid,base[1]+bw*.3],[top[0]-tw*.15,top[1]-2],[top[0]+tw*.4,top[1]-1],[base[0]+bw*.45,base[1]+bw*.25]];
+  const R=[[base[0]+bw*.45,base[1]+bw*.25],[top[0]+tw*.4,top[1]-1],[top[0]+tw,top[1]],[base[0]+bw,base[1]]];
+  const fill=(pts,a1,a2)=>{const gr=ctx.createLinearGradient(pts[0][0],pts[1][1],pts[3][0],pts[0][1]);gr.addColorStop(0,`rgba(${col},${a1})`);gr.addColorStop(1,`rgba(${col.map(v=>Math.min(255,v+60))},${a2})`);ctx.fillStyle=gr;poly(pts);ctx.fill()};
+  ctx.shadowColor=rgba(kind,.6);ctx.shadowBlur=18;fill(L,.35,.18);ctx.shadowBlur=0;fill(M,.75,.45);fill(R,.5,.25);
+  ctx.strokeStyle="rgba(255,255,255,.55)";ctx.lineWidth=1;[L,M,R].forEach(p=>{poly(p);ctx.stroke()});
+  // crown: a cut gem for you, a lens for the probe
+  const tx=top[0],ty=top[1]-3,s=tw*2.1;
+  if(kind==="you"){const g1=[[tx,ty-s*1.25],[tx+s*.8,ty-s*.35],[tx,ty+s*.2],[tx-s*.8,ty-s*.35]];ctx.shadowColor=rgba("you",.9);ctx.shadowBlur=22;fill([g1[3],g1[0],g1[1],g1[2]],.95,.6);ctx.shadowBlur=0;ctx.strokeStyle="rgba(255,255,255,.8)";poly(g1);ctx.stroke();ctx.beginPath();ctx.moveTo(g1[3][0],g1[3][1]);ctx.lineTo(g1[1][0],g1[1][1]);ctx.stroke()}
+  else{const rr=s*.75;const gr=ctx.createRadialGradient(tx-rr*.3,ty-rr*.9,1,tx,ty-rr*.6,rr*1.2);gr.addColorStop(0,"rgba(255,245,220,.95)");gr.addColorStop(.5,rgba("probe",.75));gr.addColorStop(1,rgba("probe",.2));ctx.shadowColor=rgba("probe",.9);ctx.shadowBlur=22;ctx.fillStyle=gr;ctx.beginPath();ctx.arc(tx,ty-rr*.6,rr,0,7);ctx.fill();ctx.shadowBlur=0;ctx.strokeStyle="rgba(255,255,255,.7)";ctx.lineWidth=1;ctx.beginPath();ctx.ellipse(tx,ty-rr*.6,rr*1.5,rr*.45,-.3+now*.002%6.28,0,7);ctx.stroke()}
+  // a glint sliding up the middle facet
+  const gt=(now*.0004+(kind==="you"?0:.5))%1;if(gt<.35){const u=gt/.35,gx=lerp(base[0]-mid*.2,top[0],u),gy=lerp(base[1],top[1],u);ctx.strokeStyle=`rgba(255,255,255,${.7*Math.sin(Math.PI*u)})`;ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(gx-3,gy+4);ctx.lineTo(gx+3,gy-4);ctx.stroke()}
+  ctx.restore();
 }
-function start(){if(still){read();now=target;draw(now,0)}else if(!raf)raf=requestAnimationFrame(loop)}
-// A phone address bar hiding changes only the height, so ignore that or the particles jump.
-let lastW=innerWidth;
-addEventListener("resize",()=>{if(innerWidth===lastW&&matchMedia("(pointer:coarse)").matches)return;lastW=innerWidth;layout();start()});
-addEventListener("scroll",()=>{if(still)start()},{passive:true});
-document.addEventListener("visibilitychange",start);
-document.querySelectorAll("h2").forEach(h=>{
-  const lines=h.innerHTML.split(/<br\s*\/?>/i);h.setAttribute("aria-label",h.textContent);h.textContent="";let n=0;
-  lines.forEach((line,li)=>{
-    line.trim().split(/\s+/).forEach((w,i)=>{const o=document.createElement("span"),s=document.createElement("span");o.className="word";o.setAttribute("aria-hidden","true");s.textContent=w;s.style.transitionDelay=(n++*.07)+"s";o.appendChild(s);if(i)h.append(" ");h.appendChild(o)});
-    if(li<lines.length-1)h.appendChild(document.createElement("br"));
-  });
-});
-const io=new IntersectionObserver(es=>es.forEach(e=>{if(e.isIntersecting)e.target.classList.add("in")}),{threshold:.25});
-document.querySelectorAll(".reveal").forEach(e=>io.observe(e));
-document.querySelectorAll(".cta").forEach(btn=>{
-  if(still)return;
-  btn.addEventListener("pointermove",e=>{const r=btn.getBoundingClientRect(),x=e.clientX-r.left,y=e.clientY-r.top;btn.style.setProperty("--x",x+"px");btn.style.setProperty("--y",y+"px");btn.style.setProperty("--mx",(x-r.width/2)*.12+"px");btn.style.setProperty("--my",(y-r.height/2)*.22+"px")});
-  btn.addEventListener("pointerleave",()=>{btn.style.setProperty("--mx","0px");btn.style.setProperty("--my","0px")});
-  btn.addEventListener("pointerdown",e=>{const r=btn.getBoundingClientRect(),s=document.createElement("span");s.className="ripple";s.style.left=e.clientX-r.left+"px";s.style.top=e.clientY-r.top+"px";btn.appendChild(s);s.addEventListener("animationend",()=>s.remove())});
-});
-layout();start();
+function routeLine(route,col,a,width,dash,t=1){if(a<=0)return;ctx.save();ctx.globalAlpha=a;ctx.strokeStyle=rgba(col,1);ctx.lineWidth=width;ctx.lineCap="round";ctx.lineJoin="round";if(dash)ctx.setLineDash(dash);ctx.shadowColor=rgba(col,.9);ctx.shadowBlur=12;ctx.beginPath();
+  const n=60;for(let s=0;s<=n*t;s++){const p=along(route,s/n),q=proj(p[0],p[1],.02);s?ctx.lineTo(q[0],q[1]):ctx.moveTo(q[0],q[1])}ctx.stroke();ctx.restore()}
+function draw(i,p,now){
+  const S=state(i,p);ctx.clearRect(0,0,W,H);
+  yaw=lerp(yaw,yawT+(still?0:Math.sin(now*.00018)*.07),.06);
+  // board slab and rim light
+  const c0=proj(-4.25,-4.25),c1=proj(4.25,-4.25),c2=proj(4.25,4.25),c3=proj(-4.25,4.25),d0=proj(-4.25,-4.25,-.35),d1=proj(4.25,-4.25,-.35);
+  ctx.fillStyle="rgba(143,230,242,.05)";poly([c0,c1,d1,d0]);ctx.fill();
+  const rim=ctx.createLinearGradient(c3[0],c3[1],c1[0],c1[1]);rim.addColorStop(0,"rgba(143,230,242,.35)");rim.addColorStop(1,"rgba(255,180,84,.3)");
+  ctx.fillStyle="rgba(12,22,36,.75)";poly([c0,c1,c2,c3]);ctx.fill();ctx.strokeStyle=rim;ctx.lineWidth=1.5;ctx.stroke();
+  for(let r=7;r>=0;r--)for(let c=0;c<8;c++){
+    const qd=quad(c,r),light=(c+r)%2===0,key=c+","+r,gl=S.glow[key],out=S.fence>0&&!inFence(c,r);
+    ctx.fillStyle=light?"rgba(170,225,240,.085)":"rgba(90,140,170,.04)";poly(qd);ctx.fill();
+    if(gl){const a=gl.a*(out?1-S.fence*.85:1);ctx.fillStyle=rgba(gl.col,a);poly(qd);ctx.fill()}
+    if(out&&S.fence>0){ctx.fillStyle=`rgba(3,6,12,${.62*S.fence})`;poly(qd);ctx.fill();ctx.strokeStyle=`rgba(240,151,140,${.12*S.fence})`;ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(qd[0][0],qd[0][1]);ctx.lineTo(qd[2][0],qd[2][1]);ctx.stroke()}
+    ctx.strokeStyle="rgba(160,220,235,.09)";ctx.lineWidth=1;poly(qd);ctx.stroke();
+  }
+  if(S.fence>0){ctx.save();ctx.strokeStyle=rgba("you",.7*S.fence);ctx.lineWidth=2;ctx.setLineDash([6,5]);ctx.lineDashOffset=-now*.02;poly([proj(-2,-2),proj(3,-2),proj(3,4),proj(-2,4)]);ctx.stroke();ctx.restore()}
+  // candidate routes, decisions and the built path
+  const dc=S.decide;
+  const fadeTags=i===6?1-cl(p*3):1;
+  routeLine(ROUTES.c,dc>.3?"info":"probe",S.routes.c*(dc>.3?.9:.45)*(1-S.build*.85),2,[3,6]);
+  routeLine(ROUTES.b,dc>.15?"bad":"probe",S.routes.b*(1-S.shatter)*(dc>.15?.9:.45),2,[3,6]);
+  routeLine(ROUTES.a,dc>0?"good":"probe",S.routes.a*(dc>0?.95:.45),dc>0?2.5:2,[3,6]);
+  if(S.build>0){routeLine(ROUTES.a,"probe",1,4.5,null,S.build);ROUTES.a.slice(0,Math.ceil(S.build*ROUTES.a.length)).forEach(([c,r])=>{ctx.fillStyle=rgba("probe",.32);poly(quad(c,r));ctx.fill()})}
+  if(dc>0){const tags=[[ROUTES.a[3],"good","Accept",seg(dc,0,.3)],[ROUTES.b[3],"bad","Reject",seg(dc,.15,.45)],[ROUTES.c[3],"info","Auto",seg(dc,.3,.6)]];
+    tags.forEach(([[c,r],col,label,a])=>{a*=fadeTags;if(a<=0)return;const p=sq(c,r),q=proj(p[0],p[1],.9);ctx.save();ctx.globalAlpha=a*(label==="Reject"?1-S.shatter*.7:1);ctx.font="600 13px Instrument Sans, system-ui, sans-serif";const tw=ctx.measureText(label).width+18;ctx.fillStyle=rgba(col,.18);ctx.strokeStyle=rgba(col,.9);ctx.lineWidth=1.2;ctx.beginPath();ctx.roundRect(q[0]-tw/2,q[1]-13,tw,26,13);ctx.fill();ctx.stroke();ctx.fillStyle=rgba(col,1);ctx.textAlign="center";ctx.textBaseline="middle";ctx.fillText(label,q[0],q[1]+.5);ctx.restore()})}
+  if(S.shatter>0&&S.shatter<1){const p=sq(...ROUTES.b[3]),o=proj(p[0],p[1],.4);for(let k=0;k<14;k++){const an=k*2.4,d=S.shatter*60*(.5+rnd(k+40));ctx.fillStyle=rgba("bad",.8*(1-S.shatter));ctx.beginPath();const x=o[0]+Math.cos(an)*d,y=o[1]+Math.sin(an)*d*.6-S.shatter*20;ctx.moveTo(x,y);ctx.lineTo(x+5,y+2);ctx.lineTo(x+1,y+6);ctx.fill()}}
+  // goal crystal
+  if(S.goal>0){const p=sq(...GOAL),b=proj(p[0],p[1],0),k=b[2];const pulse=1+Math.sin(now*.004)*.08,R=.42*k*pulse*(1+S.bloom*.4);ctx.save();ctx.globalAlpha=S.goal;
+    ctx.strokeStyle=rgba("you",.5);ctx.lineWidth=1.5;ctx.beginPath();ctx.ellipse(b[0],b[1],R*1.6,R*.6,0,0,7);ctx.stroke();
+    const s=proj(p[0],p[1],.75);ctx.shadowColor=S.bloom>0?rgba("probe",1):rgba("you",.9);ctx.shadowBlur=26+S.bloom*30;ctx.fillStyle=S.bloom>0?`rgba(255,${Math.round(lerp(230,200,S.bloom))},150,.95)`:"rgba(220,250,255,.9)";
+    const st=(cx0,cy0,r1,r2)=>{ctx.beginPath();for(let a=0;a<8;a++){const rr=a%2?r2:r1,an=a*Math.PI/4-Math.PI/2+now*.0006;ctx.lineTo(cx0+Math.cos(an)*rr,cy0+Math.sin(an)*rr)}ctx.closePath();ctx.fill()};st(s[0],s[1],R*.9,R*.35);
+    if(S.bloom>0){for(let n=0;n<3;n++){const u=(S.bloom*1.4+n*.33)%1;ctx.strokeStyle=rgba("probe",(1-u)*.8);ctx.lineWidth=2;ctx.beginPath();ctx.ellipse(b[0],b[1],R*(1.6+u*4),R*(.6+u*1.5),0,0,7);ctx.stroke()}}
+    ctx.restore()}
+  // probe rays to the squares it is reading
+  if(S.probe&&S.rays.length){const t=proj(S.probe[0],S.probe[1],1.35);S.rays.forEach(([c,r],k)=>{const p=sq(c,r),q=proj(p[0],p[1]);const gr=ctx.createLinearGradient(t[0],t[1],q[0],q[1]);gr.addColorStop(0,rgba("probe",.85));gr.addColorStop(1,rgba(i===1?"you":"probe",.05));ctx.strokeStyle=gr;ctx.lineWidth=1.4;ctx.beginPath();ctx.moveTo(t[0],t[1]);ctx.lineTo(q[0],q[1]);ctx.stroke()})}
+  // pieces, far one first
+  const ps=[];if(S.you)ps.push(["you",S.you,S.youA,S.hopYou*.6]);if(S.probe)ps.push(["probe",S.probe,S.probeA,S.arcProbe*1.1]);
+  ps.sort((a,b)=>b[1][1]-a[1][1]).forEach(([k,pos,a,l])=>piece(pos[0],pos[1],k,a,l,now));
+}
+// Playback
+let cur=0,t0=performance.now(),playing=!still,visible=true,raf=0,pausedAt=0;
+function setUi(i){const m=MOVES[i];$("caption").className="caption "+m.who;$("capWho").textContent="Stage "+m.k+" · "+(m.who==="you"?"Your move":"The probe's move");$("capTitle").textContent=m.t;$("capText").textContent=m.d;
+  $("clockYou").classList.toggle("on",m.who==="you");$("clockProbe").classList.toggle("on",m.who==="probe");
+  document.querySelectorAll(".mv").forEach(b=>{const k=+b.dataset.i;b.classList.toggle("now",k===i);b.classList.toggle("done",k<i);b.setAttribute("aria-current",k===i?"step":"false")})}
+function jump(i){cur=i;t0=performance.now()-(still?MOVES[i].dur*1000:0);setUi(i);if(still)render(performance.now());else kick()}
+function render(now){const m=MOVES[cur],p=still?1:cl((now-t0)/(m.dur*1000));draw(cur,p,now);return p}
+function loop(now){raf=0;if(!visible)return;
+  const p=render(now);
+  if(playing&&p>=1){if(cur<MOVES.length-1){cur++;t0=now;setUi(cur)}else if(now-t0>MOVES[cur].dur*1000+2600){cur=0;t0=now;setUi(0)}}
+  if(!playing&&p>=1){/* hold the frame but keep the glints moving */}
+  raf=requestAnimationFrame(loop)}
+function kick(){if(!raf&&visible&&!still)raf=requestAnimationFrame(loop)}
+$("play").addEventListener("click",()=>{playing=!playing;$("play").textContent=playing?"Pause":"Play";$("play").setAttribute("aria-label",playing?"Pause the game":"Play the game");if(playing){t0=performance.now()-(pausedAt||0)}else pausedAt=performance.now()-t0;kick()});
+if(still){playing=false;$("play").textContent="Play";$("play").hidden=true}
+new IntersectionObserver(es=>es.forEach(e=>{visible=e.isIntersecting;if(visible){kick();if(still)render(performance.now())}}),{threshold:.05}).observe($("game"));
+document.addEventListener("visibilitychange",()=>{visible=!document.hidden;kick()});
+cv.addEventListener("pointermove",e=>{if(still||e.pointerType!=="mouse")return;const r=cv.getBoundingClientRect();yawT=((e.clientX-r.left)/r.width-.5)*.2});
+cv.addEventListener("pointerleave",()=>{yawT=0});
+new ResizeObserver(()=>{size();render(performance.now())}).observe(cv);
+size();setUi(0);if(still){cur=MOVES.length-1;setUi(cur);render(performance.now())}else kick();
+// Density charts: one unit per chart, comparators in grey and ProofProbe in the accent.
+const SOURCES_DATA=[{l:"A chat answer",v:19.48,lo:0.07,txt:"0–19",tip:"Range across four leading assistants with web search on, from two 2026 studies of 960 and 1,000 answers."},{l:"Best deep-research agent",v:111.21,txt:"111",tip:"Average effective citations per report, best of four agents on 100 PhD-level tasks (DeepResearch Bench, 2025)."},{l:"ProofProbe probe",v:229,txt:"229",us:1,tip:"Unique sources recorded in the notes of our deepest probe so far, RL Audits, from 60 domains."}];
+const STEERS_DATA=[{l:"A chat answer",v:1,txt:"1",tip:"The prompt you type. Follow-ups are up to you."},{l:"ProofProbe, product audit",v:32,txt:"32",us:1,tip:"10 answers at Stage 1 and 22 decisions at Stage 2 (RL Audits)."},{l:"ProofProbe, career probe",v:40,txt:"40",us:1,tip:"40 questions answered at Stage 1."}];
+function bars(host,data){const max=Math.max(...data.map(d=>d.v));data.forEach(d=>{const row=document.createElement("div");row.className="bar"+(d.us?" us":"");row.dataset.tip=d.tip;
+  const l=document.createElement("span");l.className="lbl";l.textContent=d.l;const tr=document.createElement("span");tr.className="track";const f=document.createElement("span");f.className="fill"+(d.lo!==undefined?" range":"");f.style.width=Math.max(1.2,d.v/max*100)+"%";if(d.lo!==undefined){f.style.left=d.lo/max*100+"%";f.style.width=Math.max(1.2,(d.v-d.lo)/max*100)+"%"}tr.appendChild(f);
+  const v=document.createElement("span");v.className="val";v.textContent=d.txt;row.append(l,tr,v);row.setAttribute("aria-label",d.l+": "+d.txt+". "+d.tip);host.appendChild(row)})}
+bars($("chartSources"),SOURCES_DATA);bars($("chartSteers"),STEERS_DATA);
+new IntersectionObserver(es=>es.forEach(e=>{if(e.isIntersecting)e.target.classList.add("in")}),{threshold:.3}).observe($("charts"));
+const tip=$("tipbox");document.querySelectorAll(".bar").forEach(b=>{b.tabIndex=0;
+  const show=e=>{tip.textContent=b.dataset.tip;tip.hidden=false;const r=b.getBoundingClientRect(),tw=Math.min(280,innerWidth-24);tip.style.left=Math.max(12,Math.min(innerWidth-tw-12,(e&&e.clientX?e.clientX:r.left+r.width/2)-tw/2))+"px";tip.style.top=(r.top-tip.offsetHeight-8<8?r.bottom+8:r.top-tip.offsetHeight-8)+"px"};
+  b.addEventListener("pointerenter",show);b.addEventListener("pointermove",show);b.addEventListener("pointerleave",()=>tip.hidden=true);b.addEventListener("focus",()=>show());b.addEventListener("blur",()=>tip.hidden=true)});
+addEventListener("scroll",()=>{tip.hidden=true},{passive:true});
 </script></body></html>

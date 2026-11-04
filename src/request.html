@@ -45,7 +45,7 @@ button{font:600 16px var(--body);cursor:pointer}.rm{flex:none;min-height:34px;pa
     <li><strong>Say where you are now:</strong> your role, your skills, or your product's stage.</li>
     <li><strong>Name your limits:</strong> time each week, budget, location.</li>
     <li><strong>Add specifics:</strong> job links, company names, numbers, what you've already tried.</li>
-    <li><strong>Attach what helps:</strong> a CV, job description or product document.</li>
+    <li><strong>Attach what helps:</strong> a CV, job post, offer letter, pitch deck, product doc, spreadsheet or screenshots. Paste links, such as a LinkedIn profile, portfolio, prototype or code repository, in the description.</li>
   </ul></section>
   <section class="gate" id="gate" hidden><h2>Sign in to continue</h2><p>Goal requests need an approved profile.</p><div class="gatebtns"><button type="button" class="send" id="gateSign">Sign in</button><button type="button" class="send ghost" id="gateApply">Request a profile</button></div></section>
   <form id="form" novalidate hidden>
@@ -53,7 +53,7 @@ button{font:600 16px var(--body);cursor:pointer}.rm{flex:none;min-height:34px;pa
     <div class="field"><label for="contact">How can we reach you?</label><input id="contact" type="text" maxlength="160" autocomplete="email" placeholder="Email or phone"></div>
     <div class="field"><label for="goalTitle">Your goal in one line</label><input id="goalTitle" type="text" maxlength="140" placeholder="Example: Move from support into product management"></div>
     <div class="field"><label for="body">Describe your goal</label><p class="hint">Write as much as you like. More detail now means better questions later.</p><textarea id="body" maxlength="20000"></textarea><p class="hint" id="chars" role="status">0 of 20,000 characters</p></div>
-    <div class="field"><label for="files">Documents (optional)</label><input id="files" type="file" multiple accept=".pdf,.doc,.docx,.txt,.md,.rtf,.ppt,.pptx,.xls,.xlsx,.csv,.png,.jpg,.jpeg"><div class="drop" id="drop"><b>Choose files</b><span class="hint">or drag them here. Up to 5 files, 10 MB in total. Larger uploads can't be accepted.</span></div><ul class="list" id="list"></ul></div>
+    <div class="field"><label for="files">Documents (optional)</label><input id="files" type="file" multiple accept=".pdf,.doc,.docx,.odt,.txt,.md,.rtf,.json,.ppt,.pptx,.odp,.key,.xls,.xlsx,.ods,.csv,.tsv,.png,.jpg,.jpeg,.webp,.gif,.heic"><div class="drop" id="drop"><b>Choose files</b><span class="hint">or drag them here. Up to 5 files, 10 MB in total. Larger uploads can't be accepted.</span></div><ul class="list" id="list"></ul></div>
     <button class="send" id="send" type="submit">Send request</button>
     <p class="err" id="err" role="alert"></p>
   </form>

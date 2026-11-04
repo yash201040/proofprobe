@@ -36,15 +36,20 @@ const signInCookie = async (name, password) => (await post("/api/session", { nam
 const openSignIn = async (p) => { await p.waitForSelector("#acctBtn"); await p.click("#acctBtn"); await p.waitForSelector("#acctDlg[open]"); };
 
 await page.goto(base + "/", { waitUntil: "networkidle0" });
-ok((await txt("h1")).includes("One proven path"), "home page loads");
+ok((await txt("h1")).includes("a researcher"), "home page loads with the new headline");
 ok(!(await page.$("#burger")), "the home page has no menu");
 ok((await page.$eval('.cta[href="/probes"]', (e) => e.target)) === "", "See the probes stays in the same tab");
 ok((await page.$eval('.cta[href*="github"]', (e) => e.target)) === "_blank", "GitHub opens in a new tab");
 ok((await page.$('.adminlink[href="/admin"]')) !== null, "the Admin link is on the home page");
 await page.waitForSelector("#acctBtn"); ok((await page.$eval("#acctBtn", (e) => { const r = e.getBoundingClientRect(); return r.top < 30 && innerWidth - r.right < 40 && e.textContent === "Sign in"; })), "Sign in is at the top right of the home page");
 ok(!(await page.$("#acctMe")), "a visitor isn't shown as signed in");
-await page.evaluate(() => scrollTo(0, document.documentElement.scrollHeight)); await page.waitForFunction(() => document.body.classList.contains("day"));
-ok(await page.$eval("#acctBtn", (e) => { const s = getComputedStyle(e); return s.backgroundColor !== s.color && e.getBoundingClientRect().top < 30; }), "Sign in stays readable after the page turns to day");
+ok((await page.$$("#moves .mv")).length === 7 && (await page.$$eval("#moves .mv.you", (l) => l.length)) === 4, "the game shows four moves for you and three for the probe");
+await page.click('#moves .mv[data-i="5"]'); ok((await txt("#capWho")).startsWith("Stage 2.5") && (await page.$eval("#clockProbe", (e) => e.classList.contains("on"))), "picking a move shows that stage and whose turn it is");
+await new Promise((r) => setTimeout(r, 400)); ok(await page.$eval("#board", (c) => { const x = c.getContext("2d").getImageData(0, 0, c.width, c.height).data; let n = 0; for (let i = 3; i < x.length; i += 400) if (x[i] > 0) n++; return n > 200; }), "the crystal board draws");
+ok((await page.$$("#bring .chips span")).length >= 40, "Stage 0 lists many things people can bring");
+ok((await page.$$("#density .method a")).length === 5 && (await page.$$("#chartSources .bar")).length === 3, "the density estimate shows its charts and cites its sources");
+await page.evaluate(() => scrollTo(0, document.documentElement.scrollHeight)); await new Promise((r) => setTimeout(r, 300));
+ok(await page.$eval("#acctBtn", (e) => { const s = getComputedStyle(e); return s.backgroundColor !== s.color && e.getBoundingClientRect().top < 30; }), "Sign in stays readable at the end of the page");
 await page.goto(base + "/probes", { waitUntil: "networkidle0" });
 await page.waitForSelector(".profile");
 const titles = () => page.$$eval(".pagelink b", (l) => l.map((e) => e.textContent));
