@@ -2,11 +2,9 @@
 
 Live: https://proofprobe.forested-wolfberry.workers.dev
 
-Staged research that turns any starting point into a clear, data-backed final report: a job or interview to prepare for, a search for side income, a startup idea, or another goal.
+Staged research that turns any starting point into a clear, data-backed final report: a job or interview to prepare for, a search for side income, a startup idea, or another goal. Research plays out as turns, like a game of chess. You make each "a" move, and the probe answers with each "b" move:
 
 <p align="center"><a href="https://proofprobe.forested-wolfberry.workers.dev"><img src="docs/demo.webp" width="390" alt="A crystal chess game: you and the probe take turns over four rounds, from setting a goal to one lit path, the final report."></a></p>
-
-Research plays out as turns, like a game of chess. You make each "a" move, and the probe answers with each "b" move:
 
 | Turn | You (a) | Probe (b) |
 | --- | --- | --- |
