@@ -15,7 +15,8 @@ Staged research that turns any starting point into a clear, data-backed final re
 
 - **`/proofprobe` skill** (`skills/proofprobe/SKILL.md`): runs in Claude Code. Opus does the thinking and treg does the live research, so the server needs no AI key.
 - **Worker** (`src/`): hosts the home page and the Probes directory, organised as profiles with one or more pages. Pages are public by default, and signing in to the profile unlocks editing. A request can opt into private research: Probes then shows only a teaser card, and the owner decides who else may read it from their account page.
-- **`bin/proofprobe.mjs`**: admin helper to create, publish, check and fetch cases.
+- **`bin/proofprobe.mjs`**: admin helper to create, publish, check and fetch cases. `proofprobe call` makes every research call, and `proofprobe calls` reports them.
+- **`skills/proofprobe/tools.json`**: which treg tools each research stage may use, out of about 3,600. Calls are capped, sent to the free provider first and logged per page.
 
 ## For agents and other chats
 
@@ -41,7 +42,7 @@ Local test: put `ADMIN_TOKEN_SHA256=<hash>` and `PASSWORD_KEY=<base64 key>` in `
 - Anyone can read a public page's research, questions, submitted answers, status and cost, and a notice says so. That includes requested new directions. Only the signed-in profile and the owner can change it, and unsubmitted drafts stay with them. Private pages open only for their owner, people they approve, and the owner of the site. People apply for a profile, the owner approves it, and signing in unlocks that profile's pages and no others. People can change their own password once signed in.
 - People act at Stages 1a, 2a, 3a and 4a: set a goal, answer questions, decide on proposals (Accept, Reject or Auto), then read and download the final report. Stages 1b, 2b and 3b are research the owner runs. Each stage is a view on the same page, and new research never replaces an earlier one.
 - Submitting stores a log and starts nothing. Research continues only when `/proofprobe` is run.
-- The cost shown on a page is treg data spend logged with `proofprobe cost`. Claude usage is not included.
+- The cost shown on a page is treg data spend logged with `proofprobe cost`, using the total `proofprobe calls` prints. Claude usage is not included.
 - Submissions are append-only. A database trigger blocks updates, and each log stores a SHA-256 so corruption is detectable.
 - Page content is rendered as text only, so stored content cannot inject markup.
 - CVs and research notes stay in `.proofprobe/` on this machine, which git ignores. The server holds what the site needs: questions, research, costs, answers and decisions (submitted ones are public on public pages, drafts stay private), and goal requests with their files (private to the owner).

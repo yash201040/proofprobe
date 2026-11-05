@@ -1,0 +1,341 @@
+{
+  "about": "The treg tools each research stage may use. `proofprobe tools <stage>` prints this, `proofprobe call` enforces it, caps every call and logs it to the case's calls.jsonl. Ids, parameters and prices were checked against the live catalog on the date below; re-check a tool with `treg catalog get <id>` when a call is refused or a price looks wrong.",
+  "checked": "2026-11-05",
+  "maxCostUsd": 0.05,
+  "prefer": {
+    "treg.web.search": "tinyfish",
+    "treg.web.extract": "tinyfish",
+    "treg.web.search.news": "tinyfish",
+    "treg.web.search.publications": "tinyfish"
+  },
+  "budgetsUsd": {
+    "1b": 2,
+    "2b": 2,
+    "3b": 0.5
+  },
+  "stages": {
+    "1b": [
+      "core",
+      "person",
+      "jobs",
+      "market",
+      "community",
+      "technical",
+      "deep"
+    ],
+    "2b": [
+      "core",
+      "person",
+      "jobs",
+      "market",
+      "community",
+      "technical",
+      "evidence",
+      "deep",
+      "contacts"
+    ],
+    "3b": [
+      "core",
+      "contacts"
+    ]
+  },
+  "groups": {
+    "core": {
+      "use": "Every stage. Start here: find, then open the pages, then confirm.",
+      "tools": [
+        {
+          "id": "treg.web.search",
+          "send": "{\"q\":\"...\"}",
+          "price": "free first (TinyFish)",
+          "job": "Find pages"
+        },
+        {
+          "id": "treg.web.extract",
+          "send": "{\"url\":\"https://...\"}",
+          "price": "free first (TinyFish)",
+          "job": "Read one page as text"
+        },
+        {
+          "id": "tinyfish.web.fetch",
+          "send": "{\"urls\":[\"https://...\"]}",
+          "price": "free",
+          "job": "Read up to 10 pages in one call, no fallback"
+        },
+        {
+          "id": "treg.web.search.news",
+          "send": "{\"q\":\"...\"}",
+          "price": "free first",
+          "job": "Dated news, for anything recent"
+        },
+        {
+          "id": "treg.web.search.publications",
+          "send": "{\"q\":\"...\"}",
+          "price": "free first",
+          "job": "Papers and studies"
+        },
+        {
+          "id": "crawl4ai.research.search.papers",
+          "send": "{\"query\":\"...\",\"limit\":10}",
+          "price": "$0.00015",
+          "job": "arXiv search, with dates and categories"
+        },
+        {
+          "id": "crawl4ai.wikipedia.article.detail",
+          "send": "{\"title\":\"...\"}",
+          "price": "$0.00015",
+          "job": "Background on a term or company"
+        },
+        {
+          "id": "treg.web.map",
+          "send": "{\"url\":\"https://...\",\"q\":\"topic\"}",
+          "price": "$0.001",
+          "job": "List a site's URLs for a topic, then read only those"
+        }
+      ]
+    },
+    "person": {
+      "use": "A named person from the input: their public record, never their private documents.",
+      "tools": [
+        {
+          "id": "treg.linkedin.user.profile",
+          "send": "{\"linkedin_url\":\"...\"}",
+          "price": "$0.0012",
+          "job": "Roles, skills, education"
+        },
+        {
+          "id": "treg.linkedin.user.posts",
+          "send": "{\"linkedin_url\":\"...\",\"limit\":20}",
+          "price": "$0.0015",
+          "job": "What they write about and how recently"
+        },
+        { "id": "scrapecreators.x.v1-github-user", "query": "handle=<user>", "price": "$0.00188", "job": "GitHub profile" },
+        { "id": "scrapecreators.x.v1-github-user-repositories", "query": "handle=<user>", "price": "$0.00188", "job": "Their public repositories" }
+      ]
+    },
+    "jobs": {
+      "use": "Careers, interviews and part-time income: what is hiring, where, and for what.",
+      "tools": [
+        {
+          "id": "crawl4ai.linkedin.search.jobs",
+          "send": "{\"query\":\"...\",\"location\":\"...\",\"limit\":25}",
+          "price": "$0.00045",
+          "job": "Job listings by keyword and place"
+        },
+        {
+          "id": "treg.companies.jobs.search",
+          "send": "{\"domain\":\"company.com\",\"limit\":20}",
+          "price": "$0.009",
+          "job": "One company's open roles"
+        },
+        {
+          "id": "crawl4ai.hackernews.jobs.hiring",
+          "send": "{\"keyword\":\"...\",\"remote\":true}",
+          "price": "$0.00015",
+          "job": "HN Who is hiring posts"
+        },
+        {
+          "id": "crawl4ai.glassdoor.company.reviews",
+          "send": "{\"company\":\"...\",\"limit\":20}",
+          "price": "$0.00015",
+          "job": "What employees say"
+        }
+      ]
+    },
+    "market": {
+      "use": "Startups and products: who else does this, who funds it, how big they are.",
+      "tools": [
+        {
+          "id": "treg.companies.search",
+          "send": "{\"q\":\"...\",\"country\":\"..\",\"limit\":25}",
+          "price": "from free",
+          "job": "Competitors and players by description, industry or technology"
+        },
+        {
+          "id": "treg.companies.enrich",
+          "send": "{\"domain\":\"company.com\"}",
+          "price": "$0.0005",
+          "job": "Size, industry, location of one company"
+        },
+        {
+          "id": "treg.companies.similar",
+          "send": "{\"domain\":\"company.com\"}",
+          "price": "$0.0089",
+          "job": "Lookalike companies"
+        },
+        {
+          "id": "treg.companies.news",
+          "send": "{\"domain\":\"company.com\",\"limit\":10}",
+          "price": "$0.01",
+          "job": "A company's recent events"
+        },
+        { "id": "aviato.companies.funding_rounds", "query": "website=company.com&perPage=10&page=0", "price": "$0.01", "job": "Funding rounds and investors" },
+        {
+          "id": "treg.linkedin.company.profile",
+          "send": "{\"linkedin_url\":\"...\"}",
+          "price": "$0.001",
+          "job": "Headcount band and description"
+        }
+      ]
+    },
+    "community": {
+      "use": "What practitioners actually say: pain points, prices, complaints, demand.",
+      "tools": [
+        {
+          "id": "crawl4ai.reddit.search.posts",
+          "send": "{\"query\":\"...\",\"subreddit\":\"optional\",\"limit\":25}",
+          "price": "$0.0009",
+          "job": "Reddit posts by keyword"
+        },
+        {
+          "id": "treg.reddit.subreddit.posts",
+          "send": "{\"subreddit\":\"...\"}",
+          "price": "$0.001",
+          "job": "A subreddit's latest posts"
+        },
+        {
+          "id": "crawl4ai.reddit.post.comments",
+          "send": "{\"url\":\"https://www.reddit.com/...\",\"limit\":50}",
+          "price": "$0.0009",
+          "job": "The comments under one post"
+        },
+        {
+          "id": "treg.x.search.posts",
+          "send": "{\"q\":\"...\"}",
+          "price": "$0.00075",
+          "job": "X posts by keyword"
+        },
+        {
+          "id": "treg.x.post.comments",
+          "send": "{\"tweet_id\":\"...\"}",
+          "price": "$0.0005",
+          "job": "Replies to one X post"
+        },
+        {
+          "id": "crawl4ai.hackernews.search.stories",
+          "send": "{\"query\":\"...\",\"limit\":20}",
+          "price": "$0.00015",
+          "job": "Hacker News discussions"
+        },
+        { "id": "scrapecreators.x.v1-linkedin-search-posts", "query": "query=...&date_posted=last-month", "price": "$0.00188", "job": "LinkedIn posts by keyword" },
+        {
+          "id": "treg.youtube.search.videos",
+          "send": "{\"q\":\"...\"}",
+          "price": "$0.001",
+          "job": "Talks and demos on a topic"
+        }
+      ]
+    },
+    "technical": {
+      "use": "Code, models, datasets, tools: what exists, how active it is, what breaks.",
+      "tools": [
+        {
+          "id": "crawl4ai.github.repo.profile",
+          "send": "{\"repo\":\"owner/name\",\"releases\":true}",
+          "price": "$0.00165",
+          "job": "Stars, activity, releases"
+        },
+        {
+          "id": "crawl4ai.github.repo.issues",
+          "send": "{\"repo\":\"owner/name\",\"state\":\"open\",\"limit\":30}",
+          "price": "$0.00015",
+          "job": "Known problems and requests"
+        },
+        {
+          "id": "crawl4ai.github.repo.files",
+          "send": "{\"url\":\"https://github.com/owner/name\",\"path\":\"\"}",
+          "price": "$0.00015",
+          "job": "Read a repo's files"
+        },
+        {
+          "id": "crawl4ai.packages.package.info",
+          "send": "{\"name\":\"...\",\"ecosystem\":\"npm|pypi|crates\"}",
+          "price": "$0.00015",
+          "job": "Versions and downloads of a package"
+        },
+        {
+          "id": "crawl4ai.stackoverflow.search.questions",
+          "send": "{\"tag\":\"...\",\"limit\":20}",
+          "price": "$0.00015",
+          "job": "Common problems with a tool"
+        }
+      ]
+    },
+    "evidence": {
+      "use": "Stage 2b: harder numbers for the proposals.",
+      "tools": [
+        {
+          "id": "treg.web.extract.structured",
+          "send": "{\"url\":\"https://...\",\"instruction\":\"...\"}",
+          "price": "$0.01",
+          "job": "Pull a table or typed fields out of one page"
+        },
+        {
+          "id": "crawl4ai.trustpilot.business.reviews",
+          "send": "{\"domain\":\"company.com\",\"limit\":20}",
+          "price": "$0.00135",
+          "job": "Customer reviews"
+        },
+        { "id": "litescrape.app_store.reviews", "query": "product_id=<apple id>", "price": "$0.00015", "job": "App Store reviews" },
+        { "id": "litescrape.google_play.reviews", "query": "product_id=<package>&num=20", "price": "$0.00015", "job": "Google Play reviews" },
+        { "id": "tomba.companies.tech_stack", "query": "domain=company.com", "price": "$0.0089", "job": "What a company runs on" },
+        { "id": "valyu.economics.indicators.search", "send": "see `treg catalog get`", "price": "$0.005", "job": "Official labour and economic statistics" },
+        { "id": "valyu.health.trials.search", "send": "see `treg catalog get`", "price": "$0.005", "job": "Clinical studies, for health goals only" }
+      ]
+    },
+    "deep": {
+      "use": "Escalation only, after the free tools left a decisive question open. Say which question it answers.",
+      "maxCostUsd": 0.15,
+      "tools": [
+        {
+          "id": "exa.web.search.deep",
+          "send": "{\"query\":\"...\",\"type\":\"deep\",\"numResults\":10}",
+          "price": "$0.012",
+          "job": "Several searches at once, with reasoning"
+        },
+        {
+          "id": "you.web.research",
+          "send": "{\"input\":\"...\",\"research_effort\":\"lite\"}",
+          "price": "$0.012",
+          "job": "A cited answer across many sources"
+        },
+        {
+          "id": "valyu.research.deep",
+          "send": "{\"query\":\"...\",\"mode\":\"fast\",\"output_formats\":[\"markdown\"]}",
+          "price": "$0.10 (fast mode only)",
+          "job": "A cited report; async, poll its status"
+        }
+      ]
+    },
+    "contacts": {
+      "use": "Startups only: people to approach in the proposals or the final report. Public business contacts, verified before they are shown.",
+      "tools": [
+        {
+          "id": "treg.people.search",
+          "send": "{\"company_domain\":\"...\",\"title\":\"...\",\"limit\":10}",
+          "price": "from free",
+          "job": "Who holds a role at a company"
+        },
+        {
+          "id": "treg.people.email.find",
+          "send": "{\"full_name\":\"...\",\"domain\":\"...\"}",
+          "price": "$0.0005",
+          "job": "A work email, unverified"
+        },
+        {
+          "id": "treg.people.email.verify",
+          "send": "{\"email\":\"...\"}",
+          "price": "from free",
+          "job": "Check the mailbox before showing it"
+        }
+      ]
+    }
+  },
+  "neverUse": [
+    "AI generation (video, image, voice, music): a report never needs it.",
+    "ai-search.* and other tools that ask another AI assistant: an answer from an assistant is not evidence.",
+    "Advertising accounts and ad management: they act on accounts.",
+    "Anything that writes, posts, sends or deletes.",
+    "SEO data (backlinks, keyword volume, SERP rankings), unless the goal itself is about search or marketing. Then call it with --why."
+  ],
+  "offList": "A job not covered here: run `treg catalog search \"<the job in plain words>\"`, pick by inputs you hold, then WORKS, then price, and call it with --why \"<the question it answers>\". The log keeps the reason, and a tool used off-list in two cases should be added here."
+}
