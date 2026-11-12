@@ -91,11 +91,11 @@ dialog{width:min(420px,calc(100vw - 32px));padding:22px;border:1px solid var(--l
 .dirtools{display:flex;flex-wrap:wrap;align-items:flex-end;gap:12px;margin-bottom:16px}.dirtools label{display:grid;gap:4px;font-size:14px;font-weight:600;color:var(--muted)}.dirtools select{min-height:42px;min-width:170px;padding:8px 34px 8px 11px;font:600 16px var(--body);color:var(--ink);background:var(--surface);border:1px solid var(--line);border-radius:6px;cursor:pointer}.dirtools select:hover{border-color:var(--accent)}#sortDir{min-height:42px;min-width:136px}.dircount{margin-left:auto;font-size:15px;color:var(--muted)}
 .profile .who{font:500 12.5px var(--mono);text-transform:uppercase;letter-spacing:.05em;color:var(--accent);margin-bottom:2px}.profile.single .pagelink{border-top:0;margin-top:0;padding-top:4px}
 @media (max-width:640px){#sortDir{flex:1 1 120px}.dirtools label{flex:1 1 150px}.dirtools select{width:100%;min-width:0}.dircount{margin-left:0;flex-basis:100%}}
-/* The name is always drawn as clipped text and never scaled, so hovering can't re-render the glyphs. An ink layer wipes away to show the rainbow. */
+/* The name is always drawn as clipped text and never scaled, so hovering can't re-render the glyphs. An ink layer wipes away to show the rainbow, which slides out and back in (alternate) rather than jumping back. */
 .brandlink{display:inline-block;color:var(--ink);text-decoration:none}
 @supports ((-webkit-background-clip:text) or (background-clip:text)){
 .brandlink{color:transparent;-webkit-background-clip:text;background-clip:text;background-image:linear-gradient(var(--ink),var(--ink)),linear-gradient(90deg,#FF5E7E,#FFB454,#7BE495,#5FC6C9,#7C8CFF,#D478FF,#FF5E7E);background-size:100% 100%,200% 100%;background-repeat:no-repeat;background-position:0 0,0 50%;transition:background-size .35s ease}
-.brandlink:hover,.brandlink:focus-visible{background-size:0% 100%,200% 100%;animation:rainbow 1.4s linear infinite}
+.brandlink:hover,.brandlink:focus-visible{background-size:0% 100%,200% 100%;animation:rainbow 1.4s linear infinite alternate}
 }
 @keyframes rainbow{to{background-position:0 0,200% 50%}}
 @media (prefers-reduced-motion:reduce){.brandlink:hover,.brandlink:focus-visible{animation:none}.brandlink{transition:none}}
@@ -391,17 +391,17 @@ function loaded(){const b=$("loadbar"),s=$("skel");if(s)s.remove();if(!b||b.clas
 const money=n=>"$"+Number(n).toFixed(n>0&&n<1?3:2);
 // Stages follow the turns: in turn N, "a" is the person's move and "b" is research on the owner's side.
 const STAGES=[["1a","Goal","you","Goal set"],["1b","Probe wide","us","Probing wide"],["2a","Answer","you","Answer questions"],["2b","Probe deep","us","Probing deep"],["3a","Decide","you","Decide"],["3b","Build","us","Building the final report"],["4a","Final report","you","Final report"]];
-const STAGE_TONE={"1b":"info","2a":"warn","2b":"info","3a":"warn","3b":"info","4a":"good",closed:"bad"};
+const STAGE_TONE={"1b":"info","2a":"warn","2b":"info","3a":"warn","3b":"info","4a":"good"};
 const kindOf=s=>s.sections.some(x=>x.questions.some(q=>q.kind==="decision"))?"decisions":s.sections.length?"questions":"final";
 const STAGE_OF_KIND={questions:"2a",decisions:"3a",final:"4a"};
 function stageNow(status,rerouting,lastKind){
-  if(status==="closed")return "closed";
   if(rerouting||status==="draft")return "1b";
-  if(status==="plan_ready"||lastKind==="final")return "4a";
+  // A closed probe is finished, so it reads as Stage 4a like a delivered final report.
+  if(status==="plan_ready"||status==="closed"||lastKind==="final")return "4a";
   if(lastKind==="decisions")return status==="submitted"?"3b":"3a";
   return status==="submitted"?"2b":"2a";
 }
-const stageName=k=>k==="closed"?"Closed":"Stage "+k+" · "+STAGES.find(x=>x[0]===k)[3];
+const stageName=k=>"Stage "+k+" · "+STAGES.find(x=>x[0]===k)[3];
 function fail(m){$("fatalText").textContent=m;$("fatal").hidden=false}
 function notFound(){document.title="Page not found";$("title").textContent="Page not found";const e=$("eyebrow");e.textContent="";const a=el("a","Back to Probes");a.href="/probes";e.appendChild(a);const n=$("notice");if(n)n.hidden=true}
 function showRead(d,s){
@@ -453,14 +453,13 @@ function renderStep(n){
 }
 function renderTracker(d){
   const now=stageNow(d.status,d.rerouting||!!d.reroute,kindOf(d.steps[d.steps.length-1])),at=STAGES.findIndex(x=>x[0]===now),l=$("trackList");l.textContent="";
-  STAGES.forEach(([k,label,who],i)=>{const li=el("li",null,who+(now==="closed"||i<at?" done":i===at?" now":""));if(i===at)li.setAttribute("aria-current","step");
+  STAGES.forEach(([k,label,who],i)=>{const li=el("li",null,who+(i<at?" done":i===at?" now":""));if(i===at)li.setAttribute("aria-current","step");
     li.append(el("span",k,"dot"),el("span",label,"lbl"));
     // From round 2 on, 1a carries a loop mark: a new direction revised the goal and the turns began again.
     if(k==="1a"&&d.round>1){const r=el("span","↺"+d.round,"loopmark");r.title="Round "+d.round+": the goal was revised by a new direction";li.appendChild(r)}
     l.appendChild(li)});
   const cur=STAGES[at],p=$("trackNow");p.textContent="";
-  if(now==="closed")p.textContent="This probe is closed.";
-  else{p.append(el("strong","Now: "+stageName(now)+". "),cur[2]==="us"?"This part happens on our side, so there's nothing for you to do yet.":now==="4a"?"Nothing left to do. Read the final report below, or download it.":"It's your turn. "+(d.editable?"":"Only the profile's owner can respond, after signing in."))}
+  {p.append(el("strong","Now: "+stageName(now)+". "),cur[2]==="us"?"This part happens on our side, so there's nothing for you to do yet.":now==="4a"?"Nothing left to do. Read the final report below, or download it.":"It's your turn. "+(d.editable?"":"Only the profile's owner can respond, after signing in."))}
   const rv=$("trackRound");rv.textContent="";rv.hidden=!(d.round>1);
   if(d.round>1){rv.append(el("strong","Round "+d.round+". "),d.revision?"The goal was revised by a new direction on "+day(d.revision.at)+": "+d.revision.message:"The goal was revised by a new direction.")}
   $("tracker").hidden=false;
@@ -566,7 +565,7 @@ function pageLink(p,g){
 }
 const SORTS={created:["Newest first","Oldest first","desc"],updated:["Latest first","Earliest first","desc"],profile:["A to Z","Z to A","asc"],cost:["Highest first","Lowest first","desc"]};
 let sortDir="desc",sortField="created";const SORT_NAMES={created:"Date created",updated:"Last updated",profile:"Profile",cost:"Cost"};const picked={status:new Set(),profile:new Set()};
-const STATUS_FILTERS=["1b","2a","2b","3a","3b","4a","closed"];
+const STATUS_FILTERS=["1b","2a","2b","3a","3b","4a"];
 function filterBox(group,value,label){
   const l=el("label"),c=el("input");c.type="checkbox";c.dataset.group=group;c.value=value;c.checked=picked[group].has(value);
   c.addEventListener("change",()=>{if(c.checked)picked[group].add(value);else picked[group].delete(value);renderDirectory()});

@@ -91,9 +91,10 @@ pp("publish", second.id, "--status", "plan_ready"); await page.reload({ waitUnti
 await sortBy("updated"); ok((await titles())[0] === "Second goal", "sorting by last updated works");
 ok((await txt("#filterBtn")) === "Filter" && (await page.$("#statusBy")) === null && (await titles()).length === 3, "filters start empty and show everything");
 await page.click("#filterBtn"); await page.waitForSelector("#filterPanel:not([hidden])");
-ok((await page.$$("#filterPanel input:checked")).length === 0 && (await page.$$('#filterStatus input')).length === 7, "stage options are unchecked checkboxes");
+ok((await page.$$("#filterPanel input:checked")).length === 0 && (await page.$$('#filterStatus input')).length === 6, "stage options are unchecked checkboxes");
 const box = (group, value) => page.click(`#filterPanel input[data-group="${group}"][value="${value}"]`);
 ok((await page.$$eval('#filterStatus label', (l) => l.map((e) => e.textContent))).join("|").includes("Stage 2b · Probing deep"), "filters use the turn-based stage names");
+ok(!(await page.$$eval("#filterStatus label", (l) => l.map((e) => e.textContent))).some((t) => /closed/i.test(t)), "there is no separate Closed filter, since 4a is the last stage");
 await box("status", "4a"); ok((await titles()).length === 1 && (await txt("#dirCount")) === "1 probe" && (await txt("#filterBtn")) === "Filter (1)", "one status filters the list");
 await box("status", "2a"); ok((await titles()).length === 3, "two stages combine with OR");
 const otherSlug = (await (await fetch(base + "/api/probes")).json()).profiles.find((p) => p.name === "Other Person").slug;
@@ -117,6 +118,7 @@ ok(new URL(page.url()).pathname.split("/").length === 4, "clicking anywhere on a
 const brand = await page.$(".brandlink"); const before = await page.$eval(".brandlink", (e) => { const r = e.getBoundingClientRect(); return [r.width, r.height, getComputedStyle(e).fontSize, getComputedStyle(e).transform]; });
 await brand.hover();
 ok((await page.$eval(".brandlink", (e) => getComputedStyle(e).animationName)) === "rainbow", "the ProofProbe link shimmers on hover");
+ok((await page.$eval(".brandlink", (e) => getComputedStyle(e).animationDirection)) === "alternate", "the rainbow slides back in instead of jumping back");
 ok(JSON.stringify(await page.$eval(".brandlink", (e) => { const r = e.getBoundingClientRect(); return [r.width, r.height, getComputedStyle(e).fontSize, getComputedStyle(e).transform]; })) === JSON.stringify(before), "hovering the ProofProbe link never resizes or rescales it");
 
 const paint = await browser.newPage();
@@ -388,6 +390,14 @@ await page.evaluate(() => [...document.querySelectorAll("#rows tr")].find((r) =>
 await page.waitForSelector("#deletePage");
 const logged = await page.evaluate(async (id) => (await (await fetch("/api/admin/pages/" + id)).json()).audit.map((a) => a.action), first.id);
 ok(logged.includes("answers_edited") && logged.includes("password_viewed"), "admin actions are logged");
+const asC = await browser.createBrowserContext(), asP = await asC.newPage(); await asP.goto(base + "/admin", { waitUntil: "networkidle0" });
+await asP.type("#master", "test-master-pass"); await asP.click("#login button"); await asP.waitForSelector("#profiles .signas");
+const otherPid = (await asP.evaluate(async () => (await (await fetch("/api/admin/overview")).json()).profiles.find((p) => p.name === "Other Person").id));
+ok((await fetch(base + "/api/admin/profiles/" + otherPid + "/signin", { method: "POST" })).status === 401, "signing in as a profile needs the admin login");
+await Promise.all([asP.waitForNavigation({ waitUntil: "networkidle0" }), asP.evaluate(() => [...document.querySelectorAll("#profiles .signas")].find((b) => b.textContent === "Sign in as Other Person").click())]);
+ok(new URL(asP.url()).pathname === "/account" && (await asP.evaluate(async () => (await (await fetch("/api/session")).json()).name)) === "Other Person", "the admin page signs in as any profile and opens its account");
+ok((await asP.evaluate(async () => (await fetch("/api/admin/state")).json())).loggedIn, "the admin stays signed in after signing in as a profile");
+await asC.close();
 const gone = made("Delete Me", "Temporary", "--new-profile");
 await page.reload({ waitUntil: "networkidle0" }); await page.waitForSelector("#rows tr");
 await page.evaluate(() => [...document.querySelectorAll("#rows tr")].find((r) => r.textContent.includes("Temporary")).querySelector(".act button").click());

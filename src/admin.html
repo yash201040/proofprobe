@@ -45,11 +45,11 @@ footer{margin-top:24px;color:var(--muted);font-size:15px}
   table.cards .chip{justify-self:start;white-space:normal}
 }
 @media (max-width:860px){table.cards td.act{display:block}table.cards .row input{min-width:0}}
-/* The name is always drawn as clipped text and never scaled, so hovering can't re-render the glyphs. An ink layer wipes away to show the rainbow. */
+/* The name is always drawn as clipped text and never scaled, so hovering can't re-render the glyphs. An ink layer wipes away to show the rainbow, which slides out and back in (alternate) rather than jumping back. */
 .brand{display:inline-block;color:var(--ink);text-decoration:none}
 @supports ((-webkit-background-clip:text) or (background-clip:text)){
 .brand{color:transparent;-webkit-background-clip:text;background-clip:text;background-image:linear-gradient(var(--ink),var(--ink)),linear-gradient(90deg,#FF5E7E,#FFB454,#7BE495,#5FC6C9,#7C8CFF,#D478FF,#FF5E7E);background-size:100% 100%,200% 100%;background-repeat:no-repeat;background-position:0 0,0 50%;transition:background-size .35s ease}
-.brand:hover,.brand:focus-visible{background-size:0% 100%,200% 100%;animation:rainbow 1.4s linear infinite}
+.brand:hover,.brand:focus-visible{background-size:0% 100%,200% 100%;animation:rainbow 1.4s linear infinite alternate}
 }
 @keyframes rainbow{to{background-position:0 0,200% 50%}}
 @media (prefers-reduced-motion:reduce){.brand:hover,.brand:focus-visible{animation:none}.brand{transition:none}}
@@ -107,9 +107,9 @@ const fmt=i=>i?new Date(i).toLocaleString([],{dateStyle:"medium",timeStyle:"shor
 const money=n=>"$"+Number(n).toFixed(n>0&&n<1?3:2);
 // The same turn-based stages as the probe pages: "a" is the person's move, "b" is research on your side.
 const STAGE_NAMES={"1b":"Probing wide","2a":"Answer questions","2b":"Probing deep","3a":"Decide","3b":"Building the final report","4a":"Final report"};
-const STAGE_TONE={"1b":"info","2a":"warn","2b":"info","3a":"warn","3b":"info","4a":"good",closed:"bad"};
-function stageOf(p){if(p.status==="closed")return "closed";if(p.rerouting||p.status==="draft")return "1b";if(p.status==="plan_ready"||p.lastKind==="final")return "4a";if(p.lastKind==="decisions")return p.status==="submitted"?"3b":"3a";return p.status==="submitted"?"2b":"2a"}
-const stageLabel=k=>k==="closed"?"Closed":"Stage "+k+" · "+STAGE_NAMES[k];
+const STAGE_TONE={"1b":"info","2a":"warn","2b":"info","3a":"warn","3b":"info","4a":"good"};
+function stageOf(p){if(p.rerouting||p.status==="draft")return "1b";if(p.status==="plan_ready"||p.status==="closed"||p.lastKind==="final")return "4a";if(p.lastKind==="decisions")return p.status==="submitted"?"3b":"3a";return p.status==="submitted"?"2b":"2a"}
+const stageLabel=k=>"Stage "+k+" · "+STAGE_NAMES[k];
 const kindOfStep=s=>s.sections.some(x=>x.questions.some(q=>q.kind==="decision"))?"3a":s.sections.length?"2a":"4a";
 async function api(path,opts={}){
   const r=await fetch("/api/admin"+path,{...opts,headers:{"Content-Type":"application/json"}});
@@ -166,6 +166,7 @@ function profileRows(list){
     inp.type="text";inp.autocomplete="off";inp.placeholder="4 or more characters";inp.setAttribute("aria-label","New password for "+p.name);inp.className="pwi";go.type="button";go.className="pwset ghost";
     go.addEventListener("click",async()=>{try{await api("/profiles/"+p.id+"/password",{method:"POST",body:JSON.stringify({password:inp.value})});await loadApp();$("pwMsg").textContent="Saved for "+p.name+". Devices using the old password are signed out."}catch(e){$("pwMsg").textContent=e.status===400?"Use 4 or more characters.":"Couldn't save."}});
     box.append(inp,go);set.appendChild(box);
+    if(p.status==="active"){const as=el("button","Sign in as "+p.name,"link");as.type="button";as.className="link signas";as.addEventListener("click",async()=>{try{await api("/profiles/"+p.id+"/signin",{method:"POST"});location.href="/account"}catch(e){$("pwMsg").textContent="Couldn't sign in as "+p.name+"."}});box.appendChild(as)}
     if(!p.pages){const del=el("button","Delete profile","link");del.type="button";del.className="link del";del.addEventListener("click",async()=>{if(del.dataset.armed){await api("/profiles/"+p.id,{method:"DELETE"}).catch(()=>{});loadApp()}else{del.dataset.armed="1";del.textContent="Press again to delete"}});box.appendChild(del)}
     const nm=el("td");nameCell(nm,p);tr.append(nm,el("td",String(p.pages),"num"),pw,set);body.appendChild(tr);
   });

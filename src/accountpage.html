@@ -12,11 +12,11 @@ body{margin:0;background:var(--bg);color:var(--ink);font:400 17px/1.55 var(--bod
 .wrap{max-width:820px;margin:0 auto;padding-inline:max(16px,env(safe-area-inset-left,0px)) max(16px,env(safe-area-inset-right,0px));padding-bottom:calc(env(safe-area-inset-bottom,0px) + 48px)}
 .top{display:flex;justify-content:space-between;align-items:center;min-height:68px;border-bottom:1px solid var(--line);margin-bottom:28px}
 .brand{font:700 18px var(--display)}
-/* The name is always drawn as clipped text and never scaled, so hovering can't re-render the glyphs. An ink layer wipes away to show the rainbow. */
+/* The name is always drawn as clipped text and never scaled, so hovering can't re-render the glyphs. An ink layer wipes away to show the rainbow, which slides out and back in (alternate) rather than jumping back. */
 .brand{display:inline-block;color:var(--ink);text-decoration:none}
 @supports ((-webkit-background-clip:text) or (background-clip:text)){
 .brand{color:transparent;-webkit-background-clip:text;background-clip:text;background-image:linear-gradient(var(--ink),var(--ink)),linear-gradient(90deg,#FF5E7E,#FFB454,#7BE495,#5FC6C9,#7C8CFF,#D478FF,#FF5E7E);background-size:100% 100%,200% 100%;background-repeat:no-repeat;background-position:0 0,0 50%;transition:background-size .35s ease}
-.brand:hover,.brand:focus-visible{background-size:0% 100%,200% 100%;animation:rainbow 1.4s linear infinite}
+.brand:hover,.brand:focus-visible{background-size:0% 100%,200% 100%;animation:rainbow 1.4s linear infinite alternate}
 }
 @keyframes rainbow{to{background-position:0 0,200% 50%}}
 @media (prefers-reduced-motion:reduce){.brand:hover,.brand:focus-visible{animation:none}.brand{transition:none}}

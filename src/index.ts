@@ -766,6 +766,13 @@ async function adminSite(request: Request, env: Env, parts: string[], ray: strin
       await setProfileStatus(env, id, b.status, ray);
       return json({ ok: true });
     }
+    // The owner can open the site as any approved profile, without its password. It replaces this browser's own profile sign-in.
+    if (sub === "signin" && request.method === "POST") {
+      if (profile.status !== "active") return json({ error: "not_approved", status: profile.status }, 403);
+      const cookie = await newSession(env, id);
+      await audit(env, null, "admin", "signed_in_as", "profile=" + id, ray).run();
+      return json({ name: profile.name, slug: profile.slug }, 200, { "Set-Cookie": cookie });
+    }
     if (sub === "password" && request.method === "GET") {
       await audit(env, null, "admin", "password_viewed", "profile=" + id, ray).run();
       return json({ password: profile.password_enc && profile.password_iv ? await unseal(env, profile.password_enc, profile.password_iv) : null });
