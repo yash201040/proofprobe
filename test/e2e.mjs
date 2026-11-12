@@ -394,8 +394,9 @@ const asC = await browser.createBrowserContext(), asP = await asC.newPage(); awa
 await asP.type("#master", "test-master-pass"); await asP.click("#login button"); await asP.waitForSelector("#profiles .signas");
 const otherPid = (await asP.evaluate(async () => (await (await fetch("/api/admin/overview")).json()).profiles.find((p) => p.name === "Other Person").id));
 ok((await fetch(base + "/api/admin/profiles/" + otherPid + "/signin", { method: "POST" })).status === 401, "signing in as a profile needs the admin login");
-await Promise.all([asP.waitForNavigation({ waitUntil: "networkidle0" }), asP.evaluate(() => [...document.querySelectorAll("#profiles .signas")].find((b) => b.textContent === "Sign in as Other Person").click())]);
+await Promise.all([asP.waitForNavigation({ waitUntil: "networkidle0" }), asP.evaluate(() => [...document.querySelectorAll("#profiles tr")].find((r) => r.children[1].textContent.startsWith("Other Person")).querySelector(".signas").click())]);
 ok(new URL(asP.url()).pathname === "/account" && (await asP.evaluate(async () => (await (await fetch("/api/session")).json()).name)) === "Other Person", "the admin page signs in as any profile and opens its account");
+ok((await asP.goBack({ waitUntil: "networkidle0" }), await asP.waitForSelector("#profiles .signas"), await asP.$$eval("#profiles .signas", (b) => b.every((x) => x.textContent === "Sign in as" && x.closest("td") === x.closest("tr").firstElementChild))), "each Sign in as button sits first in its row, without repeating the name");
 ok((await asP.evaluate(async () => (await fetch("/api/admin/state")).json())).loggedIn, "the admin stays signed in after signing in as a profile");
 await asC.close();
 const gone = made("Delete Me", "Temporary", "--new-profile");

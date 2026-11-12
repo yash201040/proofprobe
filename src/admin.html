@@ -92,7 +92,7 @@ select{min-height:40px;padding:6px 10px;font:inherit;color:inherit;background:va
   <p class="muted" id="noAccess" hidden style="margin-block:10px 8px">No access requests yet.</p>
   <div class="row" style="margin-bottom:24px"><select id="grantPage" aria-label="Private page"></select><select id="grantViewer" aria-label="Profile to grant access to"></select><button type="button" class="ghost" id="grantGo">Grant access</button><span class="muted" id="grantMsg"></span></div>
   <h2>Profiles</h2>
-  <div class="tablebox" style="margin-block:10px 8px"><table class="cards"><thead><tr><th>Profile</th><th>Pages</th><th>Password</th><th>Change password</th></tr></thead><tbody id="profiles"></tbody></table></div>
+  <div class="tablebox" style="margin-block:10px 8px"><table class="cards"><thead><tr><th>Session</th><th>Profile</th><th>Pages</th><th>Password</th><th>Change password</th></tr></thead><tbody id="profiles"></tbody></table></div>
   <div class="row"><input id="newProfile" placeholder="New profile name" aria-label="New profile name" style="max-width:280px"><button type="button" class="ghost" id="addProfile">Add profile</button><span class="muted" id="pwMsg"></span></div>
   <h2 style="margin-top:24px">Pages</h2>
   <div class="tablebox" style="margin-top:10px"><table class="cards"><thead><tr><th>Profile</th><th>Page</th><th>Stage</th><th>Steps</th><th>Saved</th><th>Submissions</th><th>Cost</th><th>Last change</th><th></th></tr></thead><tbody id="rows"></tbody></table></div>
@@ -166,9 +166,10 @@ function profileRows(list){
     inp.type="text";inp.autocomplete="off";inp.placeholder="4 or more characters";inp.setAttribute("aria-label","New password for "+p.name);inp.className="pwi";go.type="button";go.className="pwset ghost";
     go.addEventListener("click",async()=>{try{await api("/profiles/"+p.id+"/password",{method:"POST",body:JSON.stringify({password:inp.value})});await loadApp();$("pwMsg").textContent="Saved for "+p.name+". Devices using the old password are signed out."}catch(e){$("pwMsg").textContent=e.status===400?"Use 4 or more characters.":"Couldn't save."}});
     box.append(inp,go);set.appendChild(box);
-    if(p.status==="active"){const as=el("button","Sign in as "+p.name,"link");as.type="button";as.className="link signas";as.addEventListener("click",async()=>{try{await api("/profiles/"+p.id+"/signin",{method:"POST"});location.href="/account"}catch(e){$("pwMsg").textContent="Couldn't sign in as "+p.name+"."}});box.appendChild(as)}
+    // Opens this profile's own signed-in session; the name sits once, in the Profile column.
+    const sess=el("td");if(p.status==="active"){const as=el("button","Sign in as");as.type="button";as.className="ghost signas";as.setAttribute("aria-label","Sign in as "+p.name);as.addEventListener("click",async()=>{try{await api("/profiles/"+p.id+"/signin",{method:"POST"});location.href="/account"}catch(e){$("pwMsg").textContent="Couldn't sign in as "+p.name+"."}});sess.appendChild(as)}
     if(!p.pages){const del=el("button","Delete profile","link");del.type="button";del.className="link del";del.addEventListener("click",async()=>{if(del.dataset.armed){await api("/profiles/"+p.id,{method:"DELETE"}).catch(()=>{});loadApp()}else{del.dataset.armed="1";del.textContent="Press again to delete"}});box.appendChild(del)}
-    const nm=el("td");nameCell(nm,p);tr.append(nm,el("td",String(p.pages),"num"),pw,set);body.appendChild(tr);
+    const nm=el("td");nameCell(nm,p);tr.append(sess,nm,el("td",String(p.pages),"num"),pw,set);body.appendChild(tr);
   });
 }
 $("grantGo").addEventListener("click",async()=>{const m=$("grantMsg");try{await api("/access",{method:"POST",body:JSON.stringify({caseId:$("grantPage").value,viewerId:$("grantViewer").value,status:"approved"})});m.textContent="Access granted.";loadApp()}catch(e){m.textContent=e.status===400?"That profile owns this page already.":"Couldn't grant access."}});
